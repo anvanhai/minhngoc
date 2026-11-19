@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kho Từ vựng & Nhập Excel — Admin Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="classes.html" class="nav-brand">
+        <div class="nav-brand-logo">管</div>
+        <span>Minh Ngọc HSK · Quản trị</span>
+      </a>
+
+      <div class="nav-user">
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-admin">Admin</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung Kho từ vựng -->
+  <main class="main-wrapper">
+    <!-- Thanh menu phụ Admin -->
+    <nav class="admin-subnav">
+      <a href="classes.html" class="admin-subnav-btn">📚 Quản lý Lớp học</a>
+      <a href="curriculums.html" class="admin-subnav-btn">📖 Giáo trình & Bài học</a>
+      <a href="vocabularies.html" class="admin-subnav-btn active">🔤 Kho Từ vựng & Excel</a>
+    </nav>
+
+    <!-- Header & Nút thao tác -->
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Kho Từ Vựng Tập Trung</h1>
+        <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+          Kho lưu trữ toàn bộ từ vựng HSK 1–6, hỗ trợ phát âm chuẩn và nhập nhanh bằng file Excel/CSV.
+        </p>
+      </div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" id="btn-open-import-excel" class="btn btn-primary">
+          📥 Nhập từ file Excel / CSV
+        </button>
+        <button type="button" id="btn-open-create-vocab" class="btn btn-outline">
+          ➕ Thêm từ thủ công
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert -->
+    <div id="page-alert" class="alert"></div>
+
+    <!-- Thanh Lọc & Tìm kiếm từ vựng -->
+    <div class="card" style="padding: 14px; margin-bottom: 16px;">
+      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <input
+            type="text"
+            id="search-vocab-input"
+            class="form-control"
+            placeholder="🔍 Tìm theo Chữ Hán, Pinyin hoặc Nghĩa tiếng Việt..."
+            style="height: 40px;"
+          >
+        </div>
+
+        <div style="min-width: 140px;">
+          <select id="filter-hsk-level" class="form-control" style="height: 40px;">
+            <option value="all">Tất cả cấp độ</option>
+            <option value="1">Cấp độ HSK 1</option>
+            <option value="2">Cấp độ HSK 2</option>
+            <option value="3">Cấp độ HSK 3</option>
+            <option value="4">Cấp độ HSK 4</option>
+            <option value="5">Cấp độ HSK 5</option>
+            <option value="6">Cấp độ HSK 6</option>
+          </select>
+        </div>
+
+        <button type="button" id="btn-search-vocab" class="btn btn-secondary btn-sm" style="height: 40px;">
+          Tìm kiếm
+        </button>
+      </div>
+    </div>
+
+    <!-- Bảng danh sách từ vựng -->
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 120px;">Chữ Hán</th>
+            <th style="width: 120px;">Pinyin</th>
+            <th>Ý nghĩa tiếng Việt</th>
+            <th style="width: 90px;">Cấp độ</th>
+            <th style="width: 100px;">Từ loại</th>
+            <th>Ví dụ minh họa</th>
+            <th style="width: 60px; text-align: center;">Nghe</th>
+          </tr>
+        </thead>
+        <tbody id="vocab-table-body">
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">
+              Đang tải danh sách từ vựng...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 13px; color: var(--text-muted);">
+      <span id="vocab-count-info">Hiển thị 0 từ</span>
+    </div>
+  </main>
+
+  <!-- MODAL: NHẬP EXCEL / CSV -->
+  <div id="modal-import-excel" class="modal-overlay">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📥 Nhập Từ Vựng Bằng File Excel / CSV</h3>
+        <button type="button" class="modal-close" data-close="modal-import-excel">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="import-modal-alert" class="alert"></div>
+
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
+          Hệ thống hỗ trợ file <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code>. File chỉ cần chứa các cột:
+          <strong>Chữ Hán</strong> (hanzi), <strong>Pinyin</strong>, <strong>Nghĩa</strong> (meaning_vi), và tùy chọn cấp độ HSK.
+        </p>
+
+        <!-- Dropzone kéo thả file -->
+        <div id="excel-dropzone" class="dropzone" style="margin-bottom: 16px;">
+          <div class="dropzone-icon">📄</div>
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">Kéo & thả file Excel/CSV vào đây</div>
+          <div style="font-size: 13px; color: var(--text-muted);">hoặc bấm vào để chọn file từ máy tính</div>
+          <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display: none;">
+        </div>
+
+        <!-- Tùy chọn gán trực tiếp vào Bài học -->
+        <div class="form-group">
+          <label class="form-label" for="import-assign-curriculum">Gán thẳng vào Bài học (Tùy chọn)</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <select id="import-assign-curriculum" class="form-control">
+              <option value="">-- Không gán bài (Chỉ lưu vào kho) --</option>
+            </select>
+            <select id="import-assign-lesson" class="form-control" disabled>
+              <option value="">-- Chọn bài học --</option>
+            </select>
+          </div>
+          <div class="form-help">Nếu chọn bài, các từ vừa import sẽ tự động xuất hiện trong bài học đó của giáo trình.</div>
+        </div>
+
+        <!-- Khung xem trước dữ liệu (Preview) -->
+        <div id="preview-container" style="display: none; margin-top: 16px;">
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--text-main);">
+            Xem trước 5 dòng đầu (<span id="preview-count">0</span> từ đã nhận diện):
+          </div>
+          <div class="table-responsive" style="max-height: 180px;">
+            <table class="data-table" style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th>Hán tự</th>
+                  <th>Pinyin</th>
+                  <th>Nghĩa tiếng Việt</th>
+                  <th>HSK</th>
+                </tr>
+              </thead>
+              <tbody id="preview-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-import-excel">Hủy</button>
+        <button type="button" id="btn-confirm-import" class="btn btn-primary" disabled>
+          🚀 Bắt đầu Nhập Dữ Liệu
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: THÊM TỪ THỦ CÔNG -->
+  <div id="modal-create-vocab" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Thêm Từ Vựng Mới</h3>
+        <button type="button" class="modal-close" data-close="modal-create-vocab">&times;</button>
+      </div>
+      <form id="form-create-vocab">
+        <div class="modal-body">
+          <div id="create-vocab-alert" class="alert"></div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="v-hanzi">Chữ Hán *</label>
+              <input type="text" id="v-hanzi" class="form-control" placeholder="Ví dụ: 学" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="v-pinyin">Pinyin *</label>
+              <input type="text" id="v-pinyin" class="form-control" placeholder="Ví dụ: xué" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="v-meaning">Ý nghĩa tiếng Việt *</label>
+            <input type="text" id="v-meaning" class="form-control" placeholder="Ví dụ: Học, nghiên cứu" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="v-hsk">Cấp độ HSK</label>
+              <select id="v-hsk" class="form-control">
+                <option value="1">HSK 1</option>
+                <option value="2">HSK 2</option>
+                <option value="3">HSK 3</option>
+                <option value="4">HSK 4</option>
+                <option value="5">HSK 5</option>
+                <option value="6">HSK 6</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="v-pos">Từ loại</label>
+              <input type="text" id="v-pos" class="form-control" placeholder="Động từ, Danh từ...">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="v-ex-hanzi">Câu ví dụ (Chữ Hán)</label>
+            <input type="text" id="v-ex-hanzi" class="form-control" placeholder="Ví dụ: 我在学习汉语。">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="v-ex-vi">Dịch nghĩa câu ví dụ</label>
+            <input type="text" id="v-ex-vi" class="form-control" placeholder="Ví dụ: Tôi đang học tiếng Trung.">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-create-vocab">Hủy</button>
+          <button type="submit" id="btn-submit-vocab" class="btn btn-primary">Lưu từ vựng</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
+  </footer>
+
+  <!-- Thư viện Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <!-- Thư viện SheetJS đọc Excel/CSV qua CDN (ghim phiên bản) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Scripts -->
+  <script src="../js/config.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/xp.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/admin-vocabularies.js"></script>
+</body>
+</html>

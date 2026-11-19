@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bàn học của tôi — Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="dashboard.html" class="nav-brand">
+        <div class="nav-brand-logo">学</div>
+        <span>Minh Ngọc HSK</span>
+      </a>
+
+      <!-- Menu Học sinh -->
+      <ul class="nav-menu">
+        <li class="nav-item active"><a href="dashboard.html">🏠 Trang chủ</a></li>
+        <li class="nav-item"><a href="curriculum.html">📖 Giáo trình</a></li>
+        <li class="nav-item"><a href="leaderboard.html">🏆 Bảng xếp hạng</a></li>
+      </ul>
+
+      <div class="nav-user">
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-student">Học sinh</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung chính Dashboard -->
+  <main class="main-wrapper">
+    <div id="page-alert" class="alert"></div>
+
+    <!-- KHỐI CHƯA ĐƯỢC XẾP LỚP -->
+    <div id="unassigned-class-box" class="card" style="display: none; border-left: 4px solid #ca8a04;">
+      <h2 class="card-title">⏳ Đang chờ giáo viên xếp lớp</h2>
+      <p style="color: var(--text-muted); font-size: 15px; line-height: 1.6; margin-bottom: 12px;">
+        Chào bạn <strong><span class="user-display-name">bạn</span></strong>! Bạn đã tạo tài khoản thành công.
+        Hiện tại giáo viên chưa gán bạn vào lớp học cụ thể (ví dụ: HSK1-A hoặc HSK2-A).
+      </p>
+      <div style="background: #fefce8; border: 1px solid #fef08a; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 14px; color: #854d0e;">
+        👉 Vui lòng báo với Giáo viên / Quản trị viên tên đăng nhập của bạn: <code id="my-username" style="font-weight: 700; font-size: 15px;">---</code> để được thêm vào lớp học nhé!
+      </div>
+    </div>
+
+    <!-- KHỐI ĐÃ VÀO LỚP HỌC -->
+    <div id="assigned-class-box" style="display: none;">
+      <!-- Lời chào & Tên lớp -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+        <div>
+          <h1 style="font-size: 22px; font-weight: 800; color: var(--text-main);">
+            👋 你好，<span class="user-display-name">Minh Anh</span>!
+          </h1>
+          <p style="font-size: 14px; color: var(--text-muted); margin-top: 2px;">
+            Lớp học hiện tại: <span id="dash-class-name" style="font-weight: 700; color: var(--primary);">HSK1 - A</span>
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" id="btn-open-history-modal" class="btn btn-secondary btn-sm">
+            📜 Lịch sử khóa học
+          </button>
+          <a href="curriculum.html" class="btn btn-outline btn-sm">
+            🗺️ Lộ trình giáo trình
+          </a>
+        </div>
+      </div>
+
+      <!-- Thẻ Khóa học & Tiến độ -->
+      <div class="card" style="border-left: 4px solid var(--primary); margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase;">
+              Khóa học đang theo học
+            </div>
+            <h2 id="dash-course-title" style="font-size: 18px; font-weight: 800; margin-top: 2px;">
+              Giáo trình Chuẩn HSK 1
+            </h2>
+          </div>
+          <div style="font-size: 14px; color: var(--text-muted);">
+            Lớp đang học: <strong id="dash-class-current-lesson" style="color: #d97706;">Bài 1</strong>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px;">
+          <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--text-muted);">
+            <span>Tiến độ của bạn: <span id="dash-progress-text">0 / 0 bài</span></span>
+            <span id="dash-progress-percent">0%</span>
+          </div>
+          <div class="progress-bar-container">
+            <div id="dash-progress-fill" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 Widgets Thống kê -->
+      <div class="stat-widget-grid">
+        <div class="stat-widget">
+          <div class="stat-widget-icon" style="background: #ffedd5; color: #ea580c;">🔥</div>
+          <div>
+            <div class="stat-widget-label">Chuỗi ngày học</div>
+            <div id="dash-streak" class="stat-widget-value">0 ngày</div>
+          </div>
+        </div>
+
+        <div class="stat-widget">
+          <div class="stat-widget-icon" style="background: #fef3c7; color: #b45309;">🏆</div>
+          <div>
+            <div class="stat-widget-label">Hạng trong lớp</div>
+            <div id="dash-rank" class="stat-widget-value">Học viên</div>
+          </div>
+        </div>
+
+        <div class="stat-widget">
+          <div class="stat-widget-icon" style="background: #fef9c3; color: #ca8a04;">⚡</div>
+          <div>
+            <div class="stat-widget-label">Tổng điểm kinh nghiệm</div>
+            <div id="dash-xp" class="stat-widget-value">0 XP</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card TIẾP TỤC HỌC NGAY -->
+      <div class="card" style="box-shadow: var(--shadow-md);">
+        <h3 class="card-title">📖 Tiếp tục học ngay</h3>
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
+          Bài học trọng tâm theo tiến độ lớp của bạn:
+        </p>
+
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; margin-bottom: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span id="dash-next-badge" class="badge-status badge-ongoing" style="margin-bottom: 6px;">Bài hiện tại</span>
+              <h4 id="dash-next-title" style="font-size: 20px; font-weight: 800; color: var(--primary); font-family: 'PingFang SC', sans-serif;">
+                Bài 1: 你好
+              </h4>
+              <p id="dash-next-desc" style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+                Chào bạn
+              </p>
+            </div>
+            <div id="dash-next-stats" style="font-size: 13px; color: var(--text-muted); text-align: right;">
+              <div>Từ vựng: <strong id="dash-next-word-count">-- từ</strong></div>
+              <div>Thưởng: <strong style="color: #ca8a04;">+50 XP</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <a id="btn-start-vocab" href="#" class="btn btn-primary" style="flex: 1; min-width: 180px;">
+            ▶️ Học Từ Mới Ngay
+          </a>
+          <a id="btn-start-flashcard" href="#" class="btn btn-secondary" style="flex: 1; min-width: 180px;">
+            🗂️ Ôn Tập Flashcard (SRS)
+          </a>
+        </div>
+      </div>
+
+      <!-- Card NHIỆM VỤ & BÀI TẬP ĐƯỢC GIAO -->
+      <div class="card" style="box-shadow: var(--shadow-md);">
+        <div class="section-header" style="margin-bottom: 12px;">
+          <div>
+            <h3 class="card-title" style="margin-bottom: 2px;">🎯 Nhiệm vụ & Bài tập được giao</h3>
+            <p style="font-size: 13px; color: var(--text-muted);">
+              Hoàn thành các bài tập do giáo viên giao trước hạn chót để nhận thêm điểm thưởng XP!
+            </p>
+          </div>
+        </div>
+
+        <div id="assignments-list-container" style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="text-align: center; padding: 24px; color: var(--text-muted);">
+            Đang tải bài tập lớp...
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: LỊCH SỬ CÁC KHÓA HỌC ĐÃ THAM GIA (HSK1, HSK2...) -->
+  <div id="modal-course-history" class="modal-overlay">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📜 Lịch Sử Học Tập Của Bạn</h3>
+        <button type="button" class="modal-close" data-close="modal-course-history">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+          Toàn bộ các lớp học và khóa giáo trình bạn từng tham gia đều được lưu trữ vĩnh viễn tại đây:
+        </p>
+        <div id="history-list-container" style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+            Đang tải lịch sử...
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-course-history">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống học tiếng Trung thông minh
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/xp.js"></script>
+  <script src="js/student.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lộ trình Giáo trình — Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="dashboard.html" class="nav-brand">
+        <div class="nav-brand-logo">学</div>
+        <span>Minh Ngọc HSK</span>
+      </a>
+
+      <!-- Menu Học sinh -->
+      <ul class="nav-menu">
+        <li class="nav-item"><a href="dashboard.html">🏠 Trang chủ</a></li>
+        <li class="nav-item active"><a href="curriculum.html">📖 Giáo trình</a></li>
+        <li class="nav-item"><a href="leaderboard.html">🏆 Bảng xếp hạng</a></li>
+      </ul>
+
+      <div class="nav-user">
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-student">Học sinh</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung Bản đồ giáo trình -->
+  <main class="main-wrapper">
+    <!-- Breadcrumb & Header -->
+    <div style="margin-bottom: 16px;">
+      <a href="dashboard.html" style="font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+        ← Quay lại Bàn học của tôi
+      </a>
+    </div>
+
+    <!-- Banner Tên Giáo Trình -->
+    <div class="card" style="border-left: 4px solid var(--primary); margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <span id="curr-class-badge" class="badge-status badge-ongoing" style="margin-bottom: 6px;">Lớp đang học</span>
+          <h1 id="curr-title" style="font-size: 22px; font-weight: 800; color: var(--text-main);">
+            Đang tải giáo trình...
+          </h1>
+          <p id="curr-desc" style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+            Lộ trình bài học tuần tự chuẩn HSK
+          </p>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 13px; color: var(--text-muted);">Tiến độ hoàn thành</div>
+          <div id="curr-progress-num" style="font-size: 22px; font-weight: 800; color: var(--primary);">0%</div>
+        </div>
+      </div>
+
+      <div class="progress-bar-container" style="margin-top: 14px;">
+        <div id="curr-progress-bar" class="progress-bar-fill" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <div id="page-alert" class="alert"></div>
+
+    <!-- BẢN ĐỒ LỘ TRÌNH BÀI HỌC (ROADMAP) -->
+    <div class="section-header" style="justify-content: center; margin-bottom: 20px;">
+      <h2 class="section-title">🗺️ Lộ trình Bài học</h2>
+    </div>
+
+    <div id="roadmap-container" class="roadmap-container">
+      <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+        Đang tải lộ trình bài học...
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống học tiếng Trung thông minh
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/xp.js"></script>
+  <script src="js/student.js"></script>
+  <script src="js/curriculum.js"></script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Quản lý Giáo trình & Bài học — Admin Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="classes.html" class="nav-brand">
+        <div class="nav-brand-logo">管</div>
+        <span>Minh Ngọc HSK · Quản trị</span>
+      </a>
+
+      <div class="nav-user">
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-admin">Admin</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung Quản lý Giáo trình -->
+  <main class="main-wrapper">
+    <!-- Thanh menu phụ Admin -->
+    <nav class="admin-subnav">
+      <a href="classes.html" class="admin-subnav-btn">📚 Quản lý Lớp học</a>
+      <a href="curriculums.html" class="admin-subnav-btn active">📖 Giáo trình & Bài học</a>
+      <a href="vocabularies.html" class="admin-subnav-btn">🔤 Kho Từ vựng & Excel</a>
+    </nav>
+
+    <!-- Header & Nút tạo giáo trình -->
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Quản lý Giáo trình & Bài học</h1>
+        <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+          Định nghĩa cấu trúc giáo trình (HSK Chuẩn, Boya, Giao tiếp...) và các bài học theo thứ tự.
+        </p>
+      </div>
+      <button type="button" id="btn-open-create-curriculum" class="btn btn-primary">
+        ➕ Tạo Giáo Trình Mới
+      </button>
+    </div>
+
+    <!-- Alert -->
+    <div id="page-alert" class="alert"></div>
+
+    <!-- Khung bố cục 2 cột (hoặc xếp tầng trên mobile) -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; align-items: start;">
+      <!-- CỘT 1: DANH SÁCH GIÁO TRÌNH -->
+      <div class="card">
+        <h3 class="card-title">📚 Các Giáo trình hiện có</h3>
+        <div id="curriculums-list" style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+            Đang tải danh sách giáo trình...
+          </div>
+        </div>
+      </div>
+
+      <!-- CỘT 2: CHI TIẾT BÀI HỌC CỦA GIÁO TRÌNH ĐANG CHỌN -->
+      <div class="card">
+        <div class="section-header" style="margin-bottom: 12px;">
+          <div>
+            <h3 id="selected-curriculum-title" class="card-title" style="margin-bottom: 2px;">
+              Danh sách Bài học
+            </h3>
+            <span id="selected-curriculum-meta" style="font-size: 13px; color: var(--text-muted);">
+              Chọn một giáo trình bên trái để xem bài học
+            </span>
+          </div>
+          <button type="button" id="btn-open-create-lesson" class="btn btn-outline btn-sm" style="display: none;">
+            ➕ Thêm Bài Học
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 70px;">STT</th>
+                <th>Tên Hán tự</th>
+                <th>Tên tiếng Việt</th>
+                <th>XP</th>
+              </tr>
+            </thead>
+            <tbody id="lessons-table-body">
+              <tr>
+                <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                  Chưa chọn giáo trình nào.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: TẠO GIÁO TRÌNH MỚI -->
+  <div id="modal-create-curriculum" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Tạo Giáo Trình Mới</h3>
+        <button type="button" class="modal-close" data-close="modal-create-curriculum">&times;</button>
+      </div>
+      <form id="form-create-curriculum">
+        <div class="modal-body">
+          <div id="curriculum-modal-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="curr-title">Tên giáo trình *</label>
+            <input type="text" id="curr-title" class="form-control" placeholder="Ví dụ: Giáo trình Chuẩn HSK 2" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="curr-code">Mã giáo trình (Viết hoa không dấu) *</label>
+            <input type="text" id="curr-code" class="form-control" placeholder="Ví dụ: HSK2_STANDARD" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="curr-level">Trình độ</label>
+            <select id="curr-level" class="form-control">
+              <option value="HSK1">HSK 1</option>
+              <option value="HSK2">HSK 2</option>
+              <option value="HSK3">HSK 3</option>
+              <option value="HSK4">HSK 4</option>
+              <option value="HSK5">HSK 5</option>
+              <option value="HSK6">HSK 6</option>
+              <option value="GIAO_TIEP">Giao tiếp / Khác</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="curr-description">Mô tả giáo trình</label>
+            <textarea id="curr-description" class="form-control" placeholder="Mô tả tóm tắt nội dung giáo trình..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-create-curriculum">Hủy</button>
+          <button type="submit" id="btn-submit-curriculum" class="btn btn-primary">Xác nhận tạo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: THÊM BÀI HỌC VÀO GIÁO TRÌNH -->
+  <div id="modal-create-lesson" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Thêm Bài Học Mới</h3>
+        <button type="button" class="modal-close" data-close="modal-create-lesson">&times;</button>
+      </div>
+      <form id="form-create-lesson">
+        <div class="modal-body">
+          <div id="lesson-modal-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="lesson-order">Số thứ tự bài (1, 2, 3...) *</label>
+            <input type="number" id="lesson-order" class="form-control" min="1" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="lesson-title-zh">Tên bài tiếng Trung (Chữ Hán) *</label>
+            <input type="text" id="lesson-title-zh" class="form-control" placeholder="Ví dụ: 谢谢" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="lesson-title-vi">Tên bài tiếng Việt *</label>
+            <input type="text" id="lesson-title-vi" class="form-control" placeholder="Ví dụ: Cảm ơn" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="lesson-description">Mô tả ngắn</label>
+            <input type="text" id="lesson-description" class="form-control" placeholder="Chủ đề bài học...">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="lesson-xp">Điểm thưởng (XP)</label>
+              <input type="number" id="lesson-xp" class="form-control" value="50" min="0">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="lesson-pass-score">Điểm qua Quiz (%)</label>
+              <input type="number" id="lesson-pass-score" class="form-control" value="80" min="50" max="100">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-create-lesson">Hủy</button>
+          <button type="submit" id="btn-submit-lesson" class="btn btn-primary">Lưu bài học</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/admin-curriculums.js"></script>
+</body>
+</html>

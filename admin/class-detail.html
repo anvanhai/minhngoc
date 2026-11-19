@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chi tiết Lớp học — Admin Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="classes.html" class="nav-brand">
+        <div class="nav-brand-logo">管</div>
+        <span>Minh Ngọc HSK · Quản trị</span>
+      </a>
+
+      <div class="nav-user">
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-admin">Admin</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung chi tiết lớp -->
+  <main class="main-wrapper">
+    <!-- Breadcrumb -->
+    <div style="margin-bottom: 16px;">
+      <a href="classes.html" style="font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+        ← Quay lại Danh sách lớp học
+      </a>
+    </div>
+
+    <!-- Banner thông tin lớp -->
+    <div class="card" style="border-left: 4px solid var(--primary); margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h1 id="class-detail-name" style="font-size: 22px; font-weight: 800; margin-bottom: 4px;">
+            Đang tải thông tin lớp...
+          </h1>
+          <p id="class-detail-curriculum" style="font-size: 14px; color: var(--text-muted);">
+            Giáo trình: Đang tải...
+          </p>
+        </div>
+        <div id="class-detail-status-badge">
+          <span class="badge-status badge-ongoing">Đang học</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert thông báo -->
+    <div id="page-alert" class="alert"></div>
+
+    <!-- Tabs điều hướng trong lớp -->
+    <div class="admin-subnav">
+      <button type="button" class="admin-subnav-btn active" data-tab="tab-overview">📊 Tổng quan & Tiến độ</button>
+      <button type="button" class="admin-subnav-btn" data-tab="tab-students">👥 Học sinh (<span id="count-students">0</span>)</button>
+      <button type="button" class="admin-subnav-btn" data-tab="tab-lessons">📖 Bài học & Mở khóa</button>
+      <button type="button" class="admin-subnav-btn" data-tab="tab-assignments">📝 Bài tập (<span id="count-assignments">0</span>)</button>
+      <button type="button" class="admin-subnav-btn" data-tab="tab-settings">⚙️ Cài đặt lớp</button>
+    </div>
+
+    <!-- TAB 1: TỔNG QUAN & TIẾN ĐỘ -->
+    <div id="tab-overview" class="tab-pane">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="card" style="margin-bottom: 0;">
+          <div style="font-size: 13px; color: var(--text-muted);">Sĩ số học sinh</div>
+          <div id="stat-student-count" style="font-size: 24px; font-weight: 800; color: var(--primary);">0</div>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+          <div style="font-size: 13px; color: var(--text-muted);">Tiến độ lớp hiện tại</div>
+          <div id="stat-current-lesson" style="font-size: 24px; font-weight: 800; color: #d97706;">Bài 1</div>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+          <div style="font-size: 13px; color: var(--text-muted);">Chế độ mở bài</div>
+          <div id="stat-unlock-mode" style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-top: 4px;">Tuần tự</div>
+        </div>
+
+        <div class="card" style="margin-bottom: 0;">
+          <div style="font-size: 13px; color: var(--text-muted);">Ngày khai giảng</div>
+          <div id="stat-start-date" style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-top: 4px;">--/--/----</div>
+        </div>
+      </div>
+
+      <!-- Khung điều phối bài hiện tại của lớp -->
+      <div class="card">
+        <h3 class="card-title">📍 Điều phối bài học hiện tại của cả lớp</h3>
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
+          Khi giáo viên cập nhật bài học hiện tại ở đây, học sinh vào trang chủ sẽ thấy ngay bài này để học tiếp.
+        </p>
+
+        <form id="form-update-progress" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+          <div class="form-group" style="margin-bottom: 0; min-width: 260px;">
+            <label class="form-label" for="select-current-lesson">Bài học hiện tại</label>
+            <select id="select-current-lesson" class="form-control">
+              <!-- Load danh sách bài học -->
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0; min-width: 220px;">
+            <label class="form-label" for="select-unlock-mode">Chế độ mở bài</label>
+            <select id="select-unlock-mode" class="form-control">
+              <option value="sequential">Học tuần tự (Mở từng bài)</option>
+              <option value="all_open">Mở toàn bộ bài của giáo trình</option>
+            </select>
+          </div>
+
+          <button type="submit" id="btn-save-progress" class="btn btn-primary">
+            Lưu thay đổi tiến độ
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 2: QUẢN LÝ HỌC SINH -->
+    <div id="tab-students" class="tab-pane" style="display: none;">
+      <div class="section-header">
+        <h3 class="section-title">Danh sách Học sinh trong Lớp</h3>
+        <button type="button" id="btn-open-enroll-modal" class="btn btn-primary">
+          ➕ Thêm Học Sinh Vào Lớp
+        </button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Học sinh</th>
+              <th>Username</th>
+              <th>Số điện thoại</th>
+              <th>Ngày vào lớp</th>
+              <th>Trạng thái</th>
+              <th style="text-align: right;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="students-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                Đang tải danh sách học sinh...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: GIÁO TRÌNH & BÀI HỌC (CÓ NÚT MỞ KHÓA THỦ CÔNG) -->
+    <div id="tab-lessons" class="tab-pane" style="display: none;">
+      <div class="section-header">
+        <div>
+          <h3 class="section-title">Các bài học theo Giáo trình</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+            Giáo viên có thể bấm <strong>"Mở khóa thủ công"</strong> từng bài cho cả lớp ôn tập trước mà không cần chờ học sinh hoàn thành tuần tự.
+          </p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 80px;">Thứ tự</th>
+              <th>Tên bài chữ Hán</th>
+              <th>Tên tiếng Việt</th>
+              <th>XP</th>
+              <th>Trạng thái lớp</th>
+              <th style="text-align: right;">Mở khóa thủ công</th>
+            </tr>
+          </thead>
+          <tbody id="class-lessons-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                Đang tải bài học...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: BÀI TẬP VỀ NHÀ (ASSIGNMENTS) -->
+    <div id="tab-assignments" class="tab-pane" style="display: none;">
+      <div class="section-header">
+        <div>
+          <h3 class="section-title">Bài tập riêng của Lớp</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+            Giao nhiệm vụ, đặt hạn chót nộp bài (Deadline) và thưởng XP cho học sinh hoàn thành.
+          </p>
+        </div>
+        <button type="button" id="btn-open-create-assignment" class="btn btn-primary">
+          ➕ Giao Bài Tập Mới
+        </button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Tên bài tập</th>
+              <th>Bài học</th>
+              <th>Hạn chót (Deadline)</th>
+              <th>Thưởng XP</th>
+              <th>Tiến độ nộp bài</th>
+            </tr>
+          </thead>
+          <tbody id="assignments-table-body">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                Đang tải danh sách bài tập...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 5: CÀI ĐẶT LỚP -->
+    <div id="tab-settings" class="tab-pane" style="display: none;">
+      <div class="card" style="max-width: 600px;">
+        <h3 class="card-title">Cập nhật thông tin Lớp học</h3>
+        <form id="form-update-class-settings">
+          <div class="form-group">
+            <label class="form-label" for="setting-class-name">Tên lớp học</label>
+            <input type="text" id="setting-class-name" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="setting-class-status">Trạng thái lớp</label>
+            <select id="setting-class-status" class="form-control">
+              <option value="ongoing">🟢 Đang học (Ongoing)</option>
+              <option value="paused">🟡 Tạm dừng (Paused)</option>
+              <option value="completed">⚪ Đã kết thúc khóa (Completed)</option>
+            </select>
+          </div>
+
+          <button type="submit" id="btn-save-class-settings" class="btn btn-primary">
+            Lưu cài đặt
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: GHI DANH HỌC SINH VÀO LỚP -->
+  <div id="modal-enroll-student" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Thêm Học Sinh Vào Lớp</h3>
+        <button type="button" class="modal-close" data-close="modal-enroll-student">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="enroll-modal-alert" class="alert"></div>
+
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px;">
+          Chọn học sinh đã đăng ký tài khoản trên website để xếp vào lớp này:
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="select-student-to-enroll">Học sinh chưa vào lớp</label>
+          <select id="select-student-to-enroll" class="form-control">
+            <option value="">-- Đang tải danh sách học sinh --</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-enroll-student">Hủy</button>
+        <button type="button" id="btn-confirm-enroll" class="btn btn-primary">Xác nhận thêm vào lớp</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GIAO BÀI TẬP MỚI -->
+  <div id="modal-create-assignment" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Giao Bài Tập Cho Lớp</h3>
+        <button type="button" class="modal-close" data-close="modal-create-assignment">&times;</button>
+      </div>
+      <form id="form-create-assignment">
+        <div class="modal-body">
+          <div id="assign-modal-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="assign-title">Tiêu đề bài tập *</label>
+            <input type="text" id="assign-title" class="form-control" placeholder="Ví dụ: Học thuộc 20 từ Bài 8 + Đạt Quiz" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="assign-lesson">Gắn với bài học (Tùy chọn)</label>
+            <select id="assign-lesson" class="form-control">
+              <option value="">-- Không gắn bài cụ thể --</option>
+            </select>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="assign-due-date">Hạn chót nộp (Deadline) *</label>
+              <input type="datetime-local" id="assign-due-date" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="assign-xp">Thưởng hoàn thành (XP)</label>
+              <input type="number" id="assign-xp" class="form-control" value="30" min="0">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="assign-desc">Hướng dẫn làm bài</label>
+            <textarea id="assign-desc" class="form-control" placeholder="Nhắc nhở học sinh cần ôn kỹ các từ nào..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-create-assignment">Hủy</button>
+          <button type="submit" id="btn-submit-assignment" class="btn btn-primary">Xác nhận giao bài</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHUYỂN CẤP / LÊN HSK2 CHO HỌC SINH -->
+  <div id="modal-promote-student" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">⬆️ Chuyển Cấp / Chuyển Lớp Cho Học Sinh</h3>
+        <button type="button" class="modal-close" data-close="modal-promote-student">&times;</button>
+      </div>
+      <form id="form-promote-student">
+        <div class="modal-body">
+          <div id="promote-modal-alert" class="alert"></div>
+
+          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;">
+            <div style="font-size: 13px; color: var(--text-muted);">Học sinh được chuyển:</div>
+            <div id="promote-student-name" style="font-size: 17px; font-weight: 800; color: var(--primary);">
+              Minh Anh
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Lớp hiện tại: <span id="promote-current-class-name">HSK1 - A</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="select-target-class">Chọn Lớp học đích mới *</label>
+            <select id="select-target-class" class="form-control" required>
+              <option value="">-- Đang tải danh sách lớp --</option>
+            </select>
+            <div class="form-help">
+              Hệ thống sẽ bảo lưu 100% tài khoản, XP và lịch sử học lớp cũ; đồng thời đưa học sinh vào lớp mới để bắt đầu chu kỳ đua top mới.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="promote-note">Ghi chú chuyển lớp</label>
+            <input
+              type="text"
+              id="promote-note"
+              class="form-control"
+              value="Hoàn thành khóa học, lên cấp mới"
+              required
+            >
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-promote-student">Hủy</button>
+          <button type="submit" id="btn-submit-promote" class="btn btn-primary">Xác nhận chuyển lớp</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/admin-class-detail.js"></script>
+</body>
+</html>

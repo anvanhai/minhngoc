@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bảng Xếp Hạng Lớp — Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Styling cho Bục vinh danh Podium */
+    .podium-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 12px;
+      margin: 24px auto 30px auto;
+      max-width: 600px;
+      padding: 0 10px;
+    }
+
+    .podium-item {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px 10px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .podium-1 {
+      order: 2;
+      border-color: #f59e0b;
+      background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+      transform: translateY(-16px);
+      box-shadow: var(--shadow-md);
+    }
+    .podium-2 { order: 1; }
+    .podium-3 { order: 3; }
+
+    .podium-crown {
+      font-size: 28px;
+      margin-bottom: 4px;
+    }
+
+    .podium-avatar {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-full);
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 8px;
+      border: 2px solid var(--border-color);
+    }
+
+    .podium-1 .podium-avatar {
+      border-color: #f59e0b;
+      width: 62px;
+      height: 62px;
+      font-size: 24px;
+      background: #fef3c7;
+    }
+
+    .podium-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+
+    .podium-xp {
+      font-size: 15px;
+      font-weight: 800;
+      color: #ca8a04;
+      margin-top: 2px;
+    }
+
+    /* Thanh vị trí của bạn */
+    .my-rank-banner {
+      background: linear-gradient(90deg, #fff1f2 0%, #fff7ed 100%);
+      border: 1px solid #fecaca;
+      border-radius: var(--radius-md);
+      padding: 14px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="dashboard.html" class="nav-brand">
+        <div class="nav-brand-logo">学</div>
+        <span>Minh Ngọc HSK</span>
+      </a>
+
+      <!-- Menu Học sinh -->
+      <ul class="nav-menu">
+        <li class="nav-item"><a href="dashboard.html">🏠 Trang chủ</a></li>
+        <li class="nav-item"><a href="curriculum.html">📖 Giáo trình</a></li>
+        <li class="nav-item active"><a href="leaderboard.html">🏆 Bảng xếp hạng</a></li>
+      </ul>
+
+      <div class="nav-user">
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-student">Học sinh</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung Bảng xếp hạng -->
+  <main class="main-wrapper">
+    <!-- Header lớp học -->
+    <div style="text-align: center; margin-bottom: 20px;">
+      <h1 style="font-size: 24px; font-weight: 800; color: var(--text-main);">
+        🏆 Bảng Vàng Đua Top · <span id="lb-class-name" style="color: var(--primary);">Lớp học của tôi</span>
+      </h1>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+        Điểm xếp hạng được tính công bằng dựa trên số từ học và bài thi đạt được trong lớp này.
+      </p>
+    </div>
+
+    <div id="page-alert" class="alert"></div>
+
+    <!-- 4 Tabs lọc chu kỳ thời gian -->
+    <div class="admin-subnav" style="justify-content: center; margin-bottom: 24px;">
+      <button type="button" class="admin-subnav-btn" data-period="today">🥇 Hôm nay</button>
+      <button type="button" class="admin-subnav-btn active" data-period="week">🥈 Tuần này</button>
+      <button type="button" class="admin-subnav-btn" data-period="month">🥉 Tháng này</button>
+      <button type="button" class="admin-subnav-btn" data-period="all">🏆 Tổng điểm lớp</button>
+    </div>
+
+    <!-- BỤC VINH DANH TOP 3 (PODIUM) -->
+    <div id="podium-section" class="podium-container" style="display: none;">
+      <!-- Top 2 -->
+      <div class="podium-item podium-2" id="podium-rank-2" style="visibility: hidden;">
+        <div class="podium-crown">🥈</div>
+        <div class="podium-avatar" id="podium-avatar-2">2</div>
+        <div class="podium-name" id="podium-name-2">--</div>
+        <div class="podium-xp" id="podium-xp-2">0 XP</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="podium-words-2">0 từ</div>
+      </div>
+
+      <!-- Top 1 -->
+      <div class="podium-item podium-1" id="podium-rank-1" style="visibility: hidden;">
+        <div class="podium-crown">👑</div>
+        <div class="podium-avatar" id="podium-avatar-1">1</div>
+        <div class="podium-name" id="podium-name-1" style="font-size: 15px;">--</div>
+        <div class="podium-xp" id="podium-xp-1" style="font-size: 17px;">0 XP</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;" id="podium-words-1">0 từ</div>
+      </div>
+
+      <!-- Top 3 -->
+      <div class="podium-item podium-3" id="podium-rank-3" style="visibility: hidden;">
+        <div class="podium-crown">🥉</div>
+        <div class="podium-avatar" id="podium-avatar-3">3</div>
+        <div class="podium-name" id="podium-name-3">--</div>
+        <div class="podium-xp" id="podium-xp-3">0 XP</div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="podium-words-3">0 từ</div>
+      </div>
+    </div>
+
+    <!-- THANH VỊ TRÍ CỦA CHÍNH BẠN -->
+    <div id="my-rank-banner" class="my-rank-banner" style="display: none;">
+      <div>
+        <span style="font-weight: 800; color: var(--primary); font-size: 15px;">
+          👉 Vị trí của bạn: <span id="my-rank-text">Hạng --</span>
+        </span>
+        <span style="font-size: 14px; color: var(--text-muted); margin-left: 8px;" id="my-xp-text">
+          · 0 XP trong kỳ
+        </span>
+      </div>
+      <div>
+        <a href="curriculum.html" class="btn btn-primary btn-sm">
+          🚀 Học bài đua Top ngay
+        </a>
+      </div>
+    </div>
+
+    <!-- BẢNG DANH SÁCH XẾP HẠNG LỚP -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div class="table-responsive" style="border: none;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 70px; text-align: center;">Hạng</th>
+              <th>Học sinh</th>
+              <th>XP trong kỳ</th>
+              <th>Từ đã học</th>
+              <th>Chuỗi Streak</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-table-body">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 32px; color: var(--text-muted);">
+                Đang tải bảng xếp hạng lớp...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: HỒ SƠ THÀNH TÍCH HỌC SINH (PUBLIC PROFILE) -->
+  <div id="modal-public-profile" class="modal-overlay">
+    <div class="modal-card" style="max-width: 400px; text-align: center;">
+      <div class="modal-header">
+        <h3 class="modal-title">Hồ sơ Học viên</h3>
+        <button type="button" class="modal-close" data-close="modal-public-profile">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 24px 20px;">
+        <div id="pop-avatar" style="width: 70px; height: 70px; border-radius: var(--radius-full); background: var(--primary-light); color: var(--primary); font-size: 28px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto;">
+          学
+        </div>
+        <h3 id="pop-name" style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 4px;">
+          Minh Anh
+        </h3>
+        <div id="pop-username" style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          @minhanh
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
+          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px;">
+            <div style="font-size: 12px; color: var(--text-muted);">Thứ hạng kỳ</div>
+            <div id="pop-rank" style="font-size: 18px; font-weight: 800; color: var(--primary);">#1</div>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px;">
+            <div style="font-size: 12px; color: var(--text-muted);">XP kiếm được</div>
+            <div id="pop-xp" style="font-size: 18px; font-weight: 800; color: #ca8a04;">850 XP</div>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px;">
+            <div style="font-size: 12px; color: var(--text-muted);">Số từ đã thuộc</div>
+            <div id="pop-words" style="font-size: 18px; font-weight: 800; color: var(--text-main);">120 từ</div>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px;">
+            <div style="font-size: 12px; color: var(--text-muted);">Chuỗi Streak</div>
+            <div id="pop-streak" style="font-size: 18px; font-weight: 800; color: #ea580c;">🔥 8 ngày</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: center;">
+        <button type="button" class="btn btn-secondary" data-close="modal-public-profile">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống học tiếng Trung thông minh
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/xp.js"></script>
+  <script src="js/student.js"></script>
+  <script src="js/leaderboard.js"></script>
+</body>
+</html>

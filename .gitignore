@@ -1,0 +1,11 @@
+# Hệ điều hành & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Cấu hình chứa API Key nhạy cảm (Tùy chọn bỏ qua nếu public repo)
+# js/config.js
+
+# Nhật ký & Logs
+*.log

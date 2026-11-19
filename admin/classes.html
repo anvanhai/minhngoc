@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Quản lý Lớp học — Admin Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+  <!-- Thanh Navbar dành cho Quản trị viên -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="classes.html" class="nav-brand">
+        <div class="nav-brand-logo">管</div>
+        <span>Minh Ngọc HSK · Quản trị</span>
+      </a>
+
+      <div class="nav-user">
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-admin">Admin</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung chính Admin -->
+  <main class="main-wrapper">
+    <!-- Thanh menu phụ Admin -->
+    <nav class="admin-subnav">
+      <a href="classes.html" class="admin-subnav-btn active">📚 Quản lý Lớp học</a>
+      <a href="curriculums.html" class="admin-subnav-btn">📖 Giáo trình & Bài học</a>
+      <a href="vocabularies.html" class="admin-subnav-btn">🔤 Kho Từ vựng & Excel</a>
+    </nav>
+
+    <!-- Tiêu đề & Nút Tạo lớp -->
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Danh sách Lớp học</h1>
+        <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+          Quản lý tiến độ độc lập, danh sách học sinh và phân phối giáo trình cho từng lớp.
+        </p>
+      </div>
+      <button type="button" id="btn-open-create-class" class="btn btn-primary">
+        ➕ Tạo Lớp Học Mới
+      </button>
+    </div>
+
+    <!-- Alert thông báo -->
+    <div id="page-alert" class="alert"></div>
+
+    <!-- Grid danh sách các lớp học -->
+    <div id="classes-container" class="classes-grid">
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
+        Đang tải danh sách lớp học...
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: TẠO LỚP HỌC MỚI -->
+  <div id="modal-create-class" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Tạo Lớp Học Mới</h3>
+        <button type="button" class="modal-close" data-close="modal-create-class">&times;</button>
+      </div>
+      <form id="form-create-class">
+        <div class="modal-body">
+          <div id="modal-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="class-name">Tên lớp học *</label>
+            <input
+              type="text"
+              id="class-name"
+              class="form-control"
+              placeholder="Ví dụ: HSK1 - A (Tối T2/T4/T6)"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="class-curriculum">Giáo trình áp dụng *</label>
+            <select id="class-curriculum" class="form-control" required>
+              <option value="">-- Đang tải danh sách giáo trình --</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="class-level">Trình độ khóa học</label>
+            <select id="class-level" class="form-control">
+              <option value="HSK1">HSK 1</option>
+              <option value="HSK2">HSK 2</option>
+              <option value="HSK3">HSK 3</option>
+              <option value="HSK4">HSK 4</option>
+              <option value="HSK5">HSK 5</option>
+              <option value="HSK6">HSK 6</option>
+              <option value="GIAO_TIEP">Tiếng Trung Giao tiếp</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="class-start-date">Ngày khai giảng</label>
+            <input type="date" id="class-start-date" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="class-unlock-mode">Chế độ mở khóa bài học</label>
+            <select id="class-unlock-mode" class="form-control">
+              <option value="sequential">Học tuần tự (Làm xong bài trước mới mở bài sau)</option>
+              <option value="all_open">Mở toàn bộ bài (Học sinh tự do học và ôn lại)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-create-class">Hủy</button>
+          <button type="submit" id="btn-submit-class" class="btn btn-primary">Xác nhận tạo lớp</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/admin-classes.js"></script>
+</body>
+</html>
