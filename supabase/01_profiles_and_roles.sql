@@ -122,9 +122,9 @@ security definer
 set search_path = public
 as $$
 begin
-  -- Nếu người thực hiện KHÔNG phải là admin:
-  -- Tuyệt đối không cho phép tự ý nâng role hoặc tự cộng điểm XP/streak
-  if not public.is_admin() then
+  -- Chỉ chặn khi thao tác xuất phát từ Client đã đăng nhập (auth.uid() IS NOT NULL) và KHÔNG phải là admin:
+  -- Nếu chạy từ Supabase SQL Editor / Direct Postgres (auth.uid() IS NULL) thì luôn cho phép cập nhật.
+  if auth.uid() is not null and not public.is_admin() then
     new.role := old.role;
     new.lifetime_xp := old.lifetime_xp;
     new.current_streak := old.current_streak;
