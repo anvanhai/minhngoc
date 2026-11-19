@@ -207,6 +207,38 @@ window.Auth = (function () {
         await logout();
       });
     });
+
+    // Nếu người dùng là admin hoặc teacher, bổ sung nút chuyển đổi giữa trang Quản trị và Học sinh
+    const navUserContainer = document.querySelector('.nav-user');
+    const isInsideAdmin = window.location.pathname.includes('/admin/');
+    if (navUserContainer && (profile.role === 'admin' || profile.role === 'teacher')) {
+      if (!document.getElementById('nav-toggle-portal-btn')) {
+        const toggleBtn = document.createElement('a');
+        toggleBtn.id = 'nav-toggle-portal-btn';
+        toggleBtn.className = 'btn btn-sm btn-primary';
+        toggleBtn.style.height = '36px';
+        toggleBtn.style.padding = '0 12px';
+        toggleBtn.style.fontSize = '13px';
+        toggleBtn.style.display = 'inline-flex';
+        toggleBtn.style.alignItems = 'center';
+        toggleBtn.style.gap = '4px';
+
+        if (isInsideAdmin) {
+          toggleBtn.href = '../dashboard.html';
+          toggleBtn.innerHTML = '🎓 Giao diện học sinh';
+        } else {
+          toggleBtn.href = 'admin/classes.html';
+          toggleBtn.innerHTML = '👑 Trang Quản trị';
+        }
+
+        const logoutBtn = navUserContainer.querySelector('.btn-logout');
+        if (logoutBtn) {
+          navUserContainer.insertBefore(toggleBtn, logoutBtn);
+        } else {
+          navUserContainer.appendChild(toggleBtn);
+        }
+      }
+    }
   }
 
   return {
