@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       // Render bảng danh sách lớp
       leaderboardTableBody.innerHTML = leaderboardData.map(st => {
         const isMe = (st.student_id === authData.user.id);
-        const rowStyle = isMe ? 'background: #fff1f2; font-weight: 700;' : '';
+        const rowStyle = isMe ? 'background: var(--primary-light); font-weight: 700;' : '';
 
         let rankBadge = `<span style="font-weight: 800; color: var(--text-muted);">#${st.rank}</span>`;
         if (st.rank === 1) rankBadge = '<span style="font-size: 18px;">🥇</span>';

@@ -3,8 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Kho Từ vựng & Nhập Excel — Admin Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css?v=3.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') || 
+                sessionStorage.getItem('minhngoc_theme') || 
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="../js/theme.js?v=3.0"></script>
+  <style>
+    /* Bo góc tròn 100% dạng viên thuốc cho công tắc gạt Sáng/Tối */
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon {
+      font-size: 13px !important;
+      line-height: 1 !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 22px !important;
+      height: 22px !important;
+      border-radius: 50% !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+      z-index: 2 !important;
+      pointer-events: none !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important;
+      border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important;
+      background: #f87171 !important;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon, body[data-theme="dark"] .theme-switch-icon.sun-icon, .theme-switch.is-dark .theme-switch-icon.sun-icon {
+      opacity: 0.35 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
+      opacity: 1 !important;
+    }
+  </style>
 </head>
 <body>
 
@@ -17,6 +111,13 @@
       </a>
 
       <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" style="-webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; position: relative; width: 56px; height: 28px; padding: 0; margin: 0; border: 1.5px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--bg-subtle, #f1f5f9); cursor: pointer; outline: none; box-sizing: border-box; overflow: hidden; vertical-align: middle;" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; pointer-events: none;">
+            <span class="theme-switch-icon sun-icon" style="font-size: 13px; line-height: 1; z-index: 1;">☀️</span>
+            <span class="theme-switch-icon moon-icon" style="font-size: 13px; line-height: 1; z-index: 1;">🌙</span>
+            <span class="theme-switch-thumb" style="position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s ease; z-index: 2;"></span>
+          </span>
+        </button>
         <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
         <span class="user-role-badge role-admin">Admin</span>
         <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
@@ -33,6 +134,8 @@
       <a href="classes.html" class="admin-subnav-btn">📚 Quản lý Lớp học</a>
       <a href="curriculums.html" class="admin-subnav-btn">📖 Giáo trình & Bài học</a>
       <a href="vocabularies.html" class="admin-subnav-btn active">🔤 Kho Từ vựng & Excel</a>
+      <a href="grading.html" class="admin-subnav-btn">🎙️ Chấm bài Ghi âm</a>
+      <a href="settings.html" class="admin-subnav-btn">⚙️ Cài đặt</a>
     </nav>
 
     <!-- Header & Nút thao tác -->
@@ -40,7 +143,7 @@
       <div>
         <h1 class="section-title">Kho Từ Vựng Tập Trung</h1>
         <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
-          Kho lưu trữ toàn bộ từ vựng HSK 1–6, hỗ trợ phát âm chuẩn và nhập nhanh bằng file Excel/CSV.
+          Kho lưu trữ toàn bộ từ vựng HSK 1–9, hỗ trợ phát âm chuẩn và nhập nhanh bằng file Excel/CSV.
         </p>
       </div>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -78,6 +181,9 @@
             <option value="4">Cấp độ HSK 4</option>
             <option value="5">Cấp độ HSK 5</option>
             <option value="6">Cấp độ HSK 6</option>
+            <option value="7">Cấp độ HSK 7</option>
+            <option value="8">Cấp độ HSK 8</option>
+            <option value="9">Cấp độ HSK 9</option>
           </select>
         </div>
 
@@ -85,6 +191,20 @@
           Tìm kiếm
         </button>
       </div>
+    </div>
+
+    <!-- Dải Tabs chọn nhanh Cấp độ HSK 1 - 9 -->
+    <div class="hsk-tab-bar" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 16px;">
+      <button type="button" class="btn-hsk-tab active" data-level="all">Tất cả cấp độ</button>
+      <button type="button" class="btn-hsk-tab" data-level="1">HSK 1</button>
+      <button type="button" class="btn-hsk-tab" data-level="2">HSK 2</button>
+      <button type="button" class="btn-hsk-tab" data-level="3">HSK 3</button>
+      <button type="button" class="btn-hsk-tab" data-level="4">HSK 4</button>
+      <button type="button" class="btn-hsk-tab" data-level="5">HSK 5</button>
+      <button type="button" class="btn-hsk-tab" data-level="6">HSK 6</button>
+      <button type="button" class="btn-hsk-tab" data-level="7">HSK 7</button>
+      <button type="button" class="btn-hsk-tab" data-level="8">HSK 8</button>
+      <button type="button" class="btn-hsk-tab" data-level="9">HSK 9</button>
     </div>
 
     <!-- Bảng danh sách từ vựng -->
@@ -98,7 +218,7 @@
             <th style="width: 90px;">Cấp độ</th>
             <th style="width: 100px;">Từ loại</th>
             <th>Ví dụ minh họa</th>
-            <th style="width: 60px; text-align: center;">Nghe</th>
+            <th style="width: 110px; text-align: center;">Thao tác</th>
           </tr>
         </thead>
         <tbody id="vocab-table-body">
@@ -128,8 +248,15 @@
 
         <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
           Hệ thống hỗ trợ file <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code>. File chỉ cần chứa các cột:
-          <strong>Chữ Hán</strong> (hanzi), <strong>Pinyin</strong>, <strong>Nghĩa</strong> (meaning_vi), và tùy chọn cấp độ HSK.
+          <strong>Chữ Hán</strong> (hanzi), <strong>Pinyin</strong>, <strong>Nghĩa</strong> (meaning_vi), và tùy chọn cấp độ HSK (1–9).
         </p>
+
+        <div style="margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; background: var(--bg-subtle); border: 1px dashed var(--border-color); border-radius: var(--radius-sm); padding: 10px 14px;">
+          <span style="font-size: 13px; color: var(--text-main);">Chưa có định dạng chuẩn? Tải file mẫu tại đây:</span>
+          <a href="mau_nhap_tu_vung_hsk.csv" download="mau_nhap_tu_vung_hsk.csv" id="btn-download-sample-csv" class="btn btn-outline btn-sm" style="font-size: 12px; height: 32px; display: inline-flex; align-items: center; gap: 4px;">
+            📥 Tải File Mẫu CSV (HSK 1–9)
+          </a>
+        </div>
 
         <!-- Dropzone kéo thả file -->
         <div id="excel-dropzone" class="dropzone" style="margin-bottom: 16px;">
@@ -182,14 +309,15 @@
     </div>
   </div>
 
-  <!-- MODAL: THÊM TỪ THỦ CÔNG -->
+  <!-- MODAL: THÊM / SỬA TỪ VỰNG -->
   <div id="modal-create-vocab" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 class="modal-title">Thêm Từ Vựng Mới</h3>
+        <h3 class="modal-title" id="modal-vocab-title">Thêm Từ Vựng Mới</h3>
         <button type="button" class="modal-close" data-close="modal-create-vocab">&times;</button>
       </div>
       <form id="form-create-vocab">
+        <input type="hidden" id="v-id" value="">
         <div class="modal-body">
           <div id="create-vocab-alert" class="alert"></div>
 
@@ -219,6 +347,9 @@
                 <option value="4">HSK 4</option>
                 <option value="5">HSK 5</option>
                 <option value="6">HSK 6</option>
+                <option value="7">HSK 7</option>
+                <option value="8">HSK 8</option>
+                <option value="9">HSK 9</option>
               </select>
             </div>
             <div class="form-group">
@@ -245,6 +376,41 @@
     </div>
   </div>
 
+  <!-- MODAL: XÓA TỪ VỰNG KHỎI KHO (CẢNH BÁO MỨC ĐỘ SỬ DỤNG) -->
+  <div id="modal-delete-vocab" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--danger);">Xóa Từ Vựng Khỏi Kho</h3>
+        <button type="button" class="modal-close" data-close="modal-delete-vocab">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="delete-vocab-loading" style="text-align: center; padding: 20px; color: var(--text-muted);">
+          Đang kiểm tra dữ liệu từ vựng trong các bài học...
+        </div>
+
+        <div id="delete-vocab-content" style="display: none;">
+          <div style="font-size: 15px; margin-bottom: 12px; color: var(--text-main);">
+            Bạn có chắc chắn muốn xóa vĩnh viễn từ vựng <strong id="delete-vocab-hanzi" style="font-size: 20px; color: var(--primary);"></strong> khỏi kho?
+          </div>
+
+          <div id="delete-vocab-warning" class="alert alert-warning show" style="font-size: 13px; line-height: 1.6; margin-bottom: 12px;">
+            <div id="delete-vocab-usage-desc"></div>
+            <ul style="margin: 6px 0 0 18px; padding: 0;" id="delete-vocab-lessons-list"></ul>
+            <div id="delete-vocab-danger-note" style="margin-top: 8px; color: #b91c1c; font-weight: 600;">
+              ⚠️ Nếu xóa, từ này sẽ bị gỡ bỏ khỏi toàn bộ các bài học trên và xóa lịch sử ghi nhớ SRS của học sinh!
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-delete-vocab">Hủy</button>
+        <button type="button" id="btn-confirm-delete-vocab" class="btn btn-danger" style="display: none;">
+          🗑️ Xác nhận xóa vĩnh viễn
+        </button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
   </footer>
@@ -255,6 +421,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <!-- Scripts -->
+  <script src="../js/theme.js?v=3.0"></script>
   <script src="../js/config.js"></script>
   <script src="../js/db.js"></script>
   <script src="../js/auth.js"></script>

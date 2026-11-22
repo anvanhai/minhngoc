@@ -268,7 +268,7 @@ window.Student = (function () {
           id, order_index, title_zh, title_vi
         ),
         submissions:assignment_submissions (
-          id, student_id, status, completed_at, score
+          id, student_id, status, completed_at, score, audio_url, teacher_comment, graded_at
         )
       `)
       .eq('class_id', classId)
@@ -297,7 +297,7 @@ window.Student = (function () {
   }
 
   /**
-   * Hoàn thành bài tập
+   * Hoàn thành bài tập từ vựng thường
    */
   async function completeAssignment(assignmentId) {
     const db = getDb();
@@ -309,6 +309,86 @@ window.Student = (function () {
 
     if (error) throw error;
     return data;
+  }
+
+  /**
+   * Nộp bài tập Nghe hiểu (server-side chấm điểm trắc nghiệm)
+   */
+  async function submitListeningAssignment(assignmentId, answers) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('submit_listening_assignment', {
+      p_assignment_id: assignmentId,
+      p_answers: answers
+    });
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Tải file ghi âm của học sinh lên Supabase Storage bucket 'recordings'
+   */
+  async function uploadRecordingAudio(audioBlob, studentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const mime = audioBlob.type || 'audio/webm';
+    let ext = 'webm';
+    if (mime.includes('mp4') || mime.includes('m4a')) ext = 'mp4';
+    else if (mime.includes('wav')) ext = 'wav';
+    else if (mime.includes('ogg')) ext = 'ogg';
+
+    const fileName = `${studentId}/${Date.now()}_recording.${ext}`;
+
+    const { data, error } = await db.storage
+      .from('recordings')
+      .upload(fileName, audioBlob, {
+        contentType: mime,
+        upsert: true
+      });
+
+    if (error) throw error;
+    return data.path;
+  }
+
+  /**
+   * Nộp bài tập Nói & Ghi âm (gửi audio path vào hàng chờ giáo viên chấm)
+   */
+  async function submitSpeakingAssignment(assignmentId, audioUrl) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('submit_speaking_assignment', {
+      p_assignment_id: assignmentId,
+      p_audio_url: audioUrl
+    });
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Lấy signed URL nghe file ghi âm
+   */
+  async function getRecordingPlayUrl(audioPath) {
+    const db = getDb();
+    if (!db || !audioPath) return '';
+
+    if (audioPath.startsWith('http://') || audioPath.startsWith('https://')) {
+      return audioPath;
+    }
+
+    const { data, error } = await db.storage
+      .from('recordings')
+      .createSignedUrl(audioPath, 3600);
+
+    if (error || !data) {
+      const { data: pubData } = db.storage.from('recordings').getPublicUrl(audioPath);
+      return pubData ? pubData.publicUrl : audioPath;
+    }
+    return data.signedUrl;
   }
 
   /**
@@ -368,6 +448,41 @@ window.Student = (function () {
     return data || [];
   }
 
+  /**
+   * Lấy danh sách slide bài giảng của một bài học
+   */
+  async function getLessonSlides(lessonId) {
+    const db = getDb();
+    if (!db) return [];
+    const { data, error } = await db
+      .from('lesson_slides')
+      .select('*')
+      .eq('lesson_id', lessonId)
+      .order('sort_order', { ascending: true });
+    if (error) {
+      console.error('Lỗi tải slide bài học:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  /**
+   * Lấy signed URL xem hoặc tải slide bài giảng
+   */
+  async function getSlideViewUrl(filePath) {
+    const db = getDb();
+    if (!db || !filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+    const { data, error } = await db.storage
+      .from('lesson-slides')
+      .createSignedUrl(filePath, 3600);
+    if (error || !data) {
+      const { data: pubData } = db.storage.from('lesson-slides').getPublicUrl(filePath);
+      return pubData ? pubData.publicUrl : filePath;
+    }
+    return data.signedUrl;
+  }
+
   return {
     getActiveClass,
     getCurriculumRoadmap,
@@ -377,8 +492,14 @@ window.Student = (function () {
     submitQuizAttempt,
     getClassAssignments,
     completeAssignment,
+    submitListeningAssignment,
+    uploadRecordingAudio,
+    submitSpeakingAssignment,
+    getRecordingPlayUrl,
     getClassLeaderboard,
     updateDailyStreak,
-    getEnrollmentHistory
+    getEnrollmentHistory,
+    getLessonSlides,
+    getSlideViewUrl
   };
 })();

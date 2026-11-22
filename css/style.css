@@ -4,6 +4,7 @@
  */
 
 :root {
+  color-scheme: light;
   --primary: #c82929;         /* Đỏ son truyền thống */
   --primary-hover: #a81e1e;
   --primary-light: #fef2f2;
@@ -19,6 +20,7 @@
   --bg-page: #f8fafc;         /* Nền tổng thể mềm mại */
   --bg-card: #ffffff;
   --bg-input: #ffffff;
+  --bg-subtle: #f1f5f9;
 
   --border-color: #e2e8f0;
   --border-focus: #c82929;
@@ -45,6 +47,54 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+/* BỘ MÀU CHẾ ĐỘ TỐI (DARK THEME) */
+html[data-theme="dark"],
+body[data-theme="dark"],
+[data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #f87171;         /* Đỏ san hô sáng rõ nét trên nền tối */
+  --primary-hover: #ef4444;
+  --primary-light: rgba(248, 113, 113, 0.18);
+  --primary-border: rgba(248, 113, 113, 0.35);
+
+  --accent-gold: #fbbf24;     /* Vàng hổ phách sáng */
+  --accent-gold-light: rgba(251, 191, 36, 0.18);
+
+  --text-main: #f8fafc;       /* Trắng slate rõ ràng */
+  --text-muted: #94a3b8;      /* Xám bạc */
+  --text-light: #64748b;
+
+  --bg-page: #0b0f19;         /* Nền tổng thể tối sâu dịu mắt */
+  --bg-card: #151d30;         /* Card slate sang trọng */
+  --bg-input: #1b253b;        /* Input */
+  --bg-subtle: #1e293b;       /* Nền phụ, hover */
+
+  --border-color: #27354f;    /* Viền sắc nét tinh tế */
+  --border-focus: #f87171;
+
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.18);
+  --success-border: rgba(52, 211, 153, 0.35);
+
+  --warning: #fbbf24;
+  --warning-bg: rgba(251, 191, 36, 0.18);
+  --warning-border: rgba(251, 191, 36, 0.35);
+
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.18);
+  --danger-border: rgba(248, 113, 113, 0.35);
+
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 12px 20px -3px rgb(0 0 0 / 0.7), 0 4px 6px -4px rgb(0 0 0 / 0.7);
+}
+
+html[data-theme="dark"],
+body[data-theme="dark"] {
+  background-color: var(--bg-page) !important;
+  color: var(--text-main) !important;
 }
 
 * {
@@ -174,6 +224,122 @@ a:hover {
 }
 
 /* -------------------------------------------------------------------------- */
+/* CÔNG TẮC GẠT NGANG SÁNG / TỐI (THEME TOGGLE SWITCH SLIDER)                  */
+/* -------------------------------------------------------------------------- */
+.theme-switch,
+.theme-toggle-btn {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  width: 58px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 1.5px solid var(--border-color, #cbd5e1) !important;
+  border-radius: 999px !important;
+  background: var(--bg-subtle, #f1f5f9) !important;
+  cursor: pointer !important;
+  outline: none !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  user-select: none !important;
+  flex-shrink: 0 !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.theme-switch:hover,
+.theme-toggle-btn:hover {
+  border-color: var(--primary) !important;
+}
+
+.theme-switch-track {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 6px !important;
+  pointer-events: none !important;
+}
+
+.theme-switch-icon {
+  font-size: 13px !important;
+  line-height: 1 !important;
+  z-index: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: transform 0.25s ease, opacity 0.25s ease !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.theme-switch-icon.sun-icon {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+
+.theme-switch-icon.moon-icon {
+  opacity: 0.35 !important;
+  transform: scale(0.85) !important;
+}
+
+.theme-switch-thumb {
+  position: absolute !important;
+  top: 2px !important;
+  left: 2px !important;
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+}
+
+/* KHI GẠT SANG CHẾ ĐỘ TỐI (DARK MODE) */
+html[data-theme="dark"] .theme-switch,
+body[data-theme="dark"] .theme-switch,
+html[data-theme="dark"] .theme-toggle-btn,
+body[data-theme="dark"] .theme-toggle-btn,
+.theme-switch.is-dark,
+.theme-toggle-btn.is-dark {
+  background: #1e293b !important;
+  border-color: #f87171 !important;
+}
+
+html[data-theme="dark"] .theme-switch-thumb,
+body[data-theme="dark"] .theme-switch-thumb,
+html[data-theme="dark"] .theme-toggle-btn .theme-switch-thumb,
+body[data-theme="dark"] .theme-toggle-btn .theme-switch-thumb,
+.theme-switch.is-dark .theme-switch-thumb,
+.theme-toggle-btn.is-dark .theme-switch-thumb {
+  transform: translateX(28px) !important;
+  background: #f87171 !important;
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+}
+
+html[data-theme="dark"] .theme-switch-icon.sun-icon,
+body[data-theme="dark"] .theme-switch-icon.sun-icon,
+.theme-switch.is-dark .theme-switch-icon.sun-icon {
+  opacity: 0.35 !important;
+  transform: scale(0.85) !important;
+}
+
+html[data-theme="dark"] .theme-switch-icon.moon-icon,
+body[data-theme="dark"] .theme-switch-icon.moon-icon,
+.theme-switch.is-dark .theme-switch-icon.moon-icon {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+
+/* -------------------------------------------------------------------------- */
 /* ROLE BADGES                                                                */
 /* -------------------------------------------------------------------------- */
 .user-role-badge {
@@ -264,7 +430,7 @@ a:hover {
 /* TAB SWITCHER */
 .auth-tabs {
   display: flex;
-  background-color: #f1f5f9;
+  background-color: var(--bg-subtle);
   padding: 4px;
   border-radius: var(--radius-md);
   margin-bottom: 24px;
@@ -284,7 +450,7 @@ a:hover {
 }
 
 .auth-tab-btn.active {
-  background: #ffffff;
+  background: var(--bg-card);
   color: var(--primary);
   box-shadow: var(--shadow-sm);
 }
@@ -366,13 +532,13 @@ textarea.form-control {
 }
 
 .btn-secondary {
-  background-color: #f1f5f9;
+  background-color: var(--bg-subtle);
   color: var(--text-main);
   border-color: var(--border-color);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #e2e8f0;
+  background-color: var(--border-color);
   text-decoration: none;
 }
 
@@ -457,7 +623,7 @@ textarea.form-control {
 .admin-subnav {
   display: flex;
   gap: 8px;
-  background-color: #f1f5f9;
+  background-color: var(--bg-subtle);
   padding: 6px;
   border-radius: var(--radius-md);
   margin-bottom: 20px;
@@ -479,7 +645,7 @@ textarea.form-control {
 }
 
 .admin-subnav-btn:hover {
-  background-color: #e2e8f0;
+  background-color: var(--border-color);
   color: var(--text-main);
   text-decoration: none;
 }
@@ -582,6 +748,53 @@ textarea.form-control {
   color: #475569;
 }
 
+/* HSK Level Badges (HSK 1 - 9) */
+.badge-hsk {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+.badge-hsk-1 { background: #e0f2fe; color: #0369a1; }
+.badge-hsk-2 { background: #ccfbf1; color: #0f766e; }
+.badge-hsk-3 { background: #dcfce7; color: #15803d; }
+.badge-hsk-4 { background: #fef3c7; color: #b45309; }
+.badge-hsk-5 { background: #ffedd5; color: #c2410c; }
+.badge-hsk-6 { background: #fee2e2; color: #b91c1c; }
+.badge-hsk-7 { background: #f3e8ff; color: #7e22ce; }
+.badge-hsk-8 { background: #fae8ff; color: #86198f; }
+.badge-hsk-9 {
+  background: #fef08a;
+  color: #854d0e;
+  border: 1px solid #eab308;
+  box-shadow: 0 1px 3px rgba(234, 179, 8, 0.25);
+}
+
+/* Tab lọc HSK nhanh */
+.btn-hsk-tab {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.btn-hsk-tab:hover {
+  background: var(--bg-subtle);
+  border-color: var(--primary);
+}
+.btn-hsk-tab.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
 /* Bảng dữ liệu Data Table */
 .table-responsive {
   width: 100%;
@@ -600,7 +813,7 @@ textarea.form-control {
 }
 
 .data-table th {
-  background: #f8fafc;
+  background: var(--bg-subtle);
   color: var(--text-muted);
   font-weight: 600;
   padding: 12px 14px;
@@ -620,7 +833,7 @@ textarea.form-control {
 }
 
 .data-table tbody tr:hover {
-  background-color: #f8fafc;
+  background-color: var(--bg-subtle);
 }
 
 /* Modal Popup */
@@ -685,7 +898,7 @@ textarea.form-control {
 .modal-footer {
   padding: 14px 20px;
   border-top: 1px solid var(--border-color);
-  background: #f8fafc;
+  background: var(--bg-subtle);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -693,11 +906,11 @@ textarea.form-control {
 
 /* Dropzone Upload */
 .dropzone {
-  border: 2px dashed #cbd5e1;
+  border: 2px dashed var(--border-color);
   border-radius: var(--radius-md);
   padding: 28px 16px;
   text-align: center;
-  background: #f8fafc;
+  background: var(--bg-card);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -764,7 +977,7 @@ textarea.form-control {
 .progress-bar-container {
   width: 100%;
   height: 10px;
-  background-color: #e2e8f0;
+  background-color: var(--bg-subtle);
   border-radius: var(--radius-full);
   overflow: hidden;
   margin: 10px 0;
@@ -850,14 +1063,14 @@ textarea.form-control {
 
 .roadmap-item.current {
   border: 2px solid var(--primary);
-  background: #fff;
+  background: var(--bg-card);
   box-shadow: 0 0 0 4px var(--primary-light);
 }
 
 .roadmap-item.locked {
   opacity: 0.65;
   cursor: not-allowed;
-  background: #f8fafc;
+  background: var(--bg-subtle);
 }
 
 .roadmap-node-badge {
@@ -884,8 +1097,8 @@ textarea.form-control {
 }
 
 .roadmap-item.locked .roadmap-node-badge {
-  background: #e2e8f0;
-  color: #64748b;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
 }
 
 .roadmap-content {
@@ -911,14 +1124,27 @@ textarea.form-control {
 .lesson-studio-container {
   max-width: 640px;
   margin: 0 auto;
+  transition: max-width 0.3s ease;
+}
+
+.lesson-studio-container.wide-mode {
+  max-width: 1040px;
 }
 
 .study-mode-tabs {
   display: flex;
-  background-color: #f1f5f9;
+  background-color: var(--bg-subtle);
   padding: 4px;
   border-radius: var(--radius-md);
   margin-bottom: 20px;
+  gap: 4px;
+}
+
+@media (max-width: 640px) {
+  .study-mode-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .study-mode-tab {
@@ -936,7 +1162,7 @@ textarea.form-control {
 }
 
 .study-mode-tab.active {
-  background: #ffffff;
+  background: var(--bg-card);
   color: var(--primary);
   box-shadow: var(--shadow-sm);
 }
@@ -964,7 +1190,7 @@ textarea.form-control {
 .vocab-pinyin-large {
   font-size: 22px;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-muted);
   margin-bottom: 12px;
 }
 
@@ -980,14 +1206,14 @@ textarea.form-control {
   font-size: 12px;
   font-weight: 600;
   padding: 2px 10px;
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
   border-radius: var(--radius-full);
   margin-bottom: 20px;
 }
 
 .vocab-example-box {
-  background: #f8fafc;
+  background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 16px;
@@ -1002,11 +1228,11 @@ textarea.form-control {
   justify-content: center;
   align-items: center;
   margin: 16px auto;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--border-color);
   border-radius: var(--radius-md);
   width: 160px;
   height: 160px;
-  background: #fafafa;
+  background: var(--bg-card);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1051,12 +1277,12 @@ textarea.form-control {
 }
 
 .flashcard-front {
-  background: #ffffff;
+  background: var(--bg-card);
 }
 
 .flashcard-back {
-  background: #fffbfb;
-  border-color: #fecaca;
+  background: var(--bg-card);
+  border-color: var(--primary-border);
   transform: rotateY(180deg);
 }
 
@@ -1088,23 +1314,262 @@ textarea.form-control {
 }
 
 .btn-srs-hard {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fca5a5;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger-border);
 }
-.btn-srs-hard:hover { background: #fecaca; }
+.btn-srs-hard:hover { filter: brightness(0.95); }
 
 .btn-srs-medium {
-  background: #fef3c7;
-  color: #b45309;
-  border-color: #fcd34d;
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning-border);
 }
-.btn-srs-medium:hover { background: #fde68a; }
+.btn-srs-medium:hover { filter: brightness(0.95); }
 
 .btn-srs-easy {
-  background: #dcfce7;
-  color: #15803d;
-  border-color: #86efac;
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success-border);
 }
-.btn-srs-easy:hover { background: #bbf7d0; }
+.btn-srs-easy:hover { filter: brightness(0.95); }
+
+/* Stat widget icon styles (Light & Dark) */
+.stat-icon-fire { background: #ffedd5; color: #ea580c; }
+.stat-icon-trophy { background: #fef3c7; color: #b45309; }
+.stat-icon-zap { background: #fef9c3; color: #ca8a04; }
+
+/* -------------------------------------------------------------------------- */
+/* TOÀN BỘ OVERRIDES CHẾ ĐỘ TỐI (DARK MODE) ĐỒNG BỘ 100% TẤT CẢ CÁC TRANG   */
+/* -------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* 1. Thanh cuộn (Scrollbar) chuẩn nền tối */
+html[data-theme="dark"] ::-webkit-scrollbar,
+body[data-theme="dark"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-track,
+body[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb,
+body[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #27354f;
+  border-radius: 4px;
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover,
+body[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #384b6e;
+}
+
+/* 2. Toàn bộ Thẻ Card, Hộp chứa & Bảng biểu */
+[data-theme="dark"] .card,
+[data-theme="dark"] .class-card,
+[data-theme="dark"] .vocab-card,
+[data-theme="dark"] .auth-card,
+[data-theme="dark"] .modal-card,
+[data-theme="dark"] .table-responsive,
+[data-theme="dark"] .flashcard-face {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-main) !important;
+}
+
+/* 3. Bảng dữ liệu Data Table (Admin & Leaderboard) */
+[data-theme="dark"] .table-responsive {
+  background: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .data-table {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main) !important;
+}
+[data-theme="dark"] .data-table th {
+  background-color: #101626 !important;
+  color: var(--text-muted) !important;
+  border-bottom-color: var(--border-color) !important;
+}
+[data-theme="dark"] .data-table td {
+  border-bottom-color: var(--border-color) !important;
+  color: var(--text-main) !important;
+}
+[data-theme="dark"] .data-table tbody tr:hover {
+  background-color: var(--bg-subtle) !important;
+}
+
+/* 4. Form Controls, Ô nhập liệu & Dropdown */
+[data-theme="dark"] .form-control,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bg-input) !important;
+  color: var(--text-main) !important;
+  border-color: var(--border-color) !important;
+  color-scheme: dark !important;
+}
+[data-theme="dark"] select option {
+  background-color: #151d30 !important;
+  color: #f8fafc !important;
+}
+[data-theme="dark"] .form-control:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.25) !important;
+}
+
+/* 5. Thanh Navbar, Subnav & Tabs */
+[data-theme="dark"] .navbar {
+  background-color: var(--bg-card) !important;
+  border-bottom-color: var(--border-color) !important;
+}
+[data-theme="dark"] .admin-subnav,
+[data-theme="dark"] .study-mode-tabs,
+[data-theme="dark"] .auth-tabs {
+  background-color: #101626 !important;
+}
+[data-theme="dark"] .admin-subnav-btn,
+[data-theme="dark"] .study-mode-tab,
+[data-theme="dark"] .auth-tab-btn {
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] .admin-subnav-btn:hover,
+[data-theme="dark"] .study-mode-tab:hover,
+[data-theme="dark"] .auth-tab-btn:hover {
+  background-color: var(--bg-subtle) !important;
+  color: var(--text-main) !important;
+}
+[data-theme="dark"] .admin-subnav-btn.active,
+[data-theme="dark"] .study-mode-tab.active,
+[data-theme="dark"] .auth-tab-btn.active {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+/* 6. Tabs HSK Kho từ vựng */
+[data-theme="dark"] .btn-hsk-tab {
+  background: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] .btn-hsk-tab:hover {
+  background: var(--bg-subtle) !important;
+  color: var(--text-main) !important;
+}
+[data-theme="dark"] .btn-hsk-tab.active {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+}
+
+/* 7. Modal Popups */
+[data-theme="dark"] .modal-overlay {
+  background: rgba(3, 7, 18, 0.75) !important;
+}
+[data-theme="dark"] .modal-card {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+}
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+  border-color: var(--border-color) !important;
+}
+[data-theme="dark"] .modal-title {
+  color: var(--text-main) !important;
+}
+[data-theme="dark"] .modal-close {
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] .modal-close:hover {
+  color: var(--text-main) !important;
+}
+
+/* 8. Widgets Thống kê trên Dashboard */
+[data-theme="dark"] .stat-icon-fire { background: rgba(234, 88, 12, 0.2) !important; color: #fb923c !important; }
+[data-theme="dark"] .stat-icon-trophy { background: rgba(217, 119, 6, 0.2) !important; color: #fbbf24 !important; }
+[data-theme="dark"] .stat-icon-zap { background: rgba(202, 138, 4, 0.2) !important; color: #facc15 !important; }
+
+/* 9. Quiz Options & Flashcards */
+[data-theme="dark"] .quiz-opt-btn {
+  background-color: var(--bg-input) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-main) !important;
+}
+[data-theme="dark"] .quiz-opt-btn:hover {
+  background-color: var(--bg-subtle) !important;
+  border-color: var(--primary) !important;
+}
+[data-theme="dark"] .hanzi-writer-container,
+[data-theme="dark"] .vocab-example-box,
+[data-theme="dark"] #fc-back-example {
+  background-color: #1b253b !important;
+  border-color: var(--border-color) !important;
+}
+
+/* 10. Dropzone Excel / File Upload */
+[data-theme="dark"] #excel-dropzone,
+[data-theme="dark"] .file-drop-area {
+  background-color: #1b253b !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-muted) !important;
+}
+[data-theme="dark"] #excel-dropzone:hover {
+  border-color: var(--primary) !important;
+  background-color: #202d48 !important;
+}
+
+/* 11. Trình phát âm thanh Audio Player */
+[data-theme="dark"] audio {
+  filter: invert(0.88) hue-rotate(180deg);
+  border-radius: 999px;
+}
+
+/* 12. Huy hiệu vai trò & Cấp độ HSK */
+[data-theme="dark"] .role-student { background-color: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+[data-theme="dark"] .role-teacher { background-color: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+[data-theme="dark"] .role-admin { background-color: rgba(248, 113, 113, 0.2); color: #f87171; }
+
+[data-theme="dark"] .badge-ongoing { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+[data-theme="dark"] .badge-paused { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+[data-theme="dark"] .badge-completed { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+
+[data-theme="dark"] .badge-hsk-1 { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+[data-theme="dark"] .badge-hsk-2 { background: rgba(45, 212, 191, 0.2); color: #2dd4bf; }
+[data-theme="dark"] .badge-hsk-3 { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+[data-theme="dark"] .badge-hsk-4 { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+[data-theme="dark"] .badge-hsk-5 { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+[data-theme="dark"] .badge-hsk-6 { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+[data-theme="dark"] .badge-hsk-7 { background: rgba(192, 132, 252, 0.2); color: #c084fc; }
+[data-theme="dark"] .badge-hsk-8 { background: rgba(232, 121, 249, 0.2); color: #e879f9; }
+[data-theme="dark"] .badge-hsk-9 {
+  background: rgba(250, 204, 21, 0.2);
+  color: #facc15;
+  border-color: #eab308;
+  box-shadow: 0 0 8px rgba(250, 204, 21, 0.35);
+}
+
+/* 13. Lộ trình bài học (Roadmap) */
+[data-theme="dark"] .roadmap-item.completed .roadmap-node-badge {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
+[data-theme="dark"] .roadmap-item.current {
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.25);
+}
+[data-theme="dark"] .roadmap-item.current .roadmap-node-badge {
+  background: var(--primary);
+  color: #0b0f19;
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.5);
+}
+
+/* 14. Hình ảnh & Nền chung */
+[data-theme="dark"] img {
+  opacity: 0.95;
+}
 

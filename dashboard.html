@@ -3,8 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Bàn học của tôi — Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=3.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') || 
+                sessionStorage.getItem('minhngoc_theme') || 
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="js/theme.js?v=3.0"></script>
+  <style>
+    /* Bo góc tròn 100% dạng viên thuốc cho công tắc gạt Sáng/Tối */
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon {
+      font-size: 13px !important;
+      line-height: 1 !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 22px !important;
+      height: 22px !important;
+      border-radius: 50% !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+      z-index: 2 !important;
+      pointer-events: none !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important;
+      border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important;
+      background: #f87171 !important;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon, body[data-theme="dark"] .theme-switch-icon.sun-icon, .theme-switch.is-dark .theme-switch-icon.sun-icon {
+      opacity: 0.35 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
+      opacity: 1 !important;
+    }
+  </style>
 </head>
 <body>
 
@@ -24,6 +118,13 @@
       </ul>
 
       <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" style="-webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; position: relative; width: 56px; height: 28px; padding: 0; margin: 0; border: 1.5px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--bg-subtle, #f1f5f9); cursor: pointer; outline: none; box-sizing: border-box; overflow: hidden; vertical-align: middle;" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; pointer-events: none;">
+            <span class="theme-switch-icon sun-icon" style="font-size: 13px; line-height: 1; z-index: 1;">☀️</span>
+            <span class="theme-switch-icon moon-icon" style="font-size: 13px; line-height: 1; z-index: 1;">🌙</span>
+            <span class="theme-switch-thumb" style="position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s ease; z-index: 2;"></span>
+          </span>
+        </button>
         <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
         <span class="user-role-badge role-student">Học sinh</span>
         <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
@@ -44,7 +145,7 @@
         Chào bạn <strong><span class="user-display-name">bạn</span></strong>! Bạn đã tạo tài khoản thành công.
         Hiện tại giáo viên chưa gán bạn vào lớp học cụ thể (ví dụ: HSK1-A hoặc HSK2-A).
       </p>
-      <div style="background: #fefce8; border: 1px solid #fef08a; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 14px; color: #854d0e;">
+      <div style="background: var(--warning-bg); border: 1px solid var(--warning-border); padding: 12px 16px; border-radius: var(--radius-sm); font-size: 14px; color: var(--warning);">
         👉 Vui lòng báo với Giáo viên / Quản trị viên tên đăng nhập của bạn: <code id="my-username" style="font-weight: 700; font-size: 15px;">---</code> để được thêm vào lớp học nhé!
       </div>
     </div>
@@ -101,7 +202,7 @@
       <!-- 3 Widgets Thống kê -->
       <div class="stat-widget-grid">
         <div class="stat-widget">
-          <div class="stat-widget-icon" style="background: #ffedd5; color: #ea580c;">🔥</div>
+          <div class="stat-widget-icon stat-icon-fire">🔥</div>
           <div>
             <div class="stat-widget-label">Chuỗi ngày học</div>
             <div id="dash-streak" class="stat-widget-value">0 ngày</div>
@@ -109,7 +210,7 @@
         </div>
 
         <div class="stat-widget">
-          <div class="stat-widget-icon" style="background: #fef3c7; color: #b45309;">🏆</div>
+          <div class="stat-widget-icon stat-icon-trophy">🏆</div>
           <div>
             <div class="stat-widget-label">Hạng trong lớp</div>
             <div id="dash-rank" class="stat-widget-value">Học viên</div>
@@ -117,7 +218,7 @@
         </div>
 
         <div class="stat-widget">
-          <div class="stat-widget-icon" style="background: #fef9c3; color: #ca8a04;">⚡</div>
+          <div class="stat-widget-icon stat-icon-zap">⚡</div>
           <div>
             <div class="stat-widget-label">Tổng điểm kinh nghiệm</div>
             <div id="dash-xp" class="stat-widget-value">0 XP</div>
@@ -132,7 +233,7 @@
           Bài học trọng tâm theo tiến độ lớp của bạn:
         </p>
 
-        <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; margin-bottom: 18px;">
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; margin-bottom: 18px;">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <div>
               <span id="dash-next-badge" class="badge-status badge-ongoing" style="margin-bottom: 6px;">Bài hiện tại</span>
@@ -203,17 +304,131 @@
     </div>
   </div>
 
+  <!-- MODAL: LÀM BÀI TẬP NGHE HIỂU -->
+  <div id="modal-listening-assignment" class="modal-overlay">
+    <div class="modal-card" style="max-width: 650px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="listening-modal-title">🎧 Bài Tập Nghe Hiểu</h3>
+          <div id="listening-modal-desc" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-listening-assignment">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 68vh; overflow-y: auto;">
+        <div id="listening-modal-alert" class="alert"></div>
+
+        <!-- Trình phát Audio nghe hiểu -->
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px; text-align: center;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
+            🔊 File âm thanh bài nghe:
+          </div>
+          <audio id="listening-audio-player" controls style="width: 100%; max-width: 450px; outline: none;"></audio>
+        </div>
+
+        <!-- Danh sách câu hỏi trắc nghiệm -->
+        <div id="listening-questions-list" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Render câu hỏi ở đây -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-listening-assignment">Đóng</button>
+        <button type="button" id="btn-submit-listening" class="btn btn-primary">Nộp bài & Chấm điểm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LÀM BÀI TẬP NÓI & GHI ÂM -->
+  <div id="modal-speaking-assignment" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="speaking-modal-title">🎙️ Bài Tập Nói & Ghi Âm</h3>
+          <div id="speaking-modal-desc" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-speaking-assignment">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="speaking-modal-alert" class="alert"></div>
+
+        <!-- Khung Đề bài câu/đoạn tiếng Trung cần đọc -->
+        <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px; border: 1.5px solid var(--border-color); text-align: center;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">
+            Đề bài luyện đọc (Phát âm chuẩn theo thanh điệu):
+          </div>
+          <div id="speaking-prompt-hanzi" style="font-size: 22px; font-weight: 800; color: var(--text-main); font-family: 'PingFang SC', sans-serif; line-height: 1.5; margin-bottom: 6px;">
+            Đang tải đề bài...
+          </div>
+          <div id="speaking-prompt-pinyin" style="font-size: 15px; color: var(--primary); font-weight: 600; margin-bottom: 12px;"></div>
+
+          <div id="speaking-sample-audio-box" style="display: none; margin-top: 8px;">
+            <button type="button" id="btn-play-speaking-sample" class="btn btn-outline btn-sm">
+              🔊 Nghe audio đọc mẫu của cô giáo
+            </button>
+          </div>
+        </div>
+
+        <!-- Khung Ghi âm MediaRecorder -->
+        <div style="background: var(--bg-card); border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 20px; text-align: center; margin-bottom: 14px;">
+          <!-- Trạng thái ghi âm & Timer -->
+          <div id="recorder-status-text" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+            Nhấn nút tròn đỏ bên dưới để bắt đầu ghi âm
+          </div>
+
+          <div id="recorder-timer" style="font-size: 28px; font-weight: 800; color: var(--text-main); font-family: monospace; margin-bottom: 16px;">
+            00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>
+          </div>
+
+          <!-- Nút điều khiển Ghi âm -->
+          <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+            <button type="button" id="btn-start-record" class="btn btn-primary" style="border-radius: var(--radius-full); padding: 0 20px;">
+              🎙️ Bắt đầu ghi âm
+            </button>
+            <button type="button" id="btn-stop-record" class="btn btn-danger" style="display: none; border-radius: var(--radius-full); padding: 0 20px;">
+              ⏹️ Dừng ghi âm
+            </button>
+            <button type="button" id="btn-re-record" class="btn btn-outline" style="display: none;">
+              🔄 Ghi lại
+            </button>
+          </div>
+
+          <!-- Trình phát nghe lại bản ghi của học sinh -->
+          <div id="preview-audio-container" style="display: none; margin-top: 14px;">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Bản ghi của bạn:</div>
+            <audio id="preview-audio-player" controls style="width: 100%; max-width: 380px;"></audio>
+          </div>
+        </div>
+
+        <!-- Hướng dẫn cấp quyền Microphone nếu bị chặn -->
+        <div id="mic-permission-guide" style="display: none; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; color: var(--warning); line-height: 1.5;">
+          <strong>⚠️ Quyền truy cập Micro bị chặn:</strong>
+          Vui lòng bấm vào biểu tượng chiếc ổ khóa 🔒 (hoặc micro) ở góc trái thanh địa chỉ trình duyệt, chọn <em>"Cho phép (Allow) Microphone"</em>, sau đó tải lại trang để ghi âm nhé!
+        </div>
+
+        <!-- Trạng thái chấm điểm đã có trước đó (nếu học sinh xem lại) -->
+        <div id="speaking-prev-submission-info" style="display: none; background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 12px; font-size: 13px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-speaking-assignment">Hủy</button>
+        <button type="button" id="btn-submit-speaking" class="btn btn-primary" disabled>
+          📤 Nộp bài ghi âm
+        </button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     Minh Ngọc HSK &copy; 2026 · Hệ thống học tiếng Trung thông minh
   </footer>
 
   <!-- Scripts -->
+  <script src="js/theme.js?v=3.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/xp.js"></script>
   <script src="js/student.js"></script>
+  <script src="js/feedback-popup.js?v=3.0"></script>
   <script src="js/dashboard.js"></script>
 </body>
 </html>

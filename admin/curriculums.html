@@ -3,8 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Quản lý Giáo trình & Bài học — Admin Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css?v=3.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') || 
+                sessionStorage.getItem('minhngoc_theme') || 
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="../js/theme.js?v=3.0"></script>
+  <style>
+    /* Bo góc tròn 100% dạng viên thuốc cho công tắc gạt Sáng/Tối */
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon {
+      font-size: 13px !important;
+      line-height: 1 !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 22px !important;
+      height: 22px !important;
+      border-radius: 50% !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+      z-index: 2 !important;
+      pointer-events: none !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important;
+      border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important;
+      background: #f87171 !important;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon, body[data-theme="dark"] .theme-switch-icon.sun-icon, .theme-switch.is-dark .theme-switch-icon.sun-icon {
+      opacity: 0.35 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
+      opacity: 1 !important;
+    }
+  </style>
 </head>
 <body>
 
@@ -17,6 +111,13 @@
       </a>
 
       <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" style="-webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; position: relative; width: 56px; height: 28px; padding: 0; margin: 0; border: 1.5px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--bg-subtle, #f1f5f9); cursor: pointer; outline: none; box-sizing: border-box; overflow: hidden; vertical-align: middle;" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; pointer-events: none;">
+            <span class="theme-switch-icon sun-icon" style="font-size: 13px; line-height: 1; z-index: 1;">☀️</span>
+            <span class="theme-switch-icon moon-icon" style="font-size: 13px; line-height: 1; z-index: 1;">🌙</span>
+            <span class="theme-switch-thumb" style="position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s ease; z-index: 2;"></span>
+          </span>
+        </button>
         <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
         <span class="user-role-badge role-admin">Admin</span>
         <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
@@ -33,6 +134,8 @@
       <a href="classes.html" class="admin-subnav-btn">📚 Quản lý Lớp học</a>
       <a href="curriculums.html" class="admin-subnav-btn active">📖 Giáo trình & Bài học</a>
       <a href="vocabularies.html" class="admin-subnav-btn">🔤 Kho Từ vựng & Excel</a>
+      <a href="grading.html" class="admin-subnav-btn">🎙️ Chấm bài Ghi âm</a>
+      <a href="settings.html" class="admin-subnav-btn">⚙️ Cài đặt</a>
     </nav>
 
     <!-- Header & Nút tạo giáo trình -->
@@ -65,7 +168,7 @@
 
       <!-- CỘT 2: CHI TIẾT BÀI HỌC CỦA GIÁO TRÌNH ĐANG CHỌN -->
       <div class="card">
-        <div class="section-header" style="margin-bottom: 12px;">
+        <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
           <div>
             <h3 id="selected-curriculum-title" class="card-title" style="margin-bottom: 2px;">
               Danh sách Bài học
@@ -74,24 +177,35 @@
               Chọn một giáo trình bên trái để xem bài học
             </span>
           </div>
-          <button type="button" id="btn-open-create-lesson" class="btn btn-outline btn-sm" style="display: none;">
-            ➕ Thêm Bài Học
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="btn-edit-selected-curr" class="btn btn-outline btn-sm" style="display: none; height: 34px;">
+              ✏️ Sửa Giáo Trình
+            </button>
+            <button type="button" id="btn-delete-selected-curr" class="btn btn-outline btn-sm" style="display: none; height: 34px; color: var(--danger); border-color: #fca5a5;">
+              🗑️ Xóa Giáo Trình
+            </button>
+            <button type="button" id="btn-open-create-lesson" class="btn btn-primary btn-sm" style="display: none; height: 34px;">
+              ➕ Thêm Bài Học
+            </button>
+          </div>
         </div>
 
         <div class="table-responsive">
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width: 70px;">STT</th>
+                <th style="width: 110px;">Thứ tự</th>
                 <th>Tên Hán tự</th>
                 <th>Tên tiếng Việt</th>
                 <th>XP</th>
+                <th>Từ vựng</th>
+                <th>Slide</th>
+                <th style="text-align: right; width: 120px;">Thao tác</th>
               </tr>
             </thead>
             <tbody id="lessons-table-body">
               <tr>
-                <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
                   Chưa chọn giáo trình nào.
                 </td>
               </tr>
@@ -132,6 +246,9 @@
               <option value="HSK4">HSK 4</option>
               <option value="HSK5">HSK 5</option>
               <option value="HSK6">HSK 6</option>
+              <option value="HSK7">HSK 7</option>
+              <option value="HSK8">HSK 8</option>
+              <option value="HSK9">HSK 9</option>
               <option value="GIAO_TIEP">Giao tiếp / Khác</option>
             </select>
           </div>
@@ -200,16 +317,423 @@
     </div>
   </div>
 
+  <!-- MODAL: CHỈNH SỬA GIÁO TRÌNH -->
+  <div id="modal-edit-curriculum" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Chỉnh Sửa Giáo Trình</h3>
+        <button type="button" class="modal-close" data-close="modal-edit-curriculum">&times;</button>
+      </div>
+      <form id="form-edit-curriculum">
+        <input type="hidden" id="edit-curr-id">
+        <div class="modal-body">
+          <div id="edit-curriculum-modal-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-curr-title">Tên giáo trình *</label>
+            <input type="text" id="edit-curr-title" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-curr-code">Mã giáo trình (Viết hoa không dấu) *</label>
+            <input type="text" id="edit-curr-code" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-curr-level">Trình độ</label>
+            <select id="edit-curr-level" class="form-control">
+              <option value="HSK1">HSK 1</option>
+              <option value="HSK2">HSK 2</option>
+              <option value="HSK3">HSK 3</option>
+              <option value="HSK4">HSK 4</option>
+              <option value="HSK5">HSK 5</option>
+              <option value="HSK6">HSK 6</option>
+              <option value="HSK7">HSK 7</option>
+              <option value="HSK8">HSK 8</option>
+              <option value="HSK9">HSK 9</option>
+              <option value="GIAO_TIEP">Giao tiếp / Khác</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-curr-description">Mô tả giáo trình</label>
+            <textarea id="edit-curr-description" class="form-control" rows="3"></textarea>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-main);">
+              <input type="checkbox" id="edit-curr-active" style="width: 18px; height: 18px;">
+              <span>Đang hoạt động (Hiển thị cho giáo viên chọn khi tạo lớp)</span>
+            </label>
+            <div style="font-size: 12px; color: var(--text-muted); margin-left: 26px; margin-top: 4px;">
+              Tắt mục này để ẩn giáo trình thay vì xóa nếu giáo trình đang được các lớp học sử dụng.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-edit-curriculum">Hủy</button>
+          <button type="submit" id="btn-submit-edit-curriculum" class="btn btn-primary">Lưu thay đổi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: XÓA GIÁO TRÌNH (KIỂM TRA AN TOÀN) -->
+  <div id="modal-delete-curriculum" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--danger);">Xóa Giáo Trình</h3>
+        <button type="button" class="modal-close" data-close="modal-delete-curriculum">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="delete-curr-loading" style="text-align: center; padding: 20px; color: var(--text-muted);">
+          Đang kiểm tra dữ liệu liên quan từ hệ thống...
+        </div>
+
+        <div id="delete-curr-content" style="display: none;">
+          <!-- Khung chặn xóa khi có lớp học đang dùng -->
+          <div id="delete-curr-blocked" class="alert alert-danger" style="display: none;">
+            <div style="font-weight: 700; margin-bottom: 6px;">🚫 KHÔNG THỂ XÓA GIÁO TRÌNH NÀY!</div>
+            <div id="delete-curr-blocked-msg" style="font-size: 13px; line-height: 1.5;"></div>
+            <div style="margin-top: 10px; font-size: 13px;">
+              👉 <strong>Gợi ý:</strong> Bạn có thể bấm <strong>"Sửa giáo trình"</strong> và tắt tùy chọn <em>"Đang hoạt động"</em> để ẩn giáo trình này mà không làm ảnh hưởng tới các lớp học.
+            </div>
+          </div>
+
+          <!-- Khung xác nhận xóa khi giáo trình chưa có lớp học nào dùng -->
+          <div id="delete-curr-allowed" style="display: none;">
+            <div style="font-size: 15px; margin-bottom: 12px; color: var(--text-main);">
+              Bạn có chắc chắn muốn xóa giáo trình <strong id="delete-curr-name" style="color: var(--primary);"></strong>?
+            </div>
+
+            <div class="alert alert-warning show" style="font-size: 13px; line-height: 1.6; margin-bottom: 12px;">
+              <strong>⚠️ Dữ liệu sẽ bị xóa hoàn toàn khỏi database:</strong>
+              <ul style="margin: 6px 0 0 18px; padding: 0;" id="delete-curr-stats-list">
+                <!-- Sẽ chèn các dòng đếm thật từ DB -->
+              </ul>
+              <div style="margin-top: 6px; color: var(--text-muted);">
+                ℹ️ <em>Kho từ vựng gốc không bị xóa. Chỉ các liên kết và bài học thuộc giáo trình này bị hủy bỏ.</em>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-delete-curriculum">Đóng</button>
+        <button type="button" id="btn-confirm-delete-curr" class="btn btn-danger" style="display: none;">
+          🗑️ Xác nhận xóa vĩnh viễn
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CHỈNH SỬA BÀI HỌC -->
+  <div id="modal-edit-lesson" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Chỉnh Sửa Bài Học</h3>
+        <button type="button" class="modal-close" data-close="modal-edit-lesson">&times;</button>
+      </div>
+      <form id="form-edit-lesson">
+        <input type="hidden" id="edit-lesson-id">
+        <div class="modal-body">
+          <div id="edit-lesson-modal-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-lesson-title-zh">Tên bài tiếng Trung (Chữ Hán) *</label>
+            <input type="text" id="edit-lesson-title-zh" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-lesson-title-vi">Tên bài tiếng Việt *</label>
+            <input type="text" id="edit-lesson-title-vi" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-lesson-description">Mô tả ngắn</label>
+            <input type="text" id="edit-lesson-description" class="form-control">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="edit-lesson-xp">Điểm thưởng (XP)</label>
+              <input type="number" id="edit-lesson-xp" class="form-control" min="0">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-lesson-pass-score">Điểm qua Quiz (%)</label>
+              <input type="number" id="edit-lesson-pass-score" class="form-control" min="50" max="100">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-edit-lesson">Hủy</button>
+          <button type="submit" id="btn-submit-edit-lesson" class="btn btn-primary">Lưu thay đổi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: XÓA BÀI HỌC (KIỂM TRA DỮ LIỆU) -->
+  <div id="modal-delete-lesson" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--danger);">Xóa Bài Học</h3>
+        <button type="button" class="modal-close" data-close="modal-delete-lesson">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="delete-lesson-loading" style="text-align: center; padding: 20px; color: var(--text-muted);">
+          Đang kiểm tra dữ liệu bài học...
+        </div>
+
+        <div id="delete-lesson-content" style="display: none;">
+          <div style="font-size: 15px; margin-bottom: 12px; color: var(--text-main);">
+            Bạn có chắc chắn muốn xóa <strong id="delete-lesson-name" style="color: var(--primary);"></strong>?
+          </div>
+
+          <div class="alert alert-warning show" style="font-size: 13px; line-height: 1.6; margin-bottom: 12px;">
+            <strong>⚠️ Dữ liệu sẽ bị ảnh hưởng:</strong>
+            <ul style="margin: 6px 0 0 18px; padding: 0;" id="delete-lesson-stats-list">
+              <!-- Sẽ chèn thống kê thật -->
+            </ul>
+            <div style="margin-top: 6px; color: var(--text-muted);">
+              🔄 Sau khi xóa, số thứ tự các bài học còn lại trong giáo trình sẽ tự động được đánh số lại liên tục (1, 2, 3...).
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-delete-lesson">Hủy</button>
+        <button type="button" id="btn-confirm-delete-lesson" class="btn btn-danger" style="display: none;">
+          🗑️ Xác nhận xóa bài
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: QUẢN LÝ TỪ VỰNG TRONG BÀI HỌC (XEM, GỠ, GỠ HÀNG LOẠT, THÊM TỪ KHO) -->
+  <div id="modal-lesson-vocabularies" class="modal-overlay">
+    <div class="modal-card" style="max-width: 850px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="modal-lesson-vocab-title">Từ vựng trong Bài học</h3>
+          <span id="modal-lesson-vocab-meta" style="font-size: 13px; color: var(--text-muted);"></span>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-lesson-vocabularies">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top: 12px;">
+        <div id="lesson-vocab-alert" class="alert"></div>
+
+        <!-- Thanh công cụ từ vựng của bài -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; background: var(--bg-subtle); padding: 10px 14px; border-radius: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; font-weight: 600; color: var(--text-main);">
+              <input type="checkbox" id="check-all-lesson-vocab" style="width: 16px; height: 16px;">
+              <span>Chọn tất cả</span>
+            </label>
+            <button type="button" id="btn-batch-remove-vocab" class="btn btn-danger btn-sm" style="display: none; height: 32px; padding: 0 10px; font-size: 13px;">
+              ❌ Gỡ (<span id="selected-vocab-count">0</span>) từ đã chọn
+            </button>
+          </div>
+
+          <button type="button" id="btn-open-add-vocab-modal" class="btn btn-primary btn-sm" style="height: 32px; padding: 0 12px; font-size: 13px;">
+            ➕ Thêm từ từ kho
+          </button>
+        </div>
+
+        <!-- Bảng danh sách từ trong bài -->
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;">#</th>
+                <th style="width: 110px;">Chữ Hán</th>
+                <th style="width: 110px;">Phiên âm</th>
+                <th>Nghĩa tiếng Việt</th>
+                <th style="width: 70px;">Cấp độ</th>
+                <th style="width: 70px; text-align: right;">Gỡ</th>
+              </tr>
+            </thead>
+            <tbody id="lesson-vocab-table-body">
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                  Đang tải từ vựng...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-lesson-vocabularies">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TÌM & CHỌN TỪ TỪ KHO ĐỂ THÊM VÀO BÀI HỌC -->
+  <div id="modal-add-vocab-to-lesson" class="modal-overlay">
+    <div class="modal-card" style="max-width: 800px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">Thêm Từ Vựng Từ Kho Vào Bài Học</h3>
+          <span style="font-size: 13px; color: var(--text-muted);">Tìm kiếm và tích chọn các từ có sẵn trong kho để gán vào bài</span>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-add-vocab-to-lesson">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top: 12px;">
+        <div id="add-vocab-alert" class="alert"></div>
+
+        <!-- Bộ lọc & tìm kiếm -->
+        <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+          <input type="text" id="search-warehouse-vocab" class="form-control" placeholder="Tìm theo chữ Hán, Pinyin hoặc nghĩa tiếng Việt..." style="flex: 1; min-width: 200px;">
+          <select id="filter-warehouse-hsk" class="form-control" style="width: 130px;">
+            <option value="all">Tất cả HSK</option>
+            <option value="1">HSK 1</option>
+            <option value="2">HSK 2</option>
+            <option value="3">HSK 3</option>
+            <option value="4">HSK 4</option>
+            <option value="5">HSK 5</option>
+            <option value="6">HSK 6</option>
+            <option value="7">HSK 7</option>
+            <option value="8">HSK 8</option>
+            <option value="9">HSK 9</option>
+          </select>
+          <button type="button" id="btn-search-warehouse" class="btn btn-outline btn-sm" style="padding: 0 14px;">
+            🔍 Tìm
+          </button>
+        </div>
+
+        <!-- Danh sách từ trong kho -->
+        <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;">
+                  <input type="checkbox" id="check-all-warehouse-vocab" style="width: 16px; height: 16px;">
+                </th>
+                <th style="width: 110px;">Chữ Hán</th>
+                <th style="width: 110px;">Phiên âm</th>
+                <th>Nghĩa tiếng Việt</th>
+                <th style="width: 80px;">Cấp độ</th>
+              </tr>
+            </thead>
+            <tbody id="warehouse-vocab-table-body">
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                  Nhập từ khóa hoặc bấm "Tìm" để nạp từ trong kho.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-add-vocab-to-lesson">Hủy</button>
+        <button type="button" id="btn-confirm-add-warehouse-vocab" class="btn btn-primary" disabled>
+          ➕ Thêm (0) từ vào bài học
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: QUẢN LÝ SLIDE BÀI GIẢNG (TẢI LÊN, XEM, XÓA & THEO DÕI DUNG LƯỢNG) -->
+  <div id="modal-lesson-slides" class="modal-overlay">
+    <div class="modal-card" style="max-width: 820px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="modal-slide-lesson-title">Slide Bài Giảng</h3>
+          <span id="modal-slide-lesson-meta" style="font-size: 13px; color: var(--text-muted);"></span>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-lesson-slides">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top: 12px;">
+        <div id="slide-modal-alert" class="alert"></div>
+
+        <!-- Thanh giám sát dung lượng Storage (Gói Free 1GB) -->
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">
+              📊 Dung lượng lưu trữ Slide (Gói miễn phí 1 GB)
+            </span>
+            <span id="slide-storage-text" style="font-size: 12px; font-weight: 600; color: var(--primary);">
+              Đang tính toán...
+            </span>
+          </div>
+          <div style="width: 100%; height: 8px; background: rgba(0,0,0,0.1); border-radius: 999px; overflow: hidden;">
+            <div id="slide-storage-bar" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s;"></div>
+          </div>
+        </div>
+
+        <!-- Form Tải Slide Lên -->
+        <form id="form-upload-slide" style="background: var(--bg-card); border: 1.5px dashed var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 10px; color: var(--text-main);">
+            📤 Tải lên tài liệu slide mới
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 12px; margin-bottom: 10px;">
+            <div>
+              <label class="form-label" for="slide-title-input" style="font-size: 12px;">Tiêu đề slide *</label>
+              <input type="text" id="slide-title-input" class="form-control" placeholder="Ví dụ: Slide Ngữ pháp & Mẫu câu" required style="height: 38px;">
+            </div>
+            <div>
+              <label class="form-label" for="slide-file-input" style="font-size: 12px;">Chọn file (.pdf, .pptx, .ppt) *</label>
+              <input type="file" id="slide-file-input" class="form-control" accept=".pdf,.pptx,.ppt,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation" required style="height: 38px; padding: 4px 8px; font-size: 12px;">
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+              💡 <strong>Khuyên dùng:</strong> <em>Nên xuất slide sang định dạng <strong>PDF</strong> để học sinh có thể xem trực tiếp ngay trên trang web/điện thoại. File PowerPoint (.pptx) chỉ hỗ trợ tải về.</em>
+              <br>Giới hạn tối đa: <strong>20 MB / file</strong>.
+            </div>
+            <button type="submit" id="btn-submit-upload-slide" class="btn btn-primary btn-sm" style="height: 36px; padding: 0 16px; font-size: 13px;">
+              Tải lên bài học
+            </button>
+          </div>
+        </form>
+
+        <!-- Danh sách Slide hiện có trong bài -->
+        <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--text-main);">
+          📑 Danh sách slide của bài học này
+        </div>
+        <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 50px;">Định dạng</th>
+                <th>Tiêu đề tài liệu</th>
+                <th style="width: 100px;">Dung lượng</th>
+                <th style="width: 120px;">Xem / Tải</th>
+                <th style="width: 70px; text-align: right;">Xóa</th>
+              </tr>
+            </thead>
+            <tbody id="slide-list-table-body">
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">
+                  Đang nạp danh sách slide...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-lesson-slides">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
   </footer>
 
   <!-- Scripts -->
+  <script src="../js/theme.js?v=4.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/db.js"></script>
-  <script src="../js/auth.js"></script>
-  <script src="../js/admin.js"></script>
-  <script src="../js/admin-curriculums.js"></script>
+  <script src="../js/config.js?v=4.0"></script>
+  <script src="../js/db.js?v=4.0"></script>
+  <script src="../js/auth.js?v=4.0"></script>
+  <script src="../js/admin.js?v=4.0"></script>
+  <script src="../js/admin-curriculums.js?v=4.0"></script>
 </body>
 </html>

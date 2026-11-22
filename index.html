@@ -3,10 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Đăng nhập & Đăng ký — Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=3.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') || 
+                sessionStorage.getItem('minhngoc_theme') || 
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="js/theme.js?v=3.0"></script>
+  <style>
+    /* Bo góc tròn 100% dạng viên thuốc cho công tắc gạt Sáng/Tối */
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon {
+      font-size: 13px !important;
+      line-height: 1 !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 22px !important;
+      height: 22px !important;
+      border-radius: 50% !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+      z-index: 2 !important;
+      pointer-events: none !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important;
+      border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important;
+      background: #f87171 !important;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon, body[data-theme="dark"] .theme-switch-icon.sun-icon, .theme-switch.is-dark .theme-switch-icon.sun-icon {
+      opacity: 0.35 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
+      opacity: 1 !important;
+    }
+  </style>
 </head>
 <body>
+
+  <!-- Nút chuyển đổi Sáng / Tối trên trang Đăng nhập -->
+  <div style="position: absolute; top: 16px; right: 16px; z-index: 50;">
+    <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" style="-webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; position: relative; width: 56px; height: 28px; padding: 0; margin: 0; border: 1.5px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--bg-subtle, #f1f5f9); cursor: pointer; outline: none; box-sizing: border-box; overflow: hidden; vertical-align: middle;" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; pointer-events: none;">
+            <span class="theme-switch-icon sun-icon" style="font-size: 13px; line-height: 1; z-index: 1;">☀️</span>
+            <span class="theme-switch-icon moon-icon" style="font-size: 13px; line-height: 1; z-index: 1;">🌙</span>
+            <span class="theme-switch-thumb" style="position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s ease; z-index: 2;"></span>
+          </span>
+        </button>
+  </div>
 
   <!-- Khung đăng nhập / đăng ký trung tâm -->
   <div class="auth-page-container">
@@ -132,6 +237,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
 
   <!-- Các file logic hệ thống -->
+  <script src="js/theme.js?v=3.0"></script>
   <script src="js/config.js"></script>
   <script src="js/db.js"></script>
   <script src="js/auth.js"></script>

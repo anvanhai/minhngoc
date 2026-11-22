@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Chấm bài Nói & Ghi âm — Admin Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="../css/style.css?v=3.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') || 
+                sessionStorage.getItem('minhngoc_theme') || 
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="../js/theme.js?v=3.0"></script>
+  <style>
+    /* Bo góc tròn 100% dạng viên thuốc cho công tắc gạt Sáng/Tối */
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon {
+      font-size: 13px !important;
+      line-height: 1 !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 22px !important;
+      height: 22px !important;
+      border-radius: 50% !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+      z-index: 2 !important;
+      pointer-events: none !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important;
+      border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important;
+      background: #f87171 !important;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon, body[data-theme="dark"] .theme-switch-icon.sun-icon, .theme-switch.is-dark .theme-switch-icon.sun-icon {
+      opacity: 0.35 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
+      opacity: 1 !important;
+    }
+
+    .grading-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s;
+    }
+    .grading-card:hover {
+      border-color: var(--primary);
+    }
+    .audio-player-box {
+      background: var(--bg-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Thanh Navbar dành cho Quản trị viên -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="classes.html" class="nav-brand">
+        <div class="nav-brand-logo">管</div>
+        <span>Minh Ngọc HSK · Quản trị</span>
+      </a>
+
+      <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" style="-webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; position: relative; width: 56px; height: 28px; padding: 0; margin: 0; border: 1.5px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--bg-subtle, #f1f5f9); cursor: pointer; outline: none; box-sizing: border-box; overflow: hidden; vertical-align: middle;" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; pointer-events: none;">
+            <span class="theme-switch-icon sun-icon" style="font-size: 13px; line-height: 1; z-index: 1;">☀️</span>
+            <span class="theme-switch-icon moon-icon" style="font-size: 13px; line-height: 1; z-index: 1;">🌙</span>
+            <span class="theme-switch-thumb" style="position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s ease; z-index: 2;"></span>
+          </span>
+        </button>
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-admin">Admin</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung chính Admin -->
+  <main class="main-wrapper">
+    <!-- Thanh menu phụ Admin -->
+    <nav class="admin-subnav">
+      <a href="classes.html" class="admin-subnav-btn">📚 Quản lý Lớp học</a>
+      <a href="curriculums.html" class="admin-subnav-btn">📖 Giáo trình & Bài học</a>
+      <a href="vocabularies.html" class="admin-subnav-btn">🔤 Kho Từ vựng & Excel</a>
+      <a href="grading.html" class="admin-subnav-btn active">🎙️ Chấm bài Ghi âm</a>
+      <a href="settings.html" class="admin-subnav-btn">⚙️ Cài đặt</a>
+    </nav>
+
+    <!-- Tiêu đề & Giới thiệu -->
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Chấm Bài Nói & Ghi Âm</h1>
+        <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+          Nghe trực tiếp bản ghi âm của học sinh, nhập điểm và gửi lời nhận xét để khích lệ học sinh phát âm chuẩn.
+        </p>
+      </div>
+      <div style="font-size: 13px; color: var(--text-muted);">
+        Chờ chấm: <strong id="badge-pending-count" style="color: var(--danger); font-size: 16px;">0</strong> bài
+      </div>
+    </div>
+
+    <!-- Alert thông báo -->
+    <div id="page-alert" class="alert"></div>
+
+    <!-- Bộ lọc bài chấm -->
+    <div class="card" style="margin-bottom: 20px; padding: 14px 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: flex-end;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="filter-class">Lớp học</label>
+          <select id="filter-class" class="form-control">
+            <option value="">-- Tất cả các lớp học --</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="filter-status">Trạng thái chấm</label>
+          <select id="filter-status" class="form-control">
+            <option value="submitted">🟡 Chờ chấm (Mới nộp)</option>
+            <option value="graded">🟢 Đã chấm xong</option>
+            <option value="all">Tất cả các bài</option>
+          </select>
+        </div>
+
+        <div>
+          <button type="button" id="btn-refresh-grading" class="btn btn-outline" style="width: 100%;">
+            🔄 Làm mới danh sách
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danh sách các bài nộp ghi âm -->
+    <div id="grading-list-container">
+      <div style="text-align: center; padding: 48px; color: var(--text-muted);">
+        Đang tải danh sách bài tập ghi âm...
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
+  </footer>
+
+  <!-- Scripts -->
+  <script src="../js/theme.js?v=3.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/admin-grading.js"></script>
+</body>
+</html>

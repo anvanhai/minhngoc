@@ -3,8 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Quản lý Lớp học — Admin Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css?v=3.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') || 
+                sessionStorage.getItem('minhngoc_theme') || 
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="../js/theme.js?v=3.0"></script>
+  <style>
+    /* Bo góc tròn 100% dạng viên thuốc cho công tắc gạt Sáng/Tối */
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon {
+      font-size: 13px !important;
+      line-height: 1 !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 22px !important;
+      height: 22px !important;
+      border-radius: 50% !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+      z-index: 2 !important;
+      pointer-events: none !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important;
+      border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important;
+      background: #f87171 !important;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon, body[data-theme="dark"] .theme-switch-icon.sun-icon, .theme-switch.is-dark .theme-switch-icon.sun-icon {
+      opacity: 0.35 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
+      opacity: 1 !important;
+    }
+  </style>
 </head>
 <body>
 
@@ -17,6 +111,13 @@
       </a>
 
       <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" style="-webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; position: relative; width: 56px; height: 28px; padding: 0; margin: 0; border: 1.5px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--bg-subtle, #f1f5f9); cursor: pointer; outline: none; box-sizing: border-box; overflow: hidden; vertical-align: middle;" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; pointer-events: none;">
+            <span class="theme-switch-icon sun-icon" style="font-size: 13px; line-height: 1; z-index: 1;">☀️</span>
+            <span class="theme-switch-icon moon-icon" style="font-size: 13px; line-height: 1; z-index: 1;">🌙</span>
+            <span class="theme-switch-thumb" style="position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s ease; z-index: 2;"></span>
+          </span>
+        </button>
         <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
         <span class="user-role-badge role-admin">Admin</span>
         <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
@@ -33,6 +134,8 @@
       <a href="classes.html" class="admin-subnav-btn active">📚 Quản lý Lớp học</a>
       <a href="curriculums.html" class="admin-subnav-btn">📖 Giáo trình & Bài học</a>
       <a href="vocabularies.html" class="admin-subnav-btn">🔤 Kho Từ vựng & Excel</a>
+      <a href="grading.html" class="admin-subnav-btn">🎙️ Chấm bài Ghi âm</a>
+      <a href="settings.html" class="admin-subnav-btn">⚙️ Cài đặt</a>
     </nav>
 
     <!-- Tiêu đề & Nút Tạo lớp -->
@@ -97,6 +200,9 @@
               <option value="HSK4">HSK 4</option>
               <option value="HSK5">HSK 5</option>
               <option value="HSK6">HSK 6</option>
+              <option value="HSK7">HSK 7</option>
+              <option value="HSK8">HSK 8</option>
+              <option value="HSK9">HSK 9</option>
               <option value="GIAO_TIEP">Tiếng Trung Giao tiếp</option>
             </select>
           </div>
@@ -122,16 +228,166 @@
     </div>
   </div>
 
+  <!-- MODAL: CHỈNH SỬA LỚP HỌC -->
+  <div id="modal-edit-class" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Chỉnh Sửa Thông Tin Lớp Học</h3>
+        <button type="button" class="modal-close" data-close="modal-edit-class">&times;</button>
+      </div>
+      <form id="form-edit-class">
+        <input type="hidden" id="edit-class-id">
+        <div class="modal-body">
+          <div id="edit-class-modal-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-class-name">Tên lớp học *</label>
+            <input type="text" id="edit-class-name" class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-class-curriculum">Giáo trình áp dụng *</label>
+            <select id="edit-class-curriculum" class="form-control" required>
+              <option value="">-- Đang nạp giáo trình --</option>
+            </select>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="edit-class-level">Trình độ</label>
+              <select id="edit-class-level" class="form-control">
+                <option value="HSK1">HSK 1</option>
+                <option value="HSK2">HSK 2</option>
+                <option value="HSK3">HSK 3</option>
+                <option value="HSK4">HSK 4</option>
+                <option value="HSK5">HSK 5</option>
+                <option value="HSK6">HSK 6</option>
+                <option value="HSK7">HSK 7</option>
+                <option value="HSK8">HSK 8</option>
+                <option value="HSK9">HSK 9</option>
+                <option value="GIAO_TIEP">Tiếng Trung Giao tiếp</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-class-teacher">Giáo viên phụ trách</label>
+              <select id="edit-class-teacher" class="form-control">
+                <option value="">-- Chưa chỉ định --</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="edit-class-start-date">Ngày khai giảng</label>
+              <input type="date" id="edit-class-start-date" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="edit-class-end-date">Ngày kết thúc</label>
+              <input type="date" id="edit-class-end-date" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="edit-class-unlock-mode">Chế độ mở khóa bài học</label>
+            <select id="edit-class-unlock-mode" class="form-control">
+              <option value="sequential">Học tuần tự (Làm xong bài trước mới mở bài sau)</option>
+              <option value="all_open">Mở toàn bộ bài (Học sinh tự do học và ôn lại)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="edit-class-status">Trạng thái lớp</label>
+            <select id="edit-class-status" class="form-control">
+              <option value="ongoing">🟢 Đang học (Ongoing)</option>
+              <option value="paused">🟡 Tạm dừng (Paused)</option>
+              <option value="completed">⚪ Đã kết thúc (Completed - Lưu trữ)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-edit-class">Hủy</button>
+          <button type="submit" id="btn-submit-edit-class" class="btn btn-primary">Lưu thay đổi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: XÓA LỚP HỌC (XÁC NHẬN BẰNG TÊN LỚP) -->
+  <div id="modal-delete-class" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--danger);">Xóa Lớp Học</h3>
+        <button type="button" class="modal-close" data-close="modal-delete-class">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="delete-class-loading" style="text-align: center; padding: 24px; color: var(--text-muted);">
+          Đang kiểm tra dữ liệu lớp học...
+        </div>
+
+        <div id="delete-class-content" style="display: none;">
+          <!-- Khuyến nghị an toàn nếu lớp có dữ liệu -->
+          <div id="delete-class-safe-recommend" class="alert alert-warning show" style="display: none; margin-bottom: 16px;">
+            <div style="font-weight: 700; margin-bottom: 4px;">💡 Khuyên dùng: Đổi trạng thái sang "Đã kết thúc"</div>
+            <div style="font-size: 13px; line-height: 1.5;">
+              Lớp này đang có dữ liệu học tập. Thay vì xóa hẳn, bạn có thể chuyển trạng thái sang <strong>"Đã kết thúc"</strong> để lưu trữ an toàn mà không làm mất bài tập và bài ghi âm của học sinh.
+            </div>
+            <div style="margin-top: 10px;">
+              <button type="button" id="btn-archive-class-instead" class="btn btn-secondary btn-sm">
+                📦 Chuyển sang "Đã kết thúc" ngay
+              </button>
+            </div>
+          </div>
+
+          <div style="font-size: 15px; margin-bottom: 12px; color: var(--text-main);">
+            Bạn có chắc chắn muốn xóa vĩnh viễn lớp: <strong id="delete-class-display-name" style="color: var(--danger);"></strong>?
+          </div>
+
+          <div class="alert alert-danger show" style="font-size: 13px; line-height: 1.6; margin-bottom: 14px;">
+            <strong>⚠️ Các dữ liệu của lớp này sẽ bị dọn sạch:</strong>
+            <ul style="margin: 6px 0 0 18px; padding: 0;" id="delete-class-stats-list">
+              <!-- Render động thống kê -->
+            </ul>
+            <div style="margin-top: 8px; font-weight: 600; color: #15803d;">
+              🛡️ <em>Tài khoản học sinh, toàn bộ điểm XP tích lũy trọn đời và huy hiệu được BẢO TOÀN 100%.</em>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="input-confirm-delete-class-name" style="font-weight: 700; color: var(--danger);">
+              Gõ chính xác tên lớp để mở nút xóa:
+            </label>
+            <input
+              type="text"
+              id="input-confirm-delete-class-name"
+              class="form-control"
+              placeholder="Nhập đúng tên lớp ở trên..."
+              autocomplete="off"
+            >
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-delete-class">Hủy</button>
+        <button type="button" id="btn-confirm-delete-class" class="btn btn-danger" disabled style="opacity: 0.5; cursor: not-allowed;">
+          🗑️ Xác nhận xóa vĩnh viễn
+        </button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
   </footer>
 
   <!-- Scripts -->
+  <script src="../js/theme.js?v=4.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/db.js"></script>
-  <script src="../js/auth.js"></script>
-  <script src="../js/admin.js"></script>
-  <script src="../js/admin-classes.js"></script>
+  <script src="../js/config.js?v=4.0"></script>
+  <script src="../js/db.js?v=4.0"></script>
+  <script src="../js/auth.js?v=4.0"></script>
+  <script src="../js/admin.js?v=4.0"></script>
+  <script src="../js/admin-classes.js?v=4.0"></script>
 </body>
 </html>

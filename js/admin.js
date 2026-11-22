@@ -58,6 +58,97 @@ window.Admin = (function () {
     return data;
   }
 
+  async function updateCurriculum(id, { title, code, level, description, isActive }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const updateData = {};
+    if (title !== undefined) updateData.title = title.trim();
+    if (code !== undefined) updateData.code = code.trim().toUpperCase();
+    if (level !== undefined) updateData.level = level.trim();
+    if (description !== undefined) updateData.description = description ? description.trim() : null;
+    if (isActive !== undefined) updateData.is_active = Boolean(isActive);
+
+    const { data, error } = await db
+      .from('curriculums')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function getCurriculumUsageStats(id) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    // 1. Thử gọi hàm RPC bảo mật
+    const { data, error } = await db.rpc('get_curriculum_usage_stats', { p_curriculum_id: id });
+    if (!error && data) {
+      return data;
+    }
+
+    // 2. Fallback trực tiếp nếu chưa chạy migration SQL RPC
+    console.warn('RPC get_curriculum_usage_stats chưa được nạp hoặc lỗi, fallback truy vấn an toàn:', error);
+    const { data: classesData } = await db
+      .from('classes')
+      .select('name')
+      .eq('curriculum_id', id);
+
+    const classNames = (classesData || []).map(c => c.name);
+    const classCount = classNames.length;
+
+    const { count: lessonCount } = await db
+      .from('lessons')
+      .select('*', { count: 'exact', head: true })
+      .eq('curriculum_id', id);
+
+    return {
+      can_delete: classCount === 0,
+      class_count: classCount,
+      class_names: classNames,
+      lesson_count: lessonCount || 0,
+      vocab_link_count: 0,
+      progress_count: 0,
+      slide_count: 0,
+      recording_count: 0
+    };
+  }
+
+  async function deleteCurriculum(id) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    // 1. Lấy danh sách slide files thuộc giáo trình này trước khi xóa
+    let slidePaths = [];
+    try {
+      const { data: slides } = await db
+        .from('lesson_slides')
+        .select('file_path, lesson:lessons!inner(curriculum_id)')
+        .eq('lesson.curriculum_id', id);
+      if (slides && slides.length > 0) {
+        slidePaths = slides.map(s => s.file_path).filter(Boolean);
+      }
+    } catch (e) {}
+
+    // 2. Gọi hàm RPC xóa an toàn trong database
+    const { data, error } = await db.rpc('admin_delete_curriculum', { p_curriculum_id: id });
+    if (error) throw error;
+
+    // 3. Dọn sạch file slide qua Storage API (tránh lỗi cấm DELETE trực tiếp bảng storage.objects)
+    if (slidePaths.length > 0) {
+      try {
+        await db.storage.from('lesson-slides').remove(slidePaths);
+      } catch (err) {
+        console.warn('Lỗi dọn file Storage slide:', err);
+      }
+    }
+
+    return data;
+  }
+
   // ===========================================================================
   // 2. QUẢN LÝ BÀI HỌC (LESSONS)
   // ===========================================================================
@@ -93,6 +184,91 @@ window.Admin = (function () {
       .select()
       .single();
 
+    if (error) throw error;
+    return data;
+  }
+
+  async function getLessonById(id) {
+    const db = getDb();
+    if (!db) return null;
+    const { data, error } = await db
+      .from('lessons')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function updateLesson(id, { titleZh, titleVi, description, rewardXp, passScore }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const updateData = {};
+    if (titleZh !== undefined) updateData.title_zh = titleZh.trim();
+    if (titleVi !== undefined) updateData.title_vi = titleVi.trim();
+    if (description !== undefined) updateData.description = description ? description.trim() : null;
+    if (rewardXp !== undefined) updateData.reward_xp = parseInt(rewardXp, 10);
+    if (passScore !== undefined) updateData.pass_score_percent = parseInt(passScore, 10);
+
+    const { data, error } = await db
+      .from('lessons')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function getLessonUsageStats(id) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_lesson_usage_stats', { p_lesson_id: id });
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteLesson(id) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    // 1. Lấy danh sách file slide của bài học trước khi xóa
+    let slidePaths = [];
+    try {
+      const { data: slides } = await db
+        .from('lesson_slides')
+        .select('file_path')
+        .eq('lesson_id', id);
+      if (slides && slides.length > 0) {
+        slidePaths = slides.map(s => s.file_path).filter(Boolean);
+      }
+    } catch (e) {}
+
+    // 2. Gọi hàm RPC xóa an toàn trong database
+    const { data, error } = await db.rpc('admin_delete_lesson', { p_lesson_id: id });
+    if (error) throw error;
+
+    // 3. Dọn sạch file slide qua Storage API
+    if (slidePaths.length > 0) {
+      try {
+        await db.storage.from('lesson-slides').remove(slidePaths);
+      } catch (err) {
+        console.warn('Lỗi dọn file Storage slide:', err);
+      }
+    }
+
+    return data;
+  }
+
+  async function reorderLessons(curriculumId, lessonIds) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('reorder_lessons', {
+      p_curriculum_id: curriculumId,
+      p_lesson_ids: lessonIds
+    });
     if (error) throw error;
     return data;
   }
@@ -204,6 +380,68 @@ window.Admin = (function () {
 
     if (error) throw error;
     return true;
+  }
+
+  async function updateVocabulary(id, { hanzi, pinyin, meaningVi, hskLevel, partOfSpeech, exampleHanzi, examplePinyin, exampleVi }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const updateData = {};
+    if (hanzi !== undefined) updateData.hanzi = hanzi.trim();
+    if (pinyin !== undefined) updateData.pinyin = pinyin.trim();
+    if (meaningVi !== undefined) updateData.meaning_vi = meaningVi.trim();
+    if (hskLevel !== undefined) updateData.hsk_level = parseInt(hskLevel, 10) || 1;
+    if (partOfSpeech !== undefined) updateData.part_of_speech = partOfSpeech ? partOfSpeech.trim() : null;
+    if (exampleHanzi !== undefined) updateData.example_hanzi = exampleHanzi ? exampleHanzi.trim() : null;
+    if (examplePinyin !== undefined) updateData.example_pinyin = examplePinyin ? examplePinyin.trim() : null;
+    if (exampleVi !== undefined) updateData.example_vi = exampleVi ? exampleVi.trim() : null;
+
+    const { data, error } = await db
+      .from('vocabularies')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteVocabulary(id) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('admin_delete_vocabulary', { p_vocab_id: id });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getVocabularyUsageStats(vocabId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_vocabulary_usage_stats', { p_vocab_id: vocabId });
+    if (error) throw error;
+    return data;
+  }
+
+  async function batchRemoveWordsFromLesson(lessonId, vocabIds) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('batch_remove_words_from_lesson', {
+      p_lesson_id: lessonId,
+      p_vocab_ids: vocabIds
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function batchAddWordsToLesson(lessonId, vocabIds) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('batch_add_words_to_lesson', {
+      p_lesson_id: lessonId,
+      p_vocab_ids: vocabIds
+    });
+    if (error) throw error;
+    return data;
   }
 
   /**
@@ -347,6 +585,89 @@ window.Admin = (function () {
       .single();
 
     if (error) throw error;
+    return data;
+  }
+
+  async function getTeachers() {
+    const db = getDb();
+    if (!db) return [];
+    const { data, error } = await db
+      .from('profiles')
+      .select('id, display_name, email, role')
+      .in('role', ['teacher', 'admin'])
+      .order('display_name', { ascending: true });
+    if (error) {
+      console.error('Lỗi tải danh sách giáo viên:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  async function getClassUsageStats(classId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    // 1. Thử gọi hàm RPC bảo mật
+    const { data, error } = await db.rpc('get_class_usage_stats', { p_class_id: classId });
+    if (!error && data) return data;
+
+    // 2. Fallback trực tiếp nếu chưa nạp RPC
+    console.warn('RPC get_class_usage_stats chưa nạp hoặc lỗi, fallback truy vấn:', error);
+    const { data: cls } = await db.from('classes').select('name, status').eq('id', classId).single();
+    const { count: studentCount } = await db.from('enrollments').select('*', { count: 'exact', head: true }).eq('class_id', classId);
+    const { count: assignmentCount } = await db.from('assignments').select('*', { count: 'exact', head: true }).eq('class_id', classId);
+    let recCount = 0;
+    try {
+      const { count } = await db.from('recording_submissions').select('*', { count: 'exact', head: true }).eq('class_id', classId);
+      recCount = count || 0;
+    } catch (e) {}
+
+    return {
+      class_name: cls ? cls.name : '',
+      status: cls ? cls.status : 'ongoing',
+      student_count: studentCount || 0,
+      assignment_count: assignmentCount || 0,
+      submission_count: 0,
+      recording_count: recCount,
+      progress_count: 0,
+      xp_count: 0,
+      has_data: (studentCount > 0 || assignmentCount > 0 || recCount > 0)
+    };
+  }
+
+  async function deleteClass(classId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    // 1. Lấy danh sách file ghi âm trước khi xóa để dọn dẹp Storage
+    let recordingPaths = [];
+    try {
+      const { data: recs } = await db
+        .from('recording_submissions')
+        .select('audio_url')
+        .eq('class_id', classId);
+      if (recs && recs.length > 0) {
+        recordingPaths = recs.map(r => r.audio_url).filter(Boolean);
+      }
+    } catch (e) {}
+
+    // 2. Gọi hàm RPC xóa an toàn trong database
+    const { data, error } = await db.rpc('admin_delete_class', { p_class_id: classId });
+    if (error) throw error;
+
+    // 3. Dọn sạch file âm thanh trong Storage qua Storage API
+    if (data && data.deleted_recording_paths && Array.isArray(data.deleted_recording_paths)) {
+      recordingPaths = recordingPaths.concat(data.deleted_recording_paths);
+    }
+    const uniquePaths = Array.from(new Set(recordingPaths));
+    if (uniquePaths.length > 0) {
+      try {
+        await db.storage.from('assignment-recordings').remove(uniquePaths);
+      } catch (storageErr) {
+        console.warn('Lỗi dọn file Storage ghi âm:', storageErr);
+      }
+    }
+
     return data;
   }
 
@@ -499,6 +820,93 @@ window.Admin = (function () {
     return data;
   }
 
+  async function deleteAssignment(assignmentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { error } = await db.from('assignments').delete().eq('id', assignmentId);
+    if (error) throw error;
+    return true;
+  }
+
+  async function getAssignmentSubmissions(assignmentId, classId) {
+    const db = getDb();
+    if (!db) return [];
+    const { data: students, error: sErr } = await db
+      .from('enrollments')
+      .select('student:profiles(id, display_name, username)')
+      .eq('class_id', classId)
+      .eq('status', 'active');
+    if (sErr) throw sErr;
+
+    const { data: subs, error: subErr } = await db
+      .from('assignment_submissions')
+      .select('*')
+      .eq('assignment_id', assignmentId);
+    if (subErr) throw subErr;
+
+    const subMap = {};
+    (subs || []).forEach(s => { subMap[s.student_id] = s; });
+
+    return (students || []).map(item => ({
+      student: item.student,
+      submission: subMap[item.student.id] || null
+    }));
+  }
+
+  async function getRecordingsForGrading({ classId = 'all', status = 'all' } = {}) {
+    const db = getDb();
+    if (!db) return [];
+    let query = db
+      .from('recording_submissions')
+      .select(`
+        *,
+        student:profiles!recording_submissions_student_id_fkey(id, display_name, username),
+        class:classes!recording_submissions_class_id_fkey(id, name, level),
+        lesson:lessons!recording_submissions_lesson_id_fkey(id, order_index, title_zh, title_vi)
+      `);
+    if (classId && classId !== 'all') query = query.eq('class_id', classId);
+    if (status && status !== 'all') query = query.eq('status', status);
+    query = query.order('created_at', { ascending: false });
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function gradeRecording({ submissionId, score, comment }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('grade_recording_submission', {
+      p_submission_id: submissionId,
+      p_score: parseInt(score, 10),
+      p_comment: comment ? comment.trim() : null
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getAudioPlayUrl(audioPath) {
+    const db = getDb();
+    if (!db || !audioPath) return '';
+    if (audioPath.startsWith('http://') || audioPath.startsWith('https://')) return audioPath;
+    const { data, error } = await db.storage.from('recordings').createSignedUrl(audioPath, 3600);
+    if (error || !data) {
+      const { data: pubData } = db.storage.from('recordings').getPublicUrl(audioPath);
+      return pubData ? pubData.publicUrl : audioPath;
+    }
+    return data.signedUrl;
+  }
+
+  async function deleteRecordingFile(recordingId, audioPath) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    if (audioPath && !audioPath.startsWith('http')) {
+      await db.storage.from('recordings').remove([audioPath]);
+    }
+    const { error } = await db.from('recording_submissions').delete().eq('id', recordingId);
+    if (error) throw error;
+    return true;
+  }
+
   // ===========================================================================
   // 7. MỞ KHÓA BÀI THỦ CÔNG THEO LỚP (MANUAL UNLOCKS)
   // ===========================================================================
@@ -563,26 +971,271 @@ window.Admin = (function () {
     return data;
   }
 
+  // ===========================================================================
+  // 9. CẤU HÌNH THÔNG BÁO KẾT QUẢ / POPUP FEEDBACK (RESULT FEEDBACKS)
+  // ===========================================================================
+
+  async function getFeedbacks({ eventType = 'all' } = {}) {
+    const db = getDb();
+    if (!db) return [];
+
+    let query = db.from('result_feedbacks').select('*');
+    if (eventType && eventType !== 'all') {
+      query = query.eq('event_type', eventType);
+    }
+
+    query = query
+      .order('event_type', { ascending: true })
+      .order('min_score', { ascending: true, nullsFirst: false })
+      .order('sort_order', { ascending: true });
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Lỗi tải danh sách feedback:', error);
+      throw error;
+    }
+    return data || [];
+  }
+
+  async function createFeedback({ eventType, hasScore, minScore, maxScore, title, message, imageUrl, btnText, isActive, sortOrder }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db
+      .from('result_feedbacks')
+      .insert([{
+        event_type: eventType,
+        has_score: Boolean(hasScore),
+        min_score: (hasScore && minScore !== '' && minScore !== null) ? parseInt(minScore, 10) : null,
+        max_score: (hasScore && maxScore !== '' && maxScore !== null) ? parseInt(maxScore, 10) : null,
+        title: title ? title.trim() : null,
+        message: message.trim(),
+        image_url: imageUrl.trim(),
+        btn_text: btnText ? btnText.trim() : 'Tiếp tục',
+        is_active: isActive !== undefined ? Boolean(isActive) : true,
+        sort_order: parseInt(sortOrder || 1, 10)
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function updateFeedback(id, fields) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const updateData = {};
+    if (fields.eventType !== undefined) updateData.event_type = fields.eventType;
+    if (fields.hasScore !== undefined) updateData.has_score = Boolean(fields.hasScore);
+    if (fields.minScore !== undefined) updateData.min_score = (fields.minScore !== '' && fields.minScore !== null) ? parseInt(fields.minScore, 10) : null;
+    if (fields.maxScore !== undefined) updateData.max_score = (fields.maxScore !== '' && fields.maxScore !== null) ? parseInt(fields.maxScore, 10) : null;
+    if (fields.title !== undefined) updateData.title = fields.title ? fields.title.trim() : null;
+    if (fields.message !== undefined) updateData.message = fields.message.trim();
+    if (fields.imageUrl !== undefined) updateData.image_url = fields.imageUrl.trim();
+    if (fields.btnText !== undefined) updateData.btn_text = fields.btnText ? fields.btnText.trim() : 'Tiếp tục';
+    if (fields.isActive !== undefined) updateData.is_active = Boolean(fields.isActive);
+    if (fields.sortOrder !== undefined) updateData.sort_order = parseInt(fields.sortOrder, 10);
+    updateData.updated_at = new Date().toISOString();
+
+    const { data, error } = await db
+      .from('result_feedbacks')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteFeedback(id) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { error } = await db
+      .from('result_feedbacks')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  }
+
+  async function uploadFeedbackImage(file) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    if (!file) throw new Error('Chưa chọn file ảnh');
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('Định dạng ảnh không hợp lệ! Chỉ chấp nhận JPG, PNG, WEBP, GIF.');
+    }
+
+    const maxSize = 2 * 1024 * 1024; // 2 MB
+    if (file.size > maxSize) {
+      throw new Error(`Dung lượng ảnh vượt quá 2MB (kích thước hiện tại: ${(file.size / (1024 * 1024)).toFixed(1)}MB)! Vui lòng nén nhỏ lại.`);
+    }
+
+    const ext = file.name ? file.name.split('.').pop().toLowerCase() : 'png';
+    const filePath = `feedback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+
+    const { error: uploadErr } = await db.storage
+      .from('feedback-images')
+      .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+    if (uploadErr) {
+      console.error('Lỗi tải ảnh lên Supabase Storage:', uploadErr);
+      throw uploadErr;
+    }
+
+    const { data: pubData } = db.storage.from('feedback-images').getPublicUrl(filePath);
+    return pubData ? pubData.publicUrl : '';
+  }
+
+  // ===========================================================================
+  // 10. QUẢN LÝ SLIDE BÀI GIẢNG (LESSON SLIDES)
+  // ===========================================================================
+
+  async function getLessonSlides(lessonId) {
+    const db = getDb();
+    if (!db) return [];
+    const { data, error } = await db
+      .from('lesson_slides')
+      .select('*')
+      .eq('lesson_id', lessonId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('Lỗi tải slide bài học:', error);
+      throw error;
+    }
+    return data || [];
+  }
+
+  async function uploadLessonSlide({ lessonId, title, file }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    if (!file) throw new Error('Chưa chọn file slide');
+
+    const fileName = file.name || '';
+    const ext = fileName.split('.').pop().toLowerCase();
+    if (!['pdf', 'pptx', 'ppt'].includes(ext)) {
+      throw new Error('Định dạng file không hợp lệ! Chỉ chấp nhận file PDF (.pdf) hoặc PowerPoint (.pptx, .ppt).');
+    }
+
+    const maxSize = 20 * 1024 * 1024; // 20 MB
+    if (file.size > maxSize) {
+      throw new Error(`Dung lượng file vượt quá 20MB (kích thước hiện tại: ${(file.size / (1024 * 1024)).toFixed(1)}MB)!`);
+    }
+
+    const filePath = `${lessonId}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+
+    const { error: uploadErr } = await db.storage
+      .from('lesson-slides')
+      .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+    if (uploadErr) {
+      console.error('Lỗi tải slide lên Storage:', uploadErr);
+      throw uploadErr;
+    }
+
+    const { count } = await db
+      .from('lesson_slides')
+      .select('*', { count: 'exact', head: true })
+      .eq('lesson_id', lessonId);
+
+    const { data, error } = await db
+      .from('lesson_slides')
+      .insert([{
+        lesson_id: lessonId,
+        title: title.trim(),
+        file_path: filePath,
+        file_type: ext,
+        file_size: file.size,
+        sort_order: (count || 0) + 1
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteLessonSlide(slideId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('admin_delete_lesson_slide', { p_slide_id: slideId });
+    if (error) throw error;
+
+    if (data && data.file_path) {
+      await db.storage.from('lesson-slides').remove([data.file_path]);
+    }
+    return true;
+  }
+
+  async function getLessonSlidesStorageStats() {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_lesson_slides_storage_stats');
+    if (error) throw error;
+    return data;
+  }
+
+  async function getSlideViewUrl(filePath) {
+    const db = getDb();
+    if (!db || !filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+
+    const { data, error } = await db.storage
+      .from('lesson-slides')
+      .createSignedUrl(filePath, 3600);
+
+    if (error || !data) {
+      const { data: pubData } = db.storage.from('lesson-slides').getPublicUrl(filePath);
+      return pubData ? pubData.publicUrl : filePath;
+    }
+    return data.signedUrl;
+  }
+
   return {
     // Giáo trình
     getCurriculums,
     getCurriculumById,
     createCurriculum,
+    updateCurriculum,
+    getCurriculumUsageStats,
+    deleteCurriculum,
     // Bài học
     getLessonsByCurriculum,
+    getLessonById,
     createLesson,
+    updateLesson,
+    getLessonUsageStats,
+    deleteLesson,
+    reorderLessons,
     // Từ vựng
     getVocabularies,
     createVocabulary,
+    updateVocabulary,
+    deleteVocabulary,
+    getVocabularyUsageStats,
     getLessonVocabularies,
     addWordToLesson,
     removeWordFromLesson,
+    batchRemoveWordsFromLesson,
+    batchAddWordsToLesson,
     batchImportVocabularies,
     // Lớp học
     getClasses,
     getClassById,
     createClass,
     updateClass,
+    deleteClass,
+    getClassUsageStats,
+    getTeachers,
     // Học sinh
     getClassStudents,
     getAvailableStudentsForClass,
@@ -591,10 +1244,28 @@ window.Admin = (function () {
     // Bài tập
     getClassAssignments,
     createAssignment,
+    deleteAssignment,
+    getAssignmentSubmissions,
+    getRecordingsForGrading,
+    gradeRecording,
+    getAudioPlayUrl,
+    deleteRecordingFile,
     // Mở khóa thủ công
     getClassLessonUnlocks,
     setLessonUnlockForClass,
     // Chuyển lớp
-    promoteOrTransferStudent
+    promoteOrTransferStudent,
+    // Cấu hình Feedback thông báo kết quả
+    getFeedbacks,
+    createFeedback,
+    updateFeedback,
+    deleteFeedback,
+    uploadFeedbackImage,
+    // Slide bài giảng
+    getLessonSlides,
+    uploadLessonSlide,
+    deleteLessonSlide,
+    getLessonSlidesStorageStats,
+    getSlideViewUrl
   };
 })();

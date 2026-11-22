@@ -32,9 +32,33 @@ document.addEventListener('DOMContentLoaded', async function () {
   const tabBtnVocab = document.getElementById('tab-btn-vocab');
   const tabBtnFlashcard = document.getElementById('tab-btn-flashcard');
   const tabBtnQuiz = document.getElementById('tab-btn-quiz');
+  const tabBtnSlides = document.getElementById('tab-btn-slides');
   const modeVocabContainer = document.getElementById('mode-vocab-container');
   const modeFlashcardContainer = document.getElementById('mode-flashcard-container');
   const modeQuizContainer = document.getElementById('mode-quiz-container');
+  const modeSlidesContainer = document.getElementById('mode-slides-container');
+  const studioContainer = document.querySelector('.lesson-studio-container');
+
+  // Slide Elements
+  const slidesLoading = document.getElementById('slides-loading');
+  const slidesEmpty = document.getElementById('slides-empty');
+  const slidesContent = document.getElementById('slides-content');
+  const slidesPillsContainer = document.getElementById('slides-pills-container');
+  const btnSlideDownload = document.getElementById('btn-slide-download');
+  const btnSlideFullscreen = document.getElementById('btn-slide-fullscreen');
+  const slideTypeBadge = document.getElementById('slide-type-badge');
+  const slideTitleDisplay = document.getElementById('slide-title-display');
+  const slideSizeDisplay = document.getElementById('slide-size-display');
+  const slidePdfViewerWrap = document.getElementById('slide-pdf-viewer-wrap');
+  const slidePdfIframe = document.getElementById('slide-pdf-iframe');
+  const slidePptxViewerWrap = document.getElementById('slide-pptx-viewer-wrap');
+  const pptxTitleDisplay = document.getElementById('pptx-title-display');
+  const btnPptxDownload = document.getElementById('btn-pptx-download');
+  const pptxSizeText = document.getElementById('pptx-size-text');
+
+  let lessonSlides = [];
+  let currentSlideIndex = 0;
+  let slidesLoaded = false;
 
   // Vocab Elements
   const vocabHanzi = document.getElementById('vocab-hanzi');
@@ -112,11 +136,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         <div class="card" style="text-align: center; padding: 40px; color: var(--text-muted);">
           <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
           <h3 style="margin-bottom: 8px;">Bài học này chưa có từ vựng</h3>
-          <p style="font-size: 14px;">Giáo viên đang cập nhật danh sách từ cho bài học này.</p>
+          <p style="font-size: 14px;">Giáo viên đang cập nhật danh sách từ cho bài học này. Bạn có thể xem Slide bài giảng nếu có!</p>
         </div>
       `;
       lessonWordCounter.textContent = 'Từ 0 / 0';
-      return;
     }
 
     if (classId) {
@@ -128,6 +151,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       switchMode('flashcard');
     } else if (initialMode === 'quiz') {
       switchMode('quiz');
+    } else if (initialMode === 'slides') {
+      switchMode('slides');
     } else {
       switchMode('vocab');
     }
@@ -137,16 +162,26 @@ document.addEventListener('DOMContentLoaded', async function () {
     showAlert('Lỗi tải bài học: ' + (err.message || err));
   }
 
-  // 2. Chuyển đổi giữa 3 chế độ
+  // 2. Chuyển đổi giữa 4 chế độ
   function switchMode(mode) {
     hideAlert();
     tabBtnVocab.classList.remove('active');
     tabBtnFlashcard.classList.remove('active');
     tabBtnQuiz.classList.remove('active');
+    if (tabBtnSlides) tabBtnSlides.classList.remove('active');
 
     modeVocabContainer.style.display = 'none';
     modeFlashcardContainer.style.display = 'none';
     modeQuizContainer.style.display = 'none';
+    if (modeSlidesContainer) modeSlidesContainer.style.display = 'none';
+
+    if (studioContainer) {
+      if (mode === 'slides') {
+        studioContainer.classList.add('wide-mode');
+      } else {
+        studioContainer.classList.remove('wide-mode');
+      }
+    }
 
     if (mode === 'vocab') {
       tabBtnVocab.classList.add('active');
@@ -160,12 +195,19 @@ document.addEventListener('DOMContentLoaded', async function () {
       tabBtnQuiz.classList.add('active');
       modeQuizContainer.style.display = 'block';
       resetQuizToStart();
+    } else if (mode === 'slides') {
+      if (tabBtnSlides) tabBtnSlides.classList.add('active');
+      if (modeSlidesContainer) modeSlidesContainer.style.display = 'block';
+      loadAndRenderLessonSlides();
     }
   }
 
   tabBtnVocab.addEventListener('click', () => switchMode('vocab'));
   tabBtnFlashcard.addEventListener('click', () => switchMode('flashcard'));
   tabBtnQuiz.addEventListener('click', () => switchMode('quiz'));
+  if (tabBtnSlides) {
+    tabBtnSlides.addEventListener('click', () => switchMode('slides'));
+  }
 
   // ===========================================================================
   // CHẾ ĐỘ 1: HỌC TỪ MỚI (VOCABULARY STUDIO)
@@ -268,8 +310,14 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (classId) {
         await window.Student.recordLessonVocabProgress(classId, lessonId, words.length, words.length);
       }
-      showAlert('🎉 Bạn đã xem hết toàn bộ từ vựng của bài học! Hãy chuyển sang Flashcard hoặc làm Quiz để nhận XP.', 'success');
-      setTimeout(() => switchMode('flashcard'), 1200);
+      if (window.FeedbackPopup) {
+        window.FeedbackPopup.show('vocabulary', {
+          onContinue: () => switchMode('flashcard')
+        });
+      } else {
+        showAlert('🎉 Bạn đã xem hết toàn bộ từ vựng của bài học! Hãy chuyển sang Flashcard hoặc làm Quiz để nhận XP.', 'success');
+        setTimeout(() => switchMode('flashcard'), 1200);
+      }
     }
   });
 
@@ -295,7 +343,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     if (w.example_hanzi) {
       fcBackExample.style.display = 'block';
-      fcBackExample.innerHTML = `<strong>${w.example_hanzi}</strong><br><span style="color: #64748b;">${w.example_vi || ''}</span>`;
+      fcBackExample.innerHTML = `<strong>${w.example_hanzi}</strong><br><span style="color: var(--text-muted);">${w.example_vi || ''}</span>`;
     } else {
       fcBackExample.style.display = 'none';
     }
@@ -347,6 +395,17 @@ document.addEventListener('DOMContentLoaded', async function () {
       } else {
         if (classId) {
           await window.Student.recordLessonVocabProgress(classId, lessonId, words.length, words.length);
+        }
+
+        if (window.FeedbackPopup) {
+          window.FeedbackPopup.show('practice', {
+            score: 100,
+            onContinue: () => switchMode('quiz'),
+            onRetry: () => {
+              currentFcIndex = 0;
+              renderFlashcard();
+            }
+          });
         }
 
         modeFlashcardContainer.innerHTML = `
@@ -582,9 +641,130 @@ document.addEventListener('DOMContentLoaded', async function () {
         `;
       }
 
+      // Kích hoạt Popup chúc mừng / khích lệ kết quả
+      if (window.FeedbackPopup) {
+        window.FeedbackPopup.show('quiz', {
+          score: percent,
+          onContinue: () => {
+            if (isPassed) {
+              // Nếu qua bài, có thể hiển thị thêm popup hoàn thành bài học nếu muốn
+              window.FeedbackPopup.show('lesson');
+            }
+          },
+          onRetry: () => {
+            resetQuizToStart();
+          }
+        });
+      }
+
     } catch (err) {
       console.error('Lỗi lưu kết quả quiz:', err);
       quizResultDesc.textContent = `Đạt ${quizCorrectCount}/${total} câu (${percent}%).`;
+    }
+  }
+
+  // ===========================================================================
+  // CHẾ ĐỘ 4: SLIDE BÀI GIẢNG (LESSON SLIDES)
+  // ===========================================================================
+  async function loadAndRenderLessonSlides() {
+    if (slidesLoaded) return;
+    try {
+      if (slidesLoading) slidesLoading.style.display = 'block';
+      if (slidesEmpty) slidesEmpty.style.display = 'none';
+      if (slidesContent) slidesContent.style.display = 'none';
+
+      lessonSlides = await window.Student.getLessonSlides(lessonId);
+      slidesLoaded = true;
+      if (slidesLoading) slidesLoading.style.display = 'none';
+
+      if (!lessonSlides || lessonSlides.length === 0) {
+        if (slidesEmpty) slidesEmpty.style.display = 'block';
+        return;
+      }
+
+      if (slidesContent) slidesContent.style.display = 'block';
+      currentSlideIndex = 0;
+      renderSlideSelector();
+      await renderCurrentSlide();
+    } catch (err) {
+      console.error('Lỗi tải slide bài học:', err);
+      if (slidesLoading) slidesLoading.style.display = 'none';
+      if (slidesEmpty) slidesEmpty.style.display = 'block';
+    }
+  }
+
+  function renderSlideSelector() {
+    if (!slidesPillsContainer) return;
+    slidesPillsContainer.innerHTML = '';
+    lessonSlides.forEach((slide, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `btn btn-sm ${idx === currentSlideIndex ? 'btn-primary' : 'btn-outline'}`;
+      btn.style.borderRadius = 'var(--radius-full)';
+      btn.style.fontSize = '13px';
+      btn.style.padding = '5px 12px';
+      const isPdf = (slide.file_type || '').toLowerCase() === 'pdf';
+      const icon = isPdf ? '📄' : '📊';
+      btn.innerHTML = `${icon} Slide ${idx + 1}: ${slide.title || 'Tài liệu'}`;
+      btn.onclick = async () => {
+        currentSlideIndex = idx;
+        renderSlideSelector();
+        await renderCurrentSlide();
+      };
+      slidesPillsContainer.appendChild(btn);
+    });
+  }
+
+  async function renderCurrentSlide() {
+    const slide = lessonSlides[currentSlideIndex];
+    if (!slide) return;
+
+    const fileType = (slide.file_type || 'pdf').toLowerCase();
+    const isPdf = fileType === 'pdf';
+    const sizeMb = slide.file_size ? (slide.file_size / (1024 * 1024)).toFixed(2) + ' MB' : '';
+
+    if (slideTitleDisplay) slideTitleDisplay.textContent = slide.title || 'Slide bài giảng';
+    if (slideSizeDisplay) slideSizeDisplay.textContent = sizeMb ? `(${sizeMb})` : '';
+
+    if (isPdf) {
+      if (slideTypeBadge) {
+        slideTypeBadge.textContent = 'PDF';
+        slideTypeBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+        slideTypeBadge.style.color = '#ef4444';
+      }
+      if (slidePdfViewerWrap) slidePdfViewerWrap.style.display = 'block';
+      if (slidePptxViewerWrap) slidePptxViewerWrap.style.display = 'none';
+      if (btnSlideFullscreen) btnSlideFullscreen.style.display = 'inline-flex';
+    } else {
+      if (slideTypeBadge) {
+        slideTypeBadge.textContent = 'POWERPOINT';
+        slideTypeBadge.style.background = 'rgba(249, 115, 22, 0.15)';
+        slideTypeBadge.style.color = '#f97316';
+      }
+      if (slidePdfViewerWrap) slidePdfViewerWrap.style.display = 'none';
+      if (slidePptxViewerWrap) slidePptxViewerWrap.style.display = 'block';
+      if (pptxTitleDisplay) pptxTitleDisplay.textContent = slide.title || 'Slide PowerPoint (.pptx)';
+      if (pptxSizeText) pptxSizeText.textContent = sizeMb || 'Tải về';
+      if (btnSlideFullscreen) btnSlideFullscreen.style.display = 'none';
+    }
+
+    // Lấy signed URL xem hoặc tải về
+    const viewUrl = await window.Student.getSlideViewUrl(slide.file_path);
+
+    if (btnSlideDownload) {
+      btnSlideDownload.href = viewUrl;
+      btnSlideDownload.setAttribute('download', slide.title || 'slide');
+    }
+    if (btnPptxDownload) {
+      btnPptxDownload.href = viewUrl;
+      btnPptxDownload.setAttribute('download', slide.title || 'slide');
+    }
+    if (btnSlideFullscreen) {
+      btnSlideFullscreen.href = viewUrl;
+    }
+
+    if (isPdf && slidePdfIframe) {
+      slidePdfIframe.src = viewUrl;
     }
   }
 

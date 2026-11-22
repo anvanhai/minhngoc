@@ -18,6 +18,38 @@ document.addEventListener('DOMContentLoaded', async function () {
   const modalAlert = document.getElementById('modal-alert');
   const btnSubmitClass = document.getElementById('btn-submit-class');
 
+  let curriculumsCache = [];
+  let teachersCache = [];
+  let classesList = [];
+
+  // Edit Modal Elements
+  const modalEditClass = document.getElementById('modal-edit-class');
+  const formEditClass = document.getElementById('form-edit-class');
+  const editClassId = document.getElementById('edit-class-id');
+  const editClassName = document.getElementById('edit-class-name');
+  const editClassCurriculum = document.getElementById('edit-class-curriculum');
+  const editClassLevel = document.getElementById('edit-class-level');
+  const editClassTeacher = document.getElementById('edit-class-teacher');
+  const editClassStartDate = document.getElementById('edit-class-start-date');
+  const editClassEndDate = document.getElementById('edit-class-end-date');
+  const editClassUnlockMode = document.getElementById('edit-class-unlock-mode');
+  const editClassStatus = document.getElementById('edit-class-status');
+  const editClassModalAlert = document.getElementById('edit-class-modal-alert');
+  const btnSubmitEditClass = document.getElementById('btn-submit-edit-class');
+
+  // Delete Modal Elements
+  const modalDeleteClass = document.getElementById('modal-delete-class');
+  const deleteClassLoading = document.getElementById('delete-class-loading');
+  const deleteClassContent = document.getElementById('delete-class-content');
+  const deleteClassSafeRecommend = document.getElementById('delete-class-safe-recommend');
+  const btnArchiveClassInstead = document.getElementById('btn-archive-class-instead');
+  const deleteClassDisplayName = document.getElementById('delete-class-display-name');
+  const deleteClassStatsList = document.getElementById('delete-class-stats-list');
+  const inputConfirmDeleteClassName = document.getElementById('input-confirm-delete-class-name');
+  const btnConfirmDeleteClass = document.getElementById('btn-confirm-delete-class');
+  let pendingDeleteClassId = null;
+  let pendingDeleteClassName = '';
+
   // Đặt ngày mặc định là hôm nay
   if (inputStartDate) {
     inputStartDate.value = new Date().toISOString().split('T')[0];
@@ -39,20 +71,37 @@ document.addEventListener('DOMContentLoaded', async function () {
     modalAlert.textContent = '';
   }
 
-  // 2. Tải danh sách giáo trình để đưa vào select modal
+  // 2. Tải danh sách giáo trình và giáo viên
   async function loadCurriculumsDropdown() {
     try {
-      const curriculums = await window.Admin.getCurriculums();
-      if (!curriculums || curriculums.length === 0) {
+      curriculumsCache = await window.Admin.getCurriculums();
+      if (!curriculumsCache || curriculumsCache.length === 0) {
         selectCurriculum.innerHTML = '<option value="">-- Chưa có giáo trình, vui lòng tạo trước --</option>';
+        if (editClassCurriculum) editClassCurriculum.innerHTML = '<option value="">-- Chưa có giáo trình --</option>';
         return;
       }
-      selectCurriculum.innerHTML = curriculums.map(c => `
+      const opts = curriculumsCache.map(c => `
         <option value="${c.id}">${c.title} (${c.level}) - ${c.total_lessons || 0} bài</option>
       `).join('');
+      selectCurriculum.innerHTML = opts;
+      if (editClassCurriculum) editClassCurriculum.innerHTML = opts;
     } catch (err) {
       console.error('Lỗi tải giáo trình:', err);
       selectCurriculum.innerHTML = '<option value="">-- Lỗi tải danh sách giáo trình --</option>';
+    }
+  }
+
+  async function loadTeachersDropdown() {
+    try {
+      teachersCache = await window.Admin.getTeachers();
+      if (!editClassTeacher) return;
+      let opts = '<option value="">-- Chưa chỉ định (Tự do) --</option>';
+      opts += teachersCache.map(t => `
+        <option value="${t.id}">${t.display_name || t.email} (${t.role === 'admin' ? 'Quản trị viên' : 'Giáo viên'})</option>
+      `).join('');
+      editClassTeacher.innerHTML = opts;
+    } catch (err) {
+      console.error('Lỗi tải danh sách giáo viên:', err);
     }
   }
 
@@ -65,11 +114,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         </div>
       `;
 
-      const classes = await window.Admin.getClasses();
+      classesList = await window.Admin.getClasses();
 
-      if (!classes || classes.length === 0) {
+      if (!classesList || classesList.length === 0) {
         classesContainer.innerHTML = `
-          <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: #fff; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+          <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
             <div style="font-size: 40px; margin-bottom: 12px;">📚</div>
             <h3 style="margin-bottom: 8px;">Chưa có lớp học nào</h3>
             <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
@@ -80,7 +129,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
       }
 
-      classesContainer.innerHTML = classes.map(cls => {
+      classesContainer.innerHTML = classesList.map(cls => {
         let statusBadge = '<span class="badge-status badge-ongoing">Đang học</span>';
         if (cls.status === 'paused') {
           statusBadge = '<span class="badge-status badge-paused">Tạm dừng</span>';
@@ -109,14 +158,41 @@ document.addEventListener('DOMContentLoaded', async function () {
               <div>⚙️ Chế độ mở bài: ${cls.unlock_mode === 'all_open' ? 'Mở toàn bộ' : 'Tuần tự theo bài'}</div>
             </div>
 
-            <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border-color);">
-              <a href="class-detail.html?id=${cls.id}" class="btn btn-primary btn-block btn-sm">
+            <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+              <a href="class-detail.html?id=${cls.id}" class="btn btn-primary btn-block btn-sm" style="height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700;">
                 ⚙️ Quản lý chi tiết lớp
               </a>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-outline btn-sm btn-edit-class" data-id="${cls.id}" style="flex: 1; height: 32px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 4px;" title="Chỉnh sửa thông tin lớp">
+                  ✏️ Sửa lớp
+                </button>
+                <button type="button" class="btn btn-sm btn-delete-class" data-id="${cls.id}" data-name="${cls.name}" style="flex: 1; height: 32px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 1.5px solid #fca5a5; background: rgba(239, 68, 68, 0.08); color: #dc2626;" title="Xóa lớp học">
+                  🗑️ Xóa lớp
+                </button>
+              </div>
             </div>
           </div>
         `;
       }).join('');
+
+      // Gắn sự kiện nút Sửa lớp
+      document.querySelectorAll('.btn-edit-class').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-id');
+          openEditClassModal(id);
+        });
+      });
+
+      // Gắn sự kiện nút Xóa lớp
+      document.querySelectorAll('.btn-delete-class').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-id');
+          const name = btn.getAttribute('data-name');
+          openDeleteClassModal(id, name);
+        });
+      });
 
     } catch (err) {
       console.error('Lỗi tải danh sách lớp:', err);
@@ -185,7 +261,194 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   });
 
+  // ===========================================================================
+  // 6. MODAL CHỈNH SỬA THÔNG TIN LỚP HỌC
+  // ===========================================================================
+  async function openEditClassModal(classId) {
+    let cls = classesList.find(c => c.id === classId);
+    if (!cls) {
+      cls = await window.Admin.getClassById(classId);
+    }
+    if (!cls) return;
+
+    editClassModalAlert.className = 'alert';
+    editClassModalAlert.textContent = '';
+
+    editClassId.value = cls.id;
+    editClassName.value = cls.name || '';
+    editClassCurriculum.value = cls.curriculum_id || '';
+    editClassLevel.value = cls.level || 'HSK1';
+    editClassTeacher.value = cls.teacher_id || '';
+    editClassStartDate.value = cls.start_date || '';
+    editClassEndDate.value = cls.end_date || '';
+    editClassUnlockMode.value = cls.unlock_mode || 'sequential';
+    editClassStatus.value = cls.status || 'ongoing';
+
+    modalEditClass.classList.add('active');
+  }
+
+  document.querySelectorAll('[data-close="modal-edit-class"]').forEach(btn => {
+    btn.addEventListener('click', () => modalEditClass.classList.remove('active'));
+  });
+
+  modalEditClass.addEventListener('click', function (e) {
+    if (e.target === modalEditClass) modalEditClass.classList.remove('active');
+  });
+
+  formEditClass.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const classId = editClassId.value;
+    const name = editClassName.value.trim();
+    const curriculum_id = editClassCurriculum.value;
+    const level = editClassLevel.value;
+    const teacher_id = editClassTeacher.value || null;
+    const start_date = editClassStartDate.value || null;
+    const end_date = editClassEndDate.value || null;
+    const unlock_mode = editClassUnlockMode.value;
+    const status = editClassStatus.value;
+
+    if (!name || !curriculum_id) {
+      editClassModalAlert.className = 'alert alert-danger show';
+      editClassModalAlert.textContent = 'Vui lòng nhập tên lớp và chọn giáo trình.';
+      return;
+    }
+
+    try {
+      btnSubmitEditClass.disabled = true;
+      btnSubmitEditClass.textContent = 'Đang lưu thay đổi...';
+
+      await window.Admin.updateClass(classId, {
+        name,
+        curriculum_id,
+        level,
+        teacher_id,
+        start_date,
+        end_date,
+        unlock_mode,
+        status
+      });
+
+      modalEditClass.classList.remove('active');
+      showAlert(`Đã cập nhật thông tin lớp "${name}" thành công!`, 'success');
+      await loadClassesList();
+
+    } catch (err) {
+      console.error('Lỗi cập nhật lớp:', err);
+      editClassModalAlert.className = 'alert alert-danger show';
+      editClassModalAlert.textContent = err.message || 'Lỗi khi cập nhật lớp học';
+    } finally {
+      btnSubmitEditClass.disabled = false;
+      btnSubmitEditClass.textContent = 'Lưu thay đổi';
+    }
+  });
+
+  // ===========================================================================
+  // 7. MODAL XÓA LỚP HỌC (XÁC NHẬN BẰNG TÊN LỚP)
+  // ===========================================================================
+  async function openDeleteClassModal(classId, className) {
+    pendingDeleteClassId = classId;
+    pendingDeleteClassName = className || '';
+
+    deleteClassLoading.style.display = 'block';
+    deleteClassContent.style.display = 'none';
+    deleteClassSafeRecommend.style.display = 'none';
+    deleteClassDisplayName.textContent = pendingDeleteClassName;
+    inputConfirmDeleteClassName.value = '';
+    btnConfirmDeleteClass.disabled = true;
+    btnConfirmDeleteClass.style.opacity = '0.5';
+    btnConfirmDeleteClass.style.cursor = 'not-allowed';
+
+    modalDeleteClass.classList.add('active');
+
+    try {
+      const stats = await window.Admin.getClassUsageStats(classId);
+      deleteClassLoading.style.display = 'none';
+      deleteClassContent.style.display = 'block';
+
+      if (stats.has_data) {
+        deleteClassSafeRecommend.style.display = 'block';
+      }
+
+      deleteClassStatsList.innerHTML = `
+        <li><strong>${stats.student_count || 0}</strong> học sinh đang ghi danh trong lớp</li>
+        <li><strong>${stats.assignment_count || 0}</strong> bài tập đã giao (${stats.submission_count || 0} lượt nộp)</li>
+        <li><strong>${stats.recording_count || 0}</strong> bản ghi âm nộp bài trong Storage (sẽ xóa giải phóng bộ nhớ)</li>
+        <li><strong>${stats.progress_count || 0}</strong> dòng tiến độ bài học của học sinh</li>
+        <li><strong>${stats.xp_count || 0}</strong> giao dịch XP liên quan (sẽ gỡ mã lớp, học sinh giữ nguyên điểm XP trọn đời)</li>
+      `;
+
+    } catch (err) {
+      console.error('Lỗi tra cứu thông tin lớp:', err);
+      deleteClassLoading.innerHTML = `<span style="color: red;">Lỗi tra cứu dữ liệu lớp: ${err.message}</span>`;
+    }
+  }
+
+  // Chuyển sang đã kết thúc (Lưu trữ an toàn)
+  btnArchiveClassInstead.addEventListener('click', async function () {
+    if (!pendingDeleteClassId) return;
+    try {
+      btnArchiveClassInstead.disabled = true;
+      btnArchiveClassInstead.textContent = 'Đang lưu trữ...';
+
+      await window.Admin.updateClass(pendingDeleteClassId, { status: 'completed' });
+      modalDeleteClass.classList.remove('active');
+      showAlert(`Đã chuyển lớp "${pendingDeleteClassName}" sang trạng thái "Đã kết thúc" thành công! Toàn bộ dữ liệu được lưu trữ an toàn.`, 'success');
+      await loadClassesList();
+
+    } catch (err) {
+      alert('Lỗi khi lưu trữ lớp: ' + (err.message || err));
+    } finally {
+      btnArchiveClassInstead.disabled = false;
+      btnArchiveClassInstead.textContent = '📦 Chuyển sang "Đã kết thúc" ngay';
+    }
+  });
+
+  // Kiểm tra gõ đúng tên lớp để mở khóa nút xóa
+  inputConfirmDeleteClassName.addEventListener('input', function () {
+    const typed = inputConfirmDeleteClassName.value.trim().toLowerCase();
+    const target = pendingDeleteClassName.trim().toLowerCase();
+
+    if (typed === target && target.length > 0) {
+      btnConfirmDeleteClass.disabled = false;
+      btnConfirmDeleteClass.style.opacity = '1';
+      btnConfirmDeleteClass.style.cursor = 'pointer';
+    } else {
+      btnConfirmDeleteClass.disabled = true;
+      btnConfirmDeleteClass.style.opacity = '0.5';
+      btnConfirmDeleteClass.style.cursor = 'not-allowed';
+    }
+  });
+
+  document.querySelectorAll('[data-close="modal-delete-class"]').forEach(btn => {
+    btn.addEventListener('click', () => modalDeleteClass.classList.remove('active'));
+  });
+
+  modalDeleteClass.addEventListener('click', function (e) {
+    if (e.target === modalDeleteClass) modalDeleteClass.classList.remove('active');
+  });
+
+  // Xác nhận xóa vĩnh viễn lớp
+  btnConfirmDeleteClass.addEventListener('click', async function () {
+    if (!pendingDeleteClassId) return;
+    try {
+      btnConfirmDeleteClass.disabled = true;
+      btnConfirmDeleteClass.textContent = 'Đang xóa sạch dữ liệu...';
+
+      const res = await window.Admin.deleteClass(pendingDeleteClassId);
+      modalDeleteClass.classList.remove('active');
+      showAlert(res.message || `Đã xóa vĩnh viễn lớp "${pendingDeleteClassName}" thành công!`, 'success');
+      await loadClassesList();
+
+    } catch (err) {
+      alert(err.message || 'Lỗi khi xóa lớp học');
+    } finally {
+      btnConfirmDeleteClass.disabled = false;
+      btnConfirmDeleteClass.textContent = '🗑️ Xác nhận xóa vĩnh viễn';
+    }
+  });
+
   // Khởi chạy ban đầu
   await loadCurriculumsDropdown();
+  await loadTeachersDropdown();
   await loadClassesList();
 });

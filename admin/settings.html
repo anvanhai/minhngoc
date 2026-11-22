@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Cài đặt Hệ thống — Admin Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="../css/style.css?v=3.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') || 
+                sessionStorage.getItem('minhngoc_theme') || 
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] || 
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="../js/theme.js?v=3.0"></script>
+  <style>
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon {
+      font-size: 13px !important;
+      line-height: 1 !important;
+      z-index: 1 !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important;
+      top: 2px !important;
+      left: 2px !important;
+      width: 22px !important;
+      height: 22px !important;
+      border-radius: 50% !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease, box-shadow 0.25s ease !important;
+      z-index: 2 !important;
+      pointer-events: none !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important;
+      border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important;
+      background: #f87171 !important;
+      box-shadow: 0 0 10px rgba(248, 113, 113, 0.7) !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon, body[data-theme="dark"] .theme-switch-icon.sun-icon, .theme-switch.is-dark .theme-switch-icon.sun-icon {
+      opacity: 0.35 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
+      opacity: 1 !important;
+    }
+
+    /* Feedback Card Styles */
+    .feedback-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .feedback-card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-color);
+      border-radius: var(--radius-lg, 12px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    }
+    .feedback-card:hover {
+      border-color: var(--primary);
+      box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.08));
+    }
+    .feedback-img-wrapper {
+      position: relative;
+      width: 100%;
+      height: 160px;
+      background: var(--bg-subtle);
+      overflow: hidden;
+    }
+    .feedback-img-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s;
+    }
+    .feedback-card:hover .feedback-img-wrapper img {
+      transform: scale(1.03);
+    }
+    .feedback-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .feedback-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .feedback-title {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+    .feedback-msg {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      flex: 1;
+      margin-bottom: 12px;
+    }
+    .feedback-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border-color);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="classes.html" class="nav-brand">
+        <div class="nav-brand-logo">管</div>
+        <span>Minh Ngọc HSK · Quản trị</span>
+      </a>
+
+      <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" style="-webkit-appearance: none; appearance: none; display: inline-flex; align-items: center; position: relative; width: 56px; height: 28px; padding: 0; margin: 0; border: 1.5px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--bg-subtle, #f1f5f9); cursor: pointer; outline: none; box-sizing: border-box; overflow: hidden; vertical-align: middle;" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; pointer-events: none;">
+            <span class="theme-switch-icon sun-icon" style="font-size: 13px; line-height: 1; z-index: 1;">☀️</span>
+            <span class="theme-switch-icon moon-icon" style="font-size: 13px; line-height: 1; z-index: 1;">🌙</span>
+            <span class="theme-switch-thumb" style="position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.25s ease; z-index: 2;"></span>
+          </span>
+        </button>
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-admin">Admin</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Nội dung Cài đặt -->
+  <main class="main-wrapper">
+    <!-- Thanh menu phụ Admin -->
+    <nav class="admin-subnav">
+      <a href="classes.html" class="admin-subnav-btn">📚 Quản lý Lớp học</a>
+      <a href="curriculums.html" class="admin-subnav-btn">📖 Giáo trình & Bài học</a>
+      <a href="vocabularies.html" class="admin-subnav-btn">🔤 Kho Từ vựng & Excel</a>
+      <a href="grading.html" class="admin-subnav-btn">🎙️ Chấm bài Ghi âm</a>
+      <a href="settings.html" class="admin-subnav-btn active">⚙️ Cài đặt</a>
+    </nav>
+
+    <!-- Header phần Cài đặt -->
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">⚙️ Cài đặt Hệ thống</h1>
+        <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+          Tùy chỉnh thông báo popup kết quả (ảnh & thông điệp), mức điểm động và các thiết lập hiển thị.
+        </p>
+      </div>
+      <button type="button" id="btn-open-create-feedback" class="btn btn-primary">
+        ➕ Thêm Cấu Hình Mới
+      </button>
+    </div>
+
+    <!-- Alert -->
+    <div id="page-alert" class="alert"></div>
+
+    <!-- Tabs sự kiện & Bộ lọc -->
+    <div class="card" style="padding: 16px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="event-filter-tabs">
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn active" data-event="all">
+            Tất cả sự kiện
+          </button>
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="quiz">
+            📝 Quiz cuối bài
+          </button>
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="practice">
+            🗂️ Ôn tập Flashcard
+          </button>
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="listening">
+            🎧 Bài Nghe hiểu
+          </button>
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="vocabulary">
+            📖 Hoàn thành Từ vựng
+          </button>
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="speaking">
+            🎙️ Nộp Ghi âm / Nói
+          </button>
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="lesson">
+            🎓 Hoàn thành Bài học
+          </button>
+          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="assignment">
+            📋 Nộp Bài tập
+          </button>
+        </div>
+
+        <div style="font-size: 13px; color: var(--text-muted);" id="feedback-count-text">
+          Đang tải dữ liệu...
+        </div>
+      </div>
+    </div>
+
+    <!-- Danh sách thẻ cấu hình Feedback -->
+    <div id="feedbacks-container" class="feedback-grid">
+      <div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">
+        Đang nạp cấu hình thông báo kết quả...
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: THÊM / CHỈNH SỬA CẤU HÌNH THÔNG BÁO FEEDBACK -->
+  <div id="modal-feedback-editor" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px; width: 95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-feedback-title">Cấu Hình Thông Báo Kết Quả</h3>
+        <button type="button" class="modal-close" data-close="modal-feedback-editor">&times;</button>
+      </div>
+      <form id="form-feedback-editor">
+        <input type="hidden" id="f-id">
+        <div class="modal-body">
+          <div id="feedback-modal-alert" class="alert"></div>
+
+          <!-- Loại sự kiện -->
+          <div class="form-group">
+            <label class="form-label" for="f-event">Sự kiện kích hoạt popup *</label>
+            <select id="f-event" class="form-control" required>
+              <optgroup label="Sự kiện có chấm điểm (Tùy chỉnh nhiều mức điểm)">
+                <option value="quiz">📝 Hoàn thành bài kiểm tra / Quiz</option>
+                <option value="practice">🗂️ Hoàn thành bài ôn tập / Flashcard SRS</option>
+                <option value="listening">🎧 Hoàn thành bài Nghe hiểu</option>
+              </optgroup>
+              <optgroup label="Sự kiện không có điểm (Một thông báo chung)">
+                <option value="vocabulary">📖 Hoàn thành phần học Từ vựng</option>
+                <option value="speaking">🎙️ Nộp bài ghi âm / Nói thành công</option>
+                <option value="lesson">🎓 Hoàn thành toàn bộ Bài học</option>
+                <option value="assignment">📋 Hoàn thành nộp Bài tập được giao</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- Khoảng điểm số (chỉ hiện khi sự kiện có điểm) -->
+          <div id="score-range-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="f-min-score">Điểm tối thiểu (Min 0-100)</label>
+              <input type="number" id="f-min-score" class="form-control" min="0" max="100" placeholder="Ví dụ: 80">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="f-max-score">Điểm tối đa (Max 0-100)</label>
+              <input type="number" id="f-max-score" class="form-control" min="0" max="100" placeholder="Ví dụ: 100">
+            </div>
+            <div style="grid-column: 1 / -1; font-size: 12px; color: var(--text-muted); margin-top: -6px;">
+              💡 <em>Ví dụ: 0 - 49 (Cần cố gắng), 50 - 79 (Tiến bộ), 80 - 100 (Xuất sắc).</em>
+            </div>
+          </div>
+
+          <!-- Tải ảnh / Chọn URL ảnh -->
+          <div class="form-group">
+            <label class="form-label">Ảnh minh họa trong Popup *</label>
+            
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+              <input type="file" id="f-file-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display: none;">
+              <button type="button" id="btn-browse-img" class="btn btn-outline btn-sm" style="height: 36px; padding: 0 12px;">
+                📁 Tải ảnh từ máy tính (Tối đa 2MB)
+              </button>
+              <span id="file-chosen-name" style="font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">
+                Chưa chọn file
+              </span>
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="url" id="f-image-url" class="form-control" placeholder="Hoặc dán trực tiếp link ảnh (https://...)" required>
+            </div>
+
+            <!-- Khung xem trước ảnh ngay lập tức -->
+            <div id="img-preview-box" style="margin-top: 10px; width: 100%; height: 160px; border-radius: 8px; border: 1.5px dashed var(--border-color); display: flex; align-items: center; justify-content: center; background: var(--bg-subtle); overflow: hidden;">
+              <img id="img-preview-tag" src="" alt="Xem trước ảnh" style="max-width: 100%; max-height: 100%; object-fit: contain; display: none;">
+              <span id="img-preview-placeholder" style="font-size: 13px; color: var(--text-muted);">
+                Chưa có ảnh xem trước
+              </span>
+            </div>
+          </div>
+
+          <!-- Tiêu đề & Thông điệp -->
+          <div class="form-group">
+            <label class="form-label" for="f-title">Tiêu đề chúc mừng / khích lệ</label>
+            <input type="text" id="f-title" class="form-control" placeholder="Ví dụ: Xuất sắc! 太棒了! hoặc Cố lên nhé!">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="f-message">Dòng chữ thông điệp *</label>
+            <textarea id="f-message" class="form-control" rows="3" placeholder="Nhập thông điệp ý nghĩa gửi tới học sinh khi đạt mức điểm/sự kiện này..." required></textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="f-btn-text">Chữ trên nút bấm</label>
+              <input type="text" id="f-btn-text" class="form-control" value="Tiếp tục" placeholder="Ví dụ: Tiếp tục, Làm lại, Nhận thưởng">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="f-sort-order">Thứ tự ưu tiên</label>
+              <input type="number" id="f-sort-order" class="form-control" value="1" min="1">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-main);">
+              <input type="checkbox" id="f-is-active" style="width: 18px; height: 18px;" checked>
+              <span>Kích hoạt cấu hình này (Bật để học sinh nhìn thấy khi hoàn thành)</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-feedback-editor">Hủy</button>
+          <button type="submit" id="btn-submit-feedback" class="btn btn-primary">Lưu cấu hình</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: XEM THỬ POPUP KẾT QUẢ THỰC TẾ (LIVE PREVIEW) -->
+  <div id="modal-preview-feedback" class="modal-overlay">
+    <div class="modal-card" style="max-width: 440px; width: 92%; padding: 0; overflow: hidden; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: none;">
+      <!-- Khung ảnh lớn phía trên -->
+      <div style="position: relative; width: 100%; height: 210px; background: #f8fafc; overflow: hidden;">
+        <img id="preview-popup-img" src="" alt="Illustration" style="width: 100%; height: 100%; object-fit: cover;">
+        <button type="button" class="modal-close" data-close="modal-preview-feedback" style="position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font-size: 16px;">
+          ✕
+        </button>
+      </div>
+
+      <!-- Nội dung chữ bên dưới -->
+      <div style="padding: 24px; text-align: center; background: var(--bg-card);">
+        <div id="preview-popup-badge-box" style="margin-bottom: 12px; display: none;">
+          <span id="preview-popup-badge" class="badge-status badge-ongoing" style="font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px;">
+            Đạt 85/100 điểm
+          </span>
+        </div>
+
+        <h3 id="preview-popup-title" style="font-size: 20px; font-weight: 800; color: var(--text-main); margin-bottom: 8px;">
+          Xuất sắc!
+        </h3>
+
+        <p id="preview-popup-msg" style="font-size: 14px; line-height: 1.6; color: var(--text-muted); margin-bottom: 22px;">
+          Nội dung thông báo mẫu ở đây...
+        </p>
+
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button type="button" class="btn btn-secondary" data-close="modal-preview-feedback" style="flex: 1; border-radius: 12px; height: 44px; font-weight: 600;">
+            Đóng
+          </button>
+          <button type="button" id="preview-popup-btn" class="btn btn-primary" style="flex: 1.5; border-radius: 12px; height: 44px; font-weight: 700;" data-close="modal-preview-feedback">
+            Tiếp tục
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
+  </footer>
+
+  <!-- Scripts -->
+  <script src="../js/theme.js?v=3.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/db.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/admin.js"></script>
+  <script src="../js/admin-settings.js"></script>
+</body>
+</html>
