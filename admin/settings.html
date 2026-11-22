@@ -167,6 +167,15 @@
       padding-top: 10px;
       border-top: 1px dashed var(--border-color);
     }
+    .settings-nav-tab {
+      transition: all 0.2s ease;
+    }
+    .settings-nav-tab.active {
+      background: var(--primary) !important;
+      color: #ffffff !important;
+      border-color: var(--primary) !important;
+      box-shadow: 0 2px 8px rgba(225, 29, 72, 0.25);
+    }
   </style>
 </head>
 <body>
@@ -223,46 +232,115 @@
     <!-- Alert -->
     <div id="page-alert" class="alert"></div>
 
-    <!-- Tabs sự kiện & Bộ lọc -->
-    <div class="card" style="padding: 16px; margin-bottom: 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="event-filter-tabs">
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn active" data-event="all">
-            Tất cả sự kiện
-          </button>
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="quiz">
-            📝 Quiz cuối bài
-          </button>
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="practice">
-            🗂️ Ôn tập Flashcard
-          </button>
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="listening">
-            🎧 Bài Nghe hiểu
-          </button>
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="vocabulary">
-            📖 Hoàn thành Từ vựng
-          </button>
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="speaking">
-            🎙️ Nộp Ghi âm / Nói
-          </button>
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="lesson">
-            🎓 Hoàn thành Bài học
-          </button>
-          <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="assignment">
-            📋 Nộp Bài tập
-          </button>
-        </div>
+    <!-- Tabs chính của trang Cài đặt -->
+    <div style="display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;">
+      <button type="button" class="btn btn-outline settings-nav-tab active" data-tab="tab-feedback-settings" style="font-weight: 700; border-radius: 8px; padding: 10px 18px; font-size: 14px;">
+        🖼️ Thông báo Kết quả (Popup)
+      </button>
+      <button type="button" class="btn btn-outline settings-nav-tab" data-tab="tab-users-management" style="font-weight: 700; border-radius: 8px; padding: 10px 18px; font-size: 14px;">
+        👥 Quản lý Người dùng & Đặt lại Mật khẩu
+      </button>
+    </div>
 
-        <div style="font-size: 13px; color: var(--text-muted);" id="feedback-count-text">
-          Đang tải dữ liệu...
+    <!-- TAB 1: CẤU HÌNH POPUP THÔNG BÁO KẾT QUẢ -->
+    <div id="tab-feedback-settings" class="settings-tab-pane">
+      <!-- Tabs sự kiện & Bộ lọc -->
+      <div class="card" style="padding: 16px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="event-filter-tabs">
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn active" data-event="all">
+              Tất cả sự kiện
+            </button>
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="quiz">
+              📝 Quiz cuối bài
+            </button>
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="practice">
+              🗂️ Ôn tập Flashcard
+            </button>
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="listening">
+              🎧 Bài Nghe hiểu
+            </button>
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="vocabulary">
+              📖 Hoàn thành Từ vựng
+            </button>
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="speaking">
+              🎙️ Nộp Ghi âm / Nói
+            </button>
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="lesson">
+              🎓 Hoàn thành Bài học
+            </button>
+            <button type="button" class="btn btn-sm btn-outline event-tab-btn" data-event="assignment">
+              📋 Nộp Bài tập
+            </button>
+          </div>
+
+          <div style="font-size: 13px; color: var(--text-muted);" id="feedback-count-text">
+            Đang tải dữ liệu...
+          </div>
+        </div>
+      </div>
+
+      <!-- Danh sách thẻ cấu hình Feedback -->
+      <div id="feedbacks-container" class="feedback-grid">
+        <div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">
+          Đang nạp cấu hình thông báo kết quả...
         </div>
       </div>
     </div>
 
-    <!-- Danh sách thẻ cấu hình Feedback -->
-    <div id="feedbacks-container" class="feedback-grid">
-      <div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">
-        Đang nạp cấu hình thông báo kết quả...
+    <!-- TAB 2: QUẢN LÝ NGƯỜI DÙNG & ĐẶT LẠI MẬT KHẨU -->
+    <div id="tab-users-management" class="settings-tab-pane" style="display: none;">
+      <div class="card" style="padding: 18px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; gap: 10px; flex: 1; min-width: 280px; max-width: 500px;">
+            <input
+              type="text"
+              id="user-search-input"
+              class="form-control"
+              placeholder="🔍 Tìm theo username, họ tên, số điện thoại..."
+              style="height: 38px;"
+            >
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <select id="user-role-filter" class="form-control" style="height: 38px; width: 170px;">
+              <option value="all">Tất cả vai trò</option>
+              <option value="student">🎓 Học sinh</option>
+              <option value="teacher">👨‍🏫 Giáo viên</option>
+              <option value="admin">🛡️ Quản trị viên</option>
+            </select>
+
+            <button type="button" id="btn-refresh-users" class="btn btn-outline" style="height: 38px;">
+              🔄 Làm mới
+            </button>
+          </div>
+        </div>
+
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 10px;" id="users-count-text">
+          Đang tải danh sách người dùng...
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Người dùng</th>
+              <th>Tên đăng nhập</th>
+              <th>Vai trò</th>
+              <th>Số điện thoại</th>
+              <th>Ngày tham gia</th>
+              <th style="text-align: right;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="all-users-table-body">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
+                Đang nạp danh sách tài khoản...
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </main>
@@ -410,6 +488,96 @@
           </button>
           <button type="button" id="preview-popup-btn" class="btn btn-primary" style="flex: 1.5; border-radius: 12px; height: 44px; font-weight: 700;" data-close="modal-preview-feedback">
             Tiếp tục
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ĐẶT LẠI MẬT KHẨU NGƯỜI DÙNG -->
+  <div id="modal-reset-password" class="modal-overlay">
+    <div class="modal-card" style="max-width: 480px; width: 95%;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔑 Đặt lại Mật khẩu Người dùng</h3>
+        <button type="button" class="modal-close" data-close="modal-reset-password">&times;</button>
+      </div>
+
+      <!-- Khung Form nhập mật khẩu -->
+      <form id="form-reset-password">
+        <input type="hidden" id="reset-pwd-user-id">
+        <div class="modal-body">
+          <div id="reset-pwd-alert" class="alert"></div>
+
+          <!-- Thông tin tài khoản -->
+          <div style="background: var(--bg-subtle); padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border-color);">
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">Đang đặt lại mật khẩu cho:</div>
+            <div style="font-size: 15px; font-weight: 700; color: var(--text-main);" id="reset-pwd-target-name">--</div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+              Tên đăng nhập: <code id="reset-pwd-target-username" style="font-weight: 600; color: var(--primary);">--</code>
+            </div>
+          </div>
+
+          <!-- Ô nhập mật khẩu mới & Nút tạo ngẫu nhiên -->
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" for="input-new-password" style="margin-bottom: 0; font-weight: 600;">
+                Mật khẩu mới (tối thiểu 6 ký tự) *
+              </label>
+              <button type="button" id="btn-generate-password" class="btn btn-outline btn-sm" style="font-size: 12px; padding: 2px 8px; height: 26px;">
+                🎲 Tạo ngẫu nhiên 8 ký tự
+              </button>
+            </div>
+            <div style="position: relative;">
+              <input
+                type="text"
+                id="input-new-password"
+                class="form-control"
+                placeholder="Nhập mật khẩu mới hoặc bấm nút Tạo ngẫu nhiên"
+                minlength="6"
+                required
+                autocomplete="off"
+                style="font-family: monospace; font-size: 15px; font-weight: 600;"
+              >
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+              💡 <em>Mật khẩu được mã hóa an toàn bằng Bcrypt trên hệ thống. Không lưu trữ văn bản thô.</em>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-reset-password">Hủy</button>
+          <button type="submit" id="btn-submit-reset-password" class="btn btn-primary">
+            Lưu Mật Khẩu Mới
+          </button>
+        </div>
+      </form>
+
+      <!-- Khung hiển thị kết quả thành công một lần duy nhất -->
+      <div id="reset-pwd-success-view" style="display: none; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <div style="font-size: 44px; line-height: 1; margin-bottom: 8px;">🎉</div>
+          <h4 style="font-size: 18px; font-weight: 800; color: #16a34a; margin: 0 0 4px;">Đặt lại mật khẩu thành công!</h4>
+          <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+            Mật khẩu mới đã được áp dụng ngay lập tức cho tài khoản <strong id="reset-pwd-success-user" style="color: var(--text-main);"></strong>.
+          </p>
+        </div>
+
+        <div style="background: var(--bg-subtle); border: 1.5px dashed var(--border-color); border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 16px;">
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
+            ⚠️ Hãy sao chép để gửi cho người dùng (mật khẩu này chỉ hiển thị một lần duy nhất):
+          </div>
+          <div id="reset-pwd-result-box" style="font-family: monospace; font-size: 20px; font-weight: 800; letter-spacing: 1.5px; color: var(--primary); padding: 8px; background: var(--bg-card); border-radius: 6px; border: 1px solid var(--border-color); user-select: all; margin-bottom: 10px; word-break: break-all;">
+            --
+          </div>
+          <button type="button" id="btn-copy-new-password" class="btn btn-primary btn-sm" style="width: 100%; height: 36px; font-weight: 600;">
+            📋 Sao chép mật khẩu
+          </button>
+        </div>
+
+        <div style="text-align: right;">
+          <button type="button" class="btn btn-secondary" data-close="modal-reset-password" style="min-width: 100px;">
+            Đóng
           </button>
         </div>
       </div>

@@ -63,4 +63,29 @@
   document.addEventListener('DOMContentLoaded', function () {
     window.checkAndShowConfigNotice();
   });
+
+  /**
+   * Gọi RPC admin_reset_password để đặt lại mật khẩu cho tài khoản người dùng
+   * @param {string} targetUserId - UUID của tài khoản người dùng
+   * @param {string} newPassword - Mật khẩu mới (tối thiểu 6 ký tự)
+   * @returns {Promise<Object>} Kết quả trả về từ database RPC
+   */
+  window.adminResetPasswordDb = async function (targetUserId, newPassword) {
+    const db = window.getDb();
+    if (!db) throw new Error('Database chưa kết nối. Vui lòng kiểm tra cấu hình trong js/config.js');
+    if (!targetUserId) throw new Error('Thiếu ID người dùng cần đặt lại mật khẩu');
+    if (!newPassword || newPassword.length < 6) throw new Error('Mật khẩu mới phải có tối thiểu 6 ký tự');
+
+    const { data, error } = await db.rpc('admin_reset_password', {
+      target_user_id: targetUserId,
+      new_password: newPassword
+    });
+
+    if (error) {
+      console.error('Lỗi gọi RPC admin_reset_password:', error);
+      throw new Error(error.message || 'Không thể đặt lại mật khẩu');
+    }
+
+    return data;
+  };
 })();

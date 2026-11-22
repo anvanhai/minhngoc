@@ -1200,6 +1200,278 @@ window.Admin = (function () {
     return data.signedUrl;
   }
 
+  // ===========================================================================
+  // 14. ĐẶT LẠI MẬT KHẨU & QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG (PROFILES & AUTH)
+  // ===========================================================================
+
+  /**
+   * Tạo chuỗi mật khẩu ngẫu nhiên an toàn (mặc định 8 ký tự)
+   * Sử dụng ký tự rõ ràng, dễ phân biệt
+   */
+  function generateRandomPassword(length = 8) {
+    const charset = '23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ';
+    let result = '';
+    const cryptoObj = window.crypto || window.msCrypto;
+    if (cryptoObj && cryptoObj.getRandomValues) {
+      const values = new Uint32Array(length);
+      cryptoObj.getRandomValues(values);
+      for (let i = 0; i < length; i++) {
+        result += charset[values[i] % charset.length];
+      }
+    } else {
+      for (let i = 0; i < length; i++) {
+        result += charset.charAt(Math.floor(Math.random() * charset.length));
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Gọi hàm RPC admin_reset_password để cập nhật mật khẩu cho user
+   */
+  async function resetUserPassword(targetUserId, newPassword) {
+    if (typeof window.adminResetPasswordDb === 'function') {
+      return await window.adminResetPasswordDb(targetUserId, newPassword);
+    }
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('admin_reset_password', {
+      target_user_id: targetUserId,
+      new_password: newPassword
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Lấy danh sách toàn bộ hồ sơ người dùng trong hệ thống
+   * @param {Object} options - { search, role }
+   */
+  async function getAllProfiles(options = {}) {
+    const db = getDb();
+    if (!db) return [];
+
+    let query = db
+      .from('profiles')
+      .select('id, username, display_name, phone, role, lifetime_xp, current_streak, created_at, avatar_url')
+      .order('created_at', { ascending: false });
+
+    if (options.role && options.role !== 'all') {
+      query = query.eq('role', options.role);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Lỗi tải danh sách profiles:', error);
+      throw error;
+    }
+
+    let results = data || [];
+    if (options.search && options.search.trim()) {
+      const s = options.search.trim().toLowerCase();
+      results = results.filter(p =>
+        (p.username && p.username.toLowerCase().includes(s)) ||
+        (p.display_name && p.display_name.toLowerCase().includes(s)) ||
+        (p.phone && p.phone.toLowerCase().includes(s))
+      );
+    }
+
+    return results;
+  }
+
+  /**
+   * Khởi tạo bộ sự kiện cho modal đặt lại mật khẩu (#modal-reset-password)
+   */
+  let resetPasswordModalInitialized = false;
+  function initResetPasswordModal(callbacks = {}) {
+    if (resetPasswordModalInitialized) return;
+    const modal = document.getElementById('modal-reset-password');
+    if (!modal) return;
+
+    resetPasswordModalInitialized = true;
+    const form = document.getElementById('form-reset-password');
+    const inputUserId = document.getElementById('reset-pwd-user-id');
+    const inputNewPassword = document.getElementById('input-new-password');
+    const btnGenerate = document.getElementById('btn-generate-password');
+    const btnSubmit = document.getElementById('btn-submit-reset-password');
+    const alertBox = document.getElementById('reset-pwd-alert');
+    const successView = document.getElementById('reset-pwd-success-view');
+    const resultBox = document.getElementById('reset-pwd-result-box');
+    const btnCopy = document.getElementById('btn-copy-new-password');
+
+    // Nút sinh mật khẩu ngẫu nhiên
+    if (btnGenerate && inputNewPassword) {
+      btnGenerate.addEventListener('click', function () {
+        inputNewPassword.value = generateRandomPassword(8);
+        inputNewPassword.focus();
+        if (alertBox) {
+          alertBox.className = 'alert';
+          alertBox.textContent = '';
+        }
+      });
+    }
+
+    // Đóng modal
+    document.querySelectorAll('[data-close="modal-reset-password"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        modal.classList.remove('active');
+        if (form) form.reset();
+        if (successView) successView.style.display = 'none';
+        if (form) form.style.display = 'block';
+        if (alertBox) {
+          alertBox.className = 'alert';
+          alertBox.textContent = '';
+        }
+      });
+    });
+
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) {
+        modal.classList.remove('active');
+        if (form) form.reset();
+        if (successView) successView.style.display = 'none';
+        if (form) form.style.display = 'block';
+      }
+    });
+
+    // Nút copy mật khẩu
+    if (btnCopy && resultBox) {
+      btnCopy.addEventListener('click', async function () {
+        const textToCopy = resultBox.textContent.trim();
+        if (!textToCopy) return;
+
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(textToCopy);
+          } else {
+            const tempInput = document.createElement('input');
+            tempInput.value = textToCopy;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+          }
+          btnCopy.textContent = '✅ Đã sao chép vào bộ nhớ tạm!';
+          setTimeout(() => {
+            btnCopy.textContent = '📋 Sao chép mật khẩu';
+          }, 3000);
+        } catch (err) {
+          console.warn('Không thể sao chép tự động:', err);
+          alert('Mật khẩu: ' + textToCopy);
+        }
+      });
+    }
+
+    // Submit đổi mật khẩu
+    if (form) {
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const userId = inputUserId ? inputUserId.value.trim() : '';
+        const newPassword = inputNewPassword ? inputNewPassword.value.trim() : '';
+
+        if (!userId) {
+          if (alertBox) {
+            alertBox.className = 'alert alert-danger show';
+            alertBox.textContent = 'Lỗi: Không xác định được người dùng.';
+          }
+          return;
+        }
+
+        if (!newPassword || newPassword.length < 6) {
+          if (alertBox) {
+            alertBox.className = 'alert alert-danger show';
+            alertBox.textContent = 'Mật khẩu mới phải có tối thiểu 6 ký tự.';
+          }
+          return;
+        }
+
+        try {
+          if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = '⏳ Đang lưu mật khẩu...';
+          }
+          if (alertBox) {
+            alertBox.className = 'alert';
+            alertBox.textContent = '';
+          }
+
+          await resetUserPassword(userId, newPassword);
+
+          // Chuyển sang màn hình hiển thị mật khẩu một lần
+          if (form) form.style.display = 'none';
+          if (successView) {
+            successView.style.display = 'block';
+            if (resultBox) resultBox.textContent = newPassword;
+            const targetUsernameEl = document.getElementById('reset-pwd-target-username');
+            const successUserEl = document.getElementById('reset-pwd-success-user');
+            if (successUserEl && targetUsernameEl) {
+              successUserEl.textContent = targetUsernameEl.textContent;
+            }
+          }
+
+          if (typeof callbacks.onSuccess === 'function') {
+            callbacks.onSuccess(userId, newPassword);
+          }
+        } catch (err) {
+          if (alertBox) {
+            alertBox.className = 'alert alert-danger show';
+            alertBox.textContent = 'Lỗi: ' + (err.message || 'Không thể đặt lại mật khẩu.');
+          }
+        } finally {
+          if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'Lưu Mật Khẩu Mới';
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * Mở modal đặt lại mật khẩu cho một user cụ thể
+   * @param {Object} user - { id, username, displayName }
+   */
+  function openResetPasswordModal(user = {}) {
+    initResetPasswordModal();
+    const modal = document.getElementById('modal-reset-password');
+    if (!modal) return;
+
+    const form = document.getElementById('form-reset-password');
+    const successView = document.getElementById('reset-pwd-success-view');
+    const inputUserId = document.getElementById('reset-pwd-user-id');
+    const targetName = document.getElementById('reset-pwd-target-name');
+    const targetUsername = document.getElementById('reset-pwd-target-username');
+    const inputNewPassword = document.getElementById('input-new-password');
+    const alertBox = document.getElementById('reset-pwd-alert');
+    const btnCopy = document.getElementById('btn-copy-new-password');
+
+    if (inputUserId) inputUserId.value = user.id || '';
+    if (targetName) targetName.textContent = user.displayName || user.username || 'Người dùng';
+    if (targetUsername) targetUsername.textContent = user.username || '--';
+
+    // Tạo sẵn mật khẩu ngẫu nhiên 8 ký tự cho tiện lợi
+    const initialPass = generateRandomPassword(8);
+    if (inputNewPassword) {
+      inputNewPassword.value = initialPass;
+    }
+
+    if (alertBox) {
+      alertBox.className = 'alert';
+      alertBox.textContent = '';
+    }
+    if (btnCopy) {
+      btnCopy.textContent = '📋 Sao chép mật khẩu';
+    }
+
+    if (form) form.style.display = 'block';
+    if (successView) successView.style.display = 'none';
+
+    modal.classList.add('active');
+    if (inputNewPassword) {
+      setTimeout(() => inputNewPassword.select(), 100);
+    }
+  }
+
   return {
     // Giáo trình
     getCurriculums,
@@ -1266,6 +1538,12 @@ window.Admin = (function () {
     uploadLessonSlide,
     deleteLessonSlide,
     getLessonSlidesStorageStats,
-    getSlideViewUrl
+    getSlideViewUrl,
+    // Đặt lại mật khẩu & Quản lý Tài khoản
+    resetUserPassword,
+    getAllProfiles,
+    generateRandomPassword,
+    initResetPasswordModal,
+    openResetPasswordModal
   };
 })();

@@ -482,6 +482,158 @@ document.addEventListener('DOMContentLoaded', async function () {
     b.addEventListener('click', () => modalPreviewFeedback.classList.remove('active'));
   });
 
+  // ===========================================================================
+  // 7. QUẢN LÝ NGƯỜI DÙNG & ĐẶT LẠI MẬT KHẨU (TAB 2)
+  // ===========================================================================
+  const settingsNavTabs = document.querySelectorAll('.settings-nav-tab');
+  const tabFeedbackSettings = document.getElementById('tab-feedback-settings');
+  const tabUsersManagement = document.getElementById('tab-users-management');
+  const userSearchInput = document.getElementById('user-search-input');
+  const userRoleFilter = document.getElementById('user-role-filter');
+  const btnRefreshUsers = document.getElementById('btn-refresh-users');
+  const allUsersTableBody = document.getElementById('all-users-table-body');
+  const usersCountText = document.getElementById('users-count-text');
+
+  let allProfilesCache = [];
+
+  // Chuyển đổi tab chính của trang Cài đặt
+  settingsNavTabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.getAttribute('data-tab');
+      settingsNavTabs.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      if (targetTab === 'tab-feedback-settings') {
+        tabFeedbackSettings.style.display = 'block';
+        tabUsersManagement.style.display = 'none';
+        if (btnOpenCreateFeedback) btnOpenCreateFeedback.style.display = 'inline-flex';
+      } else if (targetTab === 'tab-users-management') {
+        tabFeedbackSettings.style.display = 'none';
+        tabUsersManagement.style.display = 'block';
+        if (btnOpenCreateFeedback) btnOpenCreateFeedback.style.display = 'none';
+        loadAllUsersList();
+      }
+    });
+  });
+
+  async function loadAllUsersList() {
+    if (!allUsersTableBody) return;
+    try {
+      allUsersTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
+            Đang tải danh sách người dùng...
+          </td>
+        </tr>
+      `;
+      allProfilesCache = await window.Admin.getAllProfiles();
+      renderUsersTable();
+    } catch (err) {
+      console.error('Lỗi tải người dùng:', err);
+      allUsersTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 32px; color: var(--danger);">
+            Lỗi khi tải danh sách người dùng: ${err.message || err}
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  function renderUsersTable() {
+    if (!allUsersTableBody) return;
+    const search = (userSearchInput ? userSearchInput.value : '').trim().toLowerCase();
+    const roleFilter = userRoleFilter ? userRoleFilter.value : 'all';
+
+    let filtered = allProfilesCache || [];
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter(u => u.role === roleFilter);
+    }
+    if (search) {
+      filtered = filtered.filter(u =>
+        (u.username && u.username.toLowerCase().includes(search)) ||
+        (u.display_name && u.display_name.toLowerCase().includes(search)) ||
+        (u.phone && u.phone.toLowerCase().includes(search))
+      );
+    }
+
+    if (usersCountText) {
+      usersCountText.textContent = `Hiển thị ${filtered.length} / tổng số ${(allProfilesCache || []).length} tài khoản`;
+    }
+
+    if (filtered.length === 0) {
+      allUsersTableBody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
+            Không tìm thấy người dùng nào phù hợp.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    allUsersTableBody.innerHTML = filtered.map(u => {
+      let roleBadge = '';
+      if (u.role === 'admin') {
+        roleBadge = '<span class="user-role-badge role-admin">🛡️ Quản trị viên</span>';
+      } else if (u.role === 'teacher') {
+        roleBadge = '<span class="user-role-badge role-teacher">👨‍🏫 Giáo viên</span>';
+      } else {
+        roleBadge = '<span class="user-role-badge role-student">🎓 Học sinh</span>';
+      }
+
+      const createdDate = u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '--';
+
+      return `
+        <tr>
+          <td>
+            <div style="font-weight: 600; color: var(--text-main);">${u.display_name || u.username}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">🔥 Streak: ${u.current_streak || 0} ngày · ${(u.lifetime_xp || 0).toLocaleString()} XP</div>
+          </td>
+          <td><code>${u.username}</code></td>
+          <td>${roleBadge}</td>
+          <td>${u.phone || '<span style="color: var(--text-light);">Chưa có</span>'}</td>
+          <td>${createdDate}</td>
+          <td style="text-align: right;">
+            <button
+              type="button"
+              class="btn btn-outline btn-sm btn-reset-password"
+              data-user-id="${u.id}"
+              data-username="${u.username}"
+              data-name="${u.display_name || u.username}"
+              style="color: var(--primary); border-color: var(--primary); font-weight: 600;"
+            >
+              🔑 Đặt lại mật khẩu
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    // Gắn sự kiện nút Đặt lại mật khẩu
+    allUsersTableBody.querySelectorAll('.btn-reset-password').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const uid = btn.getAttribute('data-user-id');
+        const uname = btn.getAttribute('data-username');
+        const dname = btn.getAttribute('data-name');
+        window.Admin.openResetPasswordModal({
+          id: uid,
+          username: uname,
+          displayName: dname
+        });
+      });
+    });
+  }
+
+  if (userSearchInput) userSearchInput.addEventListener('input', renderUsersTable);
+  if (userRoleFilter) userRoleFilter.addEventListener('change', renderUsersTable);
+  if (btnRefreshUsers) btnRefreshUsers.addEventListener('click', loadAllUsersList);
+
+  // Khởi tạo modal đặt lại mật khẩu
+  if (window.Admin && typeof window.Admin.initResetPasswordModal === 'function') {
+    window.Admin.initResetPasswordModal();
+  }
+
   // Khởi chạy
   await loadFeedbacksList();
 });

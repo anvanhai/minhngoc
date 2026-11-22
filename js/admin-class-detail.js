@@ -287,7 +287,10 @@ document.addEventListener('DOMContentLoaded', async function () {
           <td>${st.joinedAt ? new Date(st.joinedAt).toLocaleDateString('vi-VN') : '--'}</td>
           <td><span class="badge-status badge-ongoing">${st.status === 'active' ? 'Đang học' : st.status}</span></td>
           <td style="text-align: right;">
-            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+              <button type="button" class="btn btn-outline btn-sm btn-reset-password" data-student-id="${st.id}" data-username="${st.username}" data-name="${st.display_name || st.username}" title="Đặt lại mật khẩu cho học sinh" style="font-weight: 600; color: var(--primary); border-color: var(--primary);">
+                🔑 Đổi MK
+              </button>
               <button type="button" class="btn btn-primary btn-sm btn-promote-student" data-student-id="${st.id}" data-name="${st.display_name || st.username}">
                 ⬆️ Lên HSK2 / Đổi lớp
               </button>
@@ -298,6 +301,20 @@ document.addEventListener('DOMContentLoaded', async function () {
           </td>
         </tr>
       `).join('');
+
+      // Gắn sự kiện nút Đặt lại mật khẩu cho học sinh
+      document.querySelectorAll('.btn-reset-password').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const stId = btn.getAttribute('data-student-id');
+          const stUsername = btn.getAttribute('data-username');
+          const stName = btn.getAttribute('data-name');
+          window.Admin.openResetPasswordModal({
+            id: stId,
+            username: stUsername,
+            displayName: stName
+          });
+        });
+      });
 
       // Gắn sự kiện nút Lên cấp / Đổi lớp
       document.querySelectorAll('.btn-promote-student').forEach(btn => {
@@ -1068,6 +1085,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     } catch (e) {
       console.error('Lỗi nạp dropdown cài đặt lớp:', e);
     }
+  }
+
+  // Khởi tạo modal đặt lại mật khẩu nếu có
+  if (window.Admin && typeof window.Admin.initResetPasswordModal === 'function') {
+    window.Admin.initResetPasswordModal();
   }
 
   // Tải dữ liệu ban đầu
