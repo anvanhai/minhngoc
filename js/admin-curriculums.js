@@ -989,6 +989,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     } else {
       filterWarehouseHsk.value = 'all';
     }
+    const filterWarehouseSort = document.getElementById('filter-warehouse-sort');
+    if (filterWarehouseSort) filterWarehouseSort.value = 'sort_order';
     checkAllWarehouseVocab.checked = false;
     btnConfirmAddWarehouseVocab.disabled = true;
     btnConfirmAddWarehouseVocab.textContent = '➕ Thêm (0) từ vào bài học';
@@ -1002,7 +1004,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 
   const filterWarehousePos = document.getElementById('filter-warehouse-pos');
+  const filterWarehouseSort = document.getElementById('filter-warehouse-sort');
+  const btnSelectAllFilteredVocab = document.getElementById('btn-select-all-filtered-vocab');
+  const btnDeselectAllVocab = document.getElementById('btn-deselect-all-vocab');
   let searchWarehouseDebounceTimer = null;
+  let lastCheckedWarehouseIndex = -1;
 
   btnSearchWarehouse.addEventListener('click', loadWarehouseVocabularies);
   searchWarehouseVocab.addEventListener('keydown', (e) => {
@@ -1018,11 +1024,28 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (filterWarehousePos) {
     filterWarehousePos.addEventListener('change', loadWarehouseVocabularies);
   }
+  if (filterWarehouseSort) {
+    filterWarehouseSort.addEventListener('change', loadWarehouseVocabularies);
+  }
+
+  if (btnSelectAllFilteredVocab) {
+    btnSelectAllFilteredVocab.addEventListener('click', () => {
+      document.querySelectorAll('.chk-warehouse-vocab').forEach(c => { c.checked = true; });
+      updateSelectedWarehouseVocabCount();
+    });
+  }
+
+  if (btnDeselectAllVocab) {
+    btnDeselectAllVocab.addEventListener('click', () => {
+      document.querySelectorAll('.chk-warehouse-vocab').forEach(c => { c.checked = false; });
+      updateSelectedWarehouseVocabCount();
+    });
+  }
 
   async function loadWarehouseVocabularies() {
     try {
       warehouseVocabTableBody.innerHTML = `
-        <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+        <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
           Đang nạp từ vựng từ kho...
         </td></tr>
       `;
@@ -1030,10 +1053,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       const search = searchWarehouseVocab.value.trim();
       const hskLevel = filterWarehouseHsk.value;
       const pos = filterWarehousePos ? filterWarehousePos.value : 'all';
+      const sortBy = filterWarehouseSort ? filterWarehouseSort.value : 'sort_order';
 
       const res = await window.Admin.getAllVocabularies({
         search,
-        hskLevel: hskLevel === 'all' ? null : hskLevel
+        hskLevel: hskLevel === 'all' ? null : hskLevel,
+        sortBy
       });
 
       const existingVocabIds = new Set((currentLessonVocabList || []).map(v => v.id));
@@ -1048,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       if (warehouseVocabCache.length === 0) {
         warehouseVocabTableBody.innerHTML = `
-          <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+          <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
             Không có từ vựng nào mới phù hợp với bộ lọc (các từ khớp có thể đã nằm trong bài học này).
           </td></tr>
         `;
@@ -1071,7 +1096,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
       }
 
-      warehouseVocabTableBody.innerHTML = warehouseVocabCache.map(w => {
+      warehouseVocabTableBody.innerHTML = warehouseVocabCache.map((w, idx) => {
         const dup = dupMap.get(w.id);
         const dupBadge = dup
           ? `<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #fef3c7; color: #b45309; font-weight: 600; display: inline-block;">⚠️ Bài ${dup.other_lesson_order}: ${dup.other_lesson_title_zh}</span>`
@@ -1080,7 +1105,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         return `
         <tr>
           <td style="text-align: center;">
-            <input type="checkbox" class="chk-warehouse-vocab" value="${w.id}" style="width: 16px; height: 16px;">
+            <input type="checkbox" class="chk-warehouse-vocab" value="${w.id}" data-index="${idx}" style="width: 16px; height: 16px;">
+          </td>
+          <td style="text-align: center; font-weight: 700; color: var(--text-muted); font-size: 13px;">
+            ${w.sort_order !== null && w.sort_order !== undefined ? w.sort_order : (idx + 1)}
           </td>
           <td style="font-size: 18px; font-weight: 700; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">
             ${w.hanzi}
@@ -1092,15 +1120,29 @@ document.addEventListener('DOMContentLoaded', async function () {
         </tr>
       `}).join('');
 
-      document.querySelectorAll('.chk-warehouse-vocab').forEach(c => {
-        c.addEventListener('change', updateSelectedWarehouseVocabCount);
+      // Hỗ trợ Shift + Click chọn dải và tính toán số lượng
+      lastCheckedWarehouseIndex = -1;
+      const checkboxes = Array.from(document.querySelectorAll('.chk-warehouse-vocab'));
+      checkboxes.forEach((chk, index) => {
+        chk.addEventListener('click', (e) => {
+          if (e.shiftKey && lastCheckedWarehouseIndex !== -1 && lastCheckedWarehouseIndex !== index) {
+            const start = Math.min(lastCheckedWarehouseIndex, index);
+            const end = Math.max(lastCheckedWarehouseIndex, index);
+            const targetChecked = chk.checked;
+            for (let i = start; i <= end; i++) {
+              checkboxes[i].checked = targetChecked;
+            }
+          }
+          lastCheckedWarehouseIndex = index;
+          updateSelectedWarehouseVocabCount();
+        });
       });
 
       updateSelectedWarehouseVocabCount();
 
     } catch (err) {
       console.error('Lỗi tải từ trong kho:', err);
-      warehouseVocabTableBody.innerHTML = `<tr><td colspan="6" style="color: red; text-align: center;">Lỗi tải dữ liệu</td></tr>`;
+      warehouseVocabTableBody.innerHTML = `<tr><td colspan="7" style="color: red; text-align: center;">Lỗi tải dữ liệu</td></tr>`;
     }
   }
 

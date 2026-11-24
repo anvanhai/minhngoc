@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   const searchInput = document.getElementById('search-vocab-input');
   const filterHsk = document.getElementById('filter-hsk-level');
   const filterPartOfSpeech = document.getElementById('filter-part-of-speech');
+  const selectSortBy = document.getElementById('select-sort-by');
   const btnSearch = document.getElementById('btn-search-vocab');
   const btnExportExcel = document.getElementById('btn-export-excel');
   const vocabTableBody = document.getElementById('vocab-table-body');
@@ -87,6 +88,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (state.hskLevel !== undefined && filterHsk) filterHsk.value = state.hskLevel;
         if (state.partOfSpeech !== undefined && filterPartOfSpeech) filterPartOfSpeech.value = state.partOfSpeech;
         if (state.search !== undefined && searchInput) searchInput.value = state.search;
+        if (state.sortBy && selectSortBy) selectSortBy.value = state.sortBy;
 
         // Đồng bộ tab HSK tương ứng
         syncHskTabs(filterHsk ? filterHsk.value : 'all');
@@ -103,7 +105,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         pageSize: pageSize,
         hskLevel: filterHsk ? filterHsk.value : 'all',
         partOfSpeech: filterPartOfSpeech ? filterPartOfSpeech.value : 'all',
-        search: searchInput ? searchInput.value : ''
+        search: searchInput ? searchInput.value : '',
+        sortBy: selectSortBy ? selectSortBy.value : 'sort_order'
       }));
     } catch (e) {
       console.warn('Không thể lưu trạng thái vào sessionStorage:', e);
@@ -127,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   async function loadVocabulariesList() {
     try {
       vocabTableBody.innerHTML = `
-        <tr><td colspan="7" style="text-align: center; padding: 40px 16px; color: var(--text-muted);">
+        <tr><td colspan="8" style="text-align: center; padding: 40px 16px; color: var(--text-muted);">
           <div style="font-size: 26px; margin-bottom: 8px;">⏳</div>
           <div style="font-size: 14px; font-weight: 500;">Đang tải danh sách từ vựng (Trang ${currentPage})...</div>
         </td></tr>
@@ -136,13 +139,15 @@ document.addEventListener('DOMContentLoaded', async function () {
       const search = searchInput ? searchInput.value.trim() : '';
       const hskLevel = filterHsk ? filterHsk.value : 'all';
       const partOfSpeech = filterPartOfSpeech ? filterPartOfSpeech.value : 'all';
+      const sortBy = selectSortBy ? selectSortBy.value : 'sort_order';
 
       const result = await window.Admin.getVocabularies({
         search,
         hskLevel,
         partOfSpeech,
         limit: pageSize,
-        page: currentPage
+        page: currentPage,
+        sortBy
       });
 
       totalWords = result.total || 0;
@@ -162,7 +167,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       // 2. Hiển thị dữ liệu bảng
       if (currentWordsList.length === 0) {
         vocabTableBody.innerHTML = `
-          <tr><td colspan="7" style="text-align: center; padding: 48px 16px; color: var(--text-muted);">
+          <tr><td colspan="8" style="text-align: center; padding: 48px 16px; color: var(--text-muted);">
             <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
             <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
               Không tìm thấy từ vựng nào phù hợp
@@ -175,8 +180,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
       }
 
-      vocabTableBody.innerHTML = currentWordsList.map(w => `
+      vocabTableBody.innerHTML = currentWordsList.map((w, idx) => `
         <tr>
+          <td style="text-align: center; font-weight: 700; color: var(--text-muted); font-size: 13px;">
+            ${w.sort_order !== null && w.sort_order !== undefined ? w.sort_order : ((currentPage - 1) * pageSize + idx + 1)}
+          </td>
           <td style="font-size: 20px; font-weight: 700; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">
             ${w.hanzi}
           </td>
@@ -210,7 +218,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     } catch (err) {
       console.error('Lỗi tải danh sách từ vựng:', err);
       vocabTableBody.innerHTML = `
-        <tr><td colspan="7" style="text-align: center; padding: 36px 16px; color: var(--danger);">
+        <tr><td colspan="8" style="text-align: center; padding: 36px 16px; color: var(--danger);">
           <div style="font-size: 28px; margin-bottom: 8px;">⚠️</div>
           <div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;">Không thể tải danh sách từ vựng</div>
           <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">${err.message || 'Lỗi kết nối cơ sở dữ liệu'}</div>
@@ -439,6 +447,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
+  // Sắp xếp danh sách từ vựng (Thứ tự Excel, Pinyin, Chữ Hán, Mới nhất)
+  if (selectSortBy) {
+    selectSortBy.addEventListener('change', () => {
+      currentPage = 1;
+      saveState();
+      loadVocabulariesList();
+    });
+  }
+
   // ===========================================================================
   // 5. XUẤT TOÀN BỘ KHO TỪ VỰNG RA EXCEL / CSV
   // ===========================================================================
@@ -452,11 +469,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         const search = searchInput ? searchInput.value.trim() : '';
         const hskLevel = filterHsk ? filterHsk.value : 'all';
         const partOfSpeech = filterPartOfSpeech ? filterPartOfSpeech.value : 'all';
+        const sortBy = selectSortBy ? selectSortBy.value : 'sort_order';
 
         const res = await window.Admin.exportVocabulariesToExcel({
           search,
           hskLevel,
-          partOfSpeech
+          partOfSpeech,
+          sortBy
         });
 
         showAlert(`🎉 Đã xuất thành công ${res.count.toLocaleString('vi-VN')} từ vựng ra file "${res.fileName}"!`, 'success');
@@ -537,6 +556,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('v-meaning').value = word.meaning_vi || '';
     document.getElementById('v-hsk').value = String(word.hsk_level || 1);
     document.getElementById('v-pos').value = word.part_of_speech || '';
+    const inputSortOrder = document.getElementById('v-sort-order');
+    if (inputSortOrder) {
+      inputSortOrder.value = (word.sort_order !== null && word.sort_order !== undefined) ? word.sort_order : '';
+    }
     document.getElementById('v-ex-hanzi').value = word.example_hanzi || '';
     document.getElementById('v-ex-vi').value = word.example_vi || '';
 
@@ -557,6 +580,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     const meaningVi = document.getElementById('v-meaning').value.trim();
     const hskLevel = parseInt(document.getElementById('v-hsk').value, 10) || 1;
     const partOfSpeech = document.getElementById('v-pos').value.trim();
+    const sortOrderVal = document.getElementById('v-sort-order') ? document.getElementById('v-sort-order').value.trim() : '';
+    const sortOrder = sortOrderVal !== '' ? parseInt(sortOrderVal, 10) : null;
     const exampleHanzi = document.getElementById('v-ex-hanzi').value.trim();
     const exampleVi = document.getElementById('v-ex-vi').value.trim();
 
@@ -573,7 +598,8 @@ document.addEventListener('DOMContentLoaded', async function () {
           hskLevel,
           partOfSpeech,
           exampleHanzi,
-          exampleVi
+          exampleVi,
+          sortOrder
         });
         showAlert(`Đã cập nhật từ vựng "${hanzi}" (HSK ${hskLevel}) thành công!`, 'success');
       } else {
@@ -585,7 +611,8 @@ document.addEventListener('DOMContentLoaded', async function () {
           hskLevel,
           partOfSpeech,
           exampleHanzi,
-          exampleVi
+          exampleVi,
+          sortOrder
         });
         showAlert(`Đã thêm từ "${hanzi}" (HSK ${hskLevel}) vào kho từ vựng!`, 'success');
       }
@@ -803,6 +830,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   function normalizeExcelRows(rows) {
+    let rowCounter = 0;
     return rows.map(r => {
       const getVal = (keys) => {
         for (const k of keys) {
@@ -828,6 +856,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       if (!hanzi || !pinyin || !meaningVi) return null;
 
+      rowCounter++;
+      const explicitOrder = parseInt(getVal(['stt', 'tt', 'no.', 'no', 'thứ tự', 'thu tu', 'order', 'sort_order']), 10);
+      const sortOrder = (!isNaN(explicitOrder) && explicitOrder > 0) ? explicitOrder : rowCounter;
+
       return {
         hanzi,
         pinyin,
@@ -836,7 +868,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         part_of_speech: partOfSpeech || null,
         example_hanzi: exampleHanzi || null,
         example_pinyin: examplePinyin || null,
-        example_vi: exampleVi || null
+        example_vi: exampleVi || null,
+        sort_order: sortOrder
       };
     }).filter(Boolean);
   }
@@ -848,11 +881,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     const previewRows = words.slice(0, 10);
     previewTableBody.innerHTML = previewRows.map(w => `
       <tr>
+        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${w.sort_order}</td>
         <td style="font-weight: 700; color: var(--primary); font-size: 16px;">${w.hanzi}</td>
         <td>${w.pinyin}</td>
         <td>${w.meaning_vi}</td>
         <td><span class="badge-hsk badge-hsk-${w.hsk_level}">HSK ${w.hsk_level}</span></td>
-        <td>${w.part_of_speech || '--'}</td>
       </tr>
     `).join('');
 

@@ -307,7 +307,7 @@ window.Admin = (function () {
   // 3. QUẢN LÝ KHO TỪ VỰNG & LIÊN KẾT BÀI HỌC
   // ===========================================================================
 
-  async function getVocabularies({ hskLevel = null, search = '', limit = 50, page = 1, partOfSpeech = null } = {}) {
+  async function getVocabularies({ hskLevel = null, search = '', limit = 50, page = 1, partOfSpeech = null, sortBy = 'sort_order' } = {}) {
     const db = getDb();
     if (!db) return { data: [], total: 0, page: 1, limit: 50, totalPages: 0 };
 
@@ -332,12 +332,19 @@ window.Admin = (function () {
     const from = (parsedPage - 1) * parsedLimit;
     const to = from + parsedLimit - 1;
 
-    // Sắp xếp ổn định: Cấp độ HSK tăng dần -> Ngày tạo giảm dần -> ID tăng dần
-    const { data, error, count } = await query
-      .order('hsk_level', { ascending: true })
-      .order('created_at', { ascending: false })
-      .order('id', { ascending: true })
-      .range(from, to);
+    // Sắp xếp linh hoạt: mặc định theo thứ tự file Excel (sort_order), hoặc pinyin, hanzi, ngày tạo
+    if (sortBy === 'pinyin') {
+      query = query.order('hsk_level', { ascending: true }).order('pinyin', { ascending: true }).order('id', { ascending: true });
+    } else if (sortBy === 'hanzi') {
+      query = query.order('hsk_level', { ascending: true }).order('hanzi', { ascending: true }).order('id', { ascending: true });
+    } else if (sortBy === 'created_at') {
+      query = query.order('hsk_level', { ascending: true }).order('created_at', { ascending: false }).order('id', { ascending: true });
+    } else {
+      // Mặc định: theo cấp độ HSK -> số thứ tự sort_order tăng dần -> ID tăng dần
+      query = query.order('hsk_level', { ascending: true }).order('sort_order', { ascending: true, nullsFirst: false }).order('id', { ascending: true });
+    }
+
+    const { data, error, count } = await query.range(from, to);
 
     if (error) throw error;
     const total = count || 0;
@@ -354,7 +361,7 @@ window.Admin = (function () {
    * Lấy toàn bộ từ vựng theo điều kiện lọc, tự động phân lô (batch) qua .range()
    * để không bao giờ bị cắt ở giới hạn 150 hay 1000 dòng của Supabase
    */
-  async function getAllVocabularies({ hskLevel = null, search = '', partOfSpeech = null, batchSize = 1000 } = {}) {
+  async function getAllVocabularies({ hskLevel = null, search = '', partOfSpeech = null, batchSize = 1000, sortBy = 'sort_order' } = {}) {
     const db = getDb();
     if (!db) return [];
 
@@ -382,11 +389,17 @@ window.Admin = (function () {
         query = query.or(`hanzi.ilike.%${q}%,pinyin.ilike.%${q}%,meaning_vi.ilike.%${q}%`);
       }
 
-      const { data, error } = await query
-        .order('hsk_level', { ascending: true })
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: true })
-        .range(from, to);
+      if (sortBy === 'pinyin') {
+        query = query.order('hsk_level', { ascending: true }).order('pinyin', { ascending: true }).order('id', { ascending: true });
+      } else if (sortBy === 'hanzi') {
+        query = query.order('hsk_level', { ascending: true }).order('hanzi', { ascending: true }).order('id', { ascending: true });
+      } else if (sortBy === 'created_at') {
+        query = query.order('hsk_level', { ascending: true }).order('created_at', { ascending: false }).order('id', { ascending: true });
+      } else {
+        query = query.order('hsk_level', { ascending: true }).order('sort_order', { ascending: true, nullsFirst: false }).order('id', { ascending: true });
+      }
+
+      const { data, error } = await query.range(from, to);
 
       if (error) throw error;
 
@@ -408,17 +421,18 @@ window.Admin = (function () {
   /**
    * Xuất toàn bộ kho từ vựng (hoặc theo bộ lọc hiện tại) ra file Excel .xlsx
    */
-  async function exportVocabulariesToExcel({ hskLevel = null, search = '', partOfSpeech = null } = {}) {
+  async function exportVocabulariesToExcel({ hskLevel = null, search = '', partOfSpeech = null, sortBy = 'sort_order' } = {}) {
     if (!window.XLSX) {
       throw new Error('Thư viện SheetJS (XLSX) chưa được tải trên trang!');
     }
 
-    const words = await getAllVocabularies({ hskLevel, search, partOfSpeech });
+    const words = await getAllVocabularies({ hskLevel, search, partOfSpeech, sortBy });
     if (!words || words.length === 0) {
       throw new Error('Không có từ vựng nào để xuất file!');
     }
 
-    const rows = words.map(w => ({
+    const rows = words.map((w, idx) => ({
+      'STT': w.sort_order !== null && w.sort_order !== undefined ? w.sort_order : (idx + 1),
       'Chữ Hán': w.hanzi || '',
       'Phiên âm': w.pinyin || '',
       'Nghĩa tiếng Việt': w.meaning_vi || '',
@@ -439,22 +453,28 @@ window.Admin = (function () {
     return { count: words.length, fileName };
   }
 
-  async function createVocabulary({ hanzi, pinyin, meaningVi, hskLevel, partOfSpeech, exampleHanzi, examplePinyin, exampleVi }) {
+  async function createVocabulary({ hanzi, pinyin, meaningVi, hskLevel, partOfSpeech, exampleHanzi, examplePinyin, exampleVi, sortOrder = null }) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
 
+    const payload = {
+      hanzi: hanzi.trim(),
+      pinyin: pinyin.trim(),
+      meaning_vi: meaningVi.trim(),
+      hsk_level: parseInt(hskLevel || 1, 10),
+      part_of_speech: partOfSpeech ? partOfSpeech.trim() : null,
+      example_hanzi: exampleHanzi ? exampleHanzi.trim() : null,
+      example_pinyin: examplePinyin ? examplePinyin.trim() : null,
+      example_vi: exampleVi ? exampleVi.trim() : null
+    };
+
+    if (sortOrder !== null && sortOrder !== undefined && !isNaN(parseInt(sortOrder, 10))) {
+      payload.sort_order = parseInt(sortOrder, 10);
+    }
+
     const { data, error } = await db
       .from('vocabularies')
-      .insert([{
-        hanzi: hanzi.trim(),
-        pinyin: pinyin.trim(),
-        meaning_vi: meaningVi.trim(),
-        hsk_level: parseInt(hskLevel || 1, 10),
-        part_of_speech: partOfSpeech ? partOfSpeech.trim() : null,
-        example_hanzi: exampleHanzi ? exampleHanzi.trim() : null,
-        example_pinyin: examplePinyin ? examplePinyin.trim() : null,
-        example_vi: exampleVi ? exampleVi.trim() : null
-      }])
+      .insert([payload])
       .select()
       .single();
 
@@ -517,7 +537,7 @@ window.Admin = (function () {
     return true;
   }
 
-  async function updateVocabulary(id, { hanzi, pinyin, meaningVi, hskLevel, partOfSpeech, exampleHanzi, examplePinyin, exampleVi }) {
+  async function updateVocabulary(id, { hanzi, pinyin, meaningVi, hskLevel, partOfSpeech, exampleHanzi, examplePinyin, exampleVi, sortOrder = null }) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
     const updateData = {};
@@ -529,6 +549,9 @@ window.Admin = (function () {
     if (exampleHanzi !== undefined) updateData.example_hanzi = exampleHanzi ? exampleHanzi.trim() : null;
     if (examplePinyin !== undefined) updateData.example_pinyin = examplePinyin ? examplePinyin.trim() : null;
     if (exampleVi !== undefined) updateData.example_vi = exampleVi ? exampleVi.trim() : null;
+    if (sortOrder !== undefined && sortOrder !== null) {
+      updateData.sort_order = parseInt(sortOrder, 10) || null;
+    }
 
     const { data, error } = await db
       .from('vocabularies')
@@ -581,6 +604,8 @@ window.Admin = (function () {
 
   /**
    * Import mảng từ vựng từ file Excel/CSV vào database
+   * Hỗ trợ cập nhật sort_order theo đúng thứ tự dòng trong file Excel gốc,
+   * giữ nguyên ID và không làm mất liên kết với các bài học hay tiến độ học viên.
    * @param {Array<Object>} wordsList - Danh sách các từ đã chuẩn hóa
    * @param {string|null} assignLessonId - ID bài học muốn gán ngay (nếu có)
    */
@@ -591,48 +616,84 @@ window.Admin = (function () {
       throw new Error('Danh sách từ vựng trống');
     }
 
-    // 1. Thêm vào bảng vocabularies theo lô (tránh lỗi PostgREST payload quá lớn)
-    const BATCH_SIZE = 200;
+    // 1. Khử trùng lặp nội bộ trong file (giữ lại dòng đầu tiên xuất hiện để bảo toàn STT)
+    const seenMap = new Set();
+    const dedupedWords = [];
+    for (const w of wordsList) {
+      const key = `${w.hanzi}_${w.hsk_level}`;
+      if (!seenMap.has(key)) {
+        seenMap.add(key);
+        dedupedWords.push(w);
+      }
+    }
+
+    // 2. Thêm hoặc cập nhật vào bảng vocabularies theo lô (tránh payload quá lớn)
+    const BATCH_SIZE = 150;
     let totalImported = 0;
 
-    for (let i = 0; i < wordsList.length; i += BATCH_SIZE) {
-      const batch = wordsList.slice(i, i + BATCH_SIZE);
-      const { error: insertError } = await db
-        .from('vocabularies')
-        .upsert(batch, { onConflict: 'hanzi,pinyin' });
+    for (let i = 0; i < dedupedWords.length; i += BATCH_SIZE) {
+      const batch = dedupedWords.slice(i, i + BATCH_SIZE);
 
-      if (insertError) {
-        // Fallback insert nếu bảng không có ràng buộc unique hanzi,pinyin
-        const { error: fallbackError } = await db
-          .from('vocabularies')
-          .insert(batch);
-
-        if (fallbackError) throw fallbackError;
+      // Thử dùng RPC batch_upsert_vocabularies (Migration 23) để cập nhật thông minh theo (hanzi, hsk_level)
+      let rpcSucceeded = false;
+      try {
+        const { error: rpcErr } = await db.rpc('batch_upsert_vocabularies', { p_words: batch });
+        if (!rpcErr) {
+          rpcSucceeded = true;
+        }
+      } catch (e) {
+        rpcSucceeded = false;
       }
+
+      if (!rpcSucceeded) {
+        // Fallback: PostgREST upsert hoặc insert thông thường nếu RPC chưa được chạy
+        const { error: insertError } = await db
+          .from('vocabularies')
+          .upsert(batch, { onConflict: 'hanzi,pinyin' });
+
+        if (insertError) {
+          const { error: fallbackError } = await db
+            .from('vocabularies')
+            .insert(batch);
+
+          if (fallbackError) throw fallbackError;
+        }
+      }
+
       totalImported += batch.length;
     }
 
-    // 2. Nếu có chọn gán vào bài học, liên kết an toàn theo từng lô vào lesson_vocabularies
+    // 3. Nếu có chọn gán vào bài học, bảo toàn đúng thứ tự các từ trong file
     if (assignLessonId) {
-      const allHanzis = wordsList.map(w => w.hanzi);
+      const allHanzis = dedupedWords.map(w => w.hanzi);
+      const vocabMap = new Map();
+
       for (let i = 0; i < allHanzis.length; i += BATCH_SIZE) {
         const batchHanzis = allHanzis.slice(i, i + BATCH_SIZE);
-        const { data: existingVocabs } = await db
+        const { data: foundVocabs } = await db
           .from('vocabularies')
-          .select('id')
+          .select('id, hanzi, hsk_level')
           .in('hanzi', batchHanzis);
 
-        if (existingVocabs && existingVocabs.length > 0) {
-          const lessonLinks = existingVocabs.map((v, idx) => ({
-            lesson_id: assignLessonId,
-            vocabulary_id: v.id,
-            sort_order: i + idx + 1
-          }));
-
-          await db
-            .from('lesson_vocabularies')
-            .upsert(lessonLinks, { onConflict: 'lesson_id,vocabulary_id' });
+        if (foundVocabs) {
+          foundVocabs.forEach(v => {
+            vocabMap.set(`${v.hanzi}_${v.hsk_level}`, v.id);
+            if (!vocabMap.has(v.hanzi)) vocabMap.set(v.hanzi, v.id);
+          });
         }
+      }
+
+      // Giữ chính xác thứ tự ban đầu của mảng file
+      const orderedVocabIds = [];
+      for (const w of dedupedWords) {
+        const id = vocabMap.get(`${w.hanzi}_${w.hsk_level}`) || vocabMap.get(w.hanzi);
+        if (id && !orderedVocabIds.includes(id)) {
+          orderedVocabIds.push(id);
+        }
+      }
+
+      if (orderedVocabIds.length > 0) {
+        await batchAddWordsToLesson(assignLessonId, orderedVocabIds);
       }
     }
 
@@ -1146,26 +1207,84 @@ window.Admin = (function () {
   async function getAssignmentSubmissions(assignmentId, classId) {
     const db = getDb();
     if (!db) return [];
-    const { data: students, error: sErr } = await db
-      .from('enrollments')
-      .select('student:profiles(id, display_name, username)')
-      .eq('class_id', classId)
-      .eq('status', 'active');
-    if (sErr) throw sErr;
 
-    const { data: subs, error: subErr } = await db
-      .from('assignment_submissions')
-      .select('*')
-      .eq('assignment_id', assignmentId);
-    if (subErr) throw subErr;
+    // Chạy song song:
+    // 1. Danh sách học sinh trong lớp
+    // 2. Bài nộp tổng hợp (assignment_submissions)
+    // 3. Chi tiết bài nộp ghi âm kèm các bản ghi con takes (recording_submissions)
+    const [studentsRes, subsRes, recsRes] = await Promise.all([
+      db.from('enrollments')
+        .select('student:profiles(id, display_name, username, avatar_url)')
+        .eq('class_id', classId)
+        .eq('status', 'active'),
+      db.from('assignment_submissions')
+        .select('*')
+        .eq('assignment_id', assignmentId),
+      db.from('recording_submissions')
+        .select(`
+          id, student_id, assignment_id, status, score, teacher_comment, teacher_audio_url, teacher_audio_mime, teacher_audio_duration, audio_url, created_at,
+          recordings:submission_recordings(id, position, storage_path, mime_type, duration_seconds)
+        `)
+        .eq('assignment_id', assignmentId)
+    ]);
+
+    if (studentsRes.error) throw studentsRes.error;
+    if (subsRes.error) throw subsRes.error;
+    if (recsRes.error) console.warn('Lỗi tải recording_submissions:', recsRes.error);
 
     const subMap = {};
-    (subs || []).forEach(s => { subMap[s.student_id] = s; });
+    (subsRes.data || []).forEach(s => { subMap[s.student_id] = s; });
 
-    return (students || []).map(item => ({
-      student: item.student,
-      submission: subMap[item.student.id] || null
-    }));
+    const recMap = {};
+    (recsRes.data || []).forEach(r => { recMap[r.student_id] = r; });
+
+    return (studentsRes.data || []).map(item => {
+      const student = item.student || null;
+      const stId = student ? student.id : null;
+      const baseSub = stId ? subMap[stId] : null;
+      const recSub = stId ? recMap[stId] : null;
+
+      let finalSub = null;
+      if (baseSub || recSub) {
+        finalSub = { ...(baseSub || {}) };
+
+        if (recSub) {
+          finalSub.recording_id = recSub.id;
+          finalSub.status = (recSub.status === 'graded') ? 'graded' : (finalSub.status || recSub.status || 'submitted');
+          finalSub.score = (recSub.score !== null && recSub.score !== undefined) ? recSub.score : finalSub.score;
+          finalSub.teacher_comment = recSub.teacher_comment || finalSub.teacher_comment || null;
+          finalSub.teacher_audio_url = recSub.teacher_audio_url || finalSub.teacher_audio_url || null;
+          finalSub.teacher_audio_mime = recSub.teacher_audio_mime || finalSub.teacher_audio_mime || 'audio/webm';
+          finalSub.teacher_audio_duration = recSub.teacher_audio_duration || finalSub.teacher_audio_duration || 0;
+          finalSub.completed_at = finalSub.completed_at || recSub.created_at;
+
+          if (recSub.recordings && Array.isArray(recSub.recordings) && recSub.recordings.length > 0) {
+            finalSub.recordings = [...recSub.recordings].sort((a, b) => (a.position || 1) - (b.position || 1));
+          } else if (recSub.audio_url || finalSub.audio_url) {
+            finalSub.recordings = [{
+              id: 'legacy-take',
+              position: 1,
+              storage_path: recSub.audio_url || finalSub.audio_url,
+              mime_type: 'audio/webm',
+              duration_seconds: 0
+            }];
+          }
+        } else if (finalSub.audio_url) {
+          finalSub.recordings = [{
+            id: 'legacy-take',
+            position: 1,
+            storage_path: finalSub.audio_url,
+            mime_type: 'audio/webm',
+            duration_seconds: 0
+          }];
+        }
+      }
+
+      return {
+        student,
+        submission: finalSub
+      };
+    });
   }
 
   async function getRecordingsForGrading({ classId = 'all', status = 'all' } = {}) {

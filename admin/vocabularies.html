@@ -249,6 +249,15 @@
           </select>
         </div>
 
+        <div style="min-width: 175px;">
+          <select id="select-sort-by" class="form-control" style="height: 40px;">
+            <option value="sort_order" selected>📌 Thứ tự trong file Excel</option>
+            <option value="pinyin">🔤 Pinyin (A - Z)</option>
+            <option value="hanzi">🀄 Chữ Hán (A - Z)</option>
+            <option value="created_at">🕒 Mới thêm gần đây</option>
+          </select>
+        </div>
+
         <button type="button" id="btn-search-vocab" class="btn btn-secondary btn-sm" style="height: 40px;">
           Tìm kiếm
         </button>
@@ -293,6 +302,7 @@
       <table class="data-table">
         <thead>
           <tr>
+            <th style="width: 60px; text-align: center;">STT</th>
             <th style="width: 120px;">Chữ Hán</th>
             <th style="width: 120px;">Pinyin</th>
             <th>Ý nghĩa tiếng Việt</th>
@@ -304,7 +314,7 @@
         </thead>
         <tbody id="vocab-table-body">
           <tr>
-            <td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">
+            <td colspan="8" style="text-align: center; padding: 32px; color: var(--text-muted);">
               Đang tải danh sách từ vựng...
             </td>
           </tr>
@@ -392,6 +402,7 @@
             <table class="data-table" style="font-size: 13px;">
               <thead>
                 <tr>
+                  <th style="width: 50px; text-align: center;">STT</th>
                   <th>Hán tự</th>
                   <th>Pinyin</th>
                   <th>Nghĩa tiếng Việt</th>
@@ -440,7 +451,7 @@
             <input type="text" id="v-meaning" class="form-control" placeholder="Ví dụ: Học, nghiên cứu" required>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
             <div class="form-group">
               <label class="form-label" for="v-hsk">Cấp độ HSK</label>
               <select id="v-hsk" class="form-control">
@@ -458,6 +469,10 @@
             <div class="form-group">
               <label class="form-label" for="v-pos">Từ loại</label>
               <input type="text" id="v-pos" class="form-control" placeholder="Động từ, Danh từ...">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="v-sort-order">Số thứ tự (STT)</label>
+              <input type="number" id="v-sort-order" class="form-control" placeholder="Tự động" min="1">
             </div>
           </div>
 

@@ -607,9 +607,9 @@
         <div id="add-vocab-alert" class="alert"></div>
 
         <!-- Bộ lọc & tìm kiếm -->
-        <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
-          <input type="text" id="search-warehouse-vocab" class="form-control" placeholder="Tìm theo chữ Hán, Pinyin hoặc nghĩa tiếng Việt..." style="flex: 1; min-width: 200px;">
-          <select id="filter-warehouse-hsk" class="form-control" style="width: 125px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+          <input type="text" id="search-warehouse-vocab" class="form-control" placeholder="Tìm theo chữ Hán, Pinyin hoặc nghĩa tiếng Việt..." style="flex: 1; min-width: 180px;">
+          <select id="filter-warehouse-hsk" class="form-control" style="width: 120px;">
             <option value="all">Tất cả HSK</option>
             <option value="1">HSK 1</option>
             <option value="2">HSK 2</option>
@@ -621,7 +621,7 @@
             <option value="8">HSK 8</option>
             <option value="9">HSK 9</option>
           </select>
-          <select id="filter-warehouse-pos" class="form-control" style="width: 135px;">
+          <select id="filter-warehouse-pos" class="form-control" style="width: 130px;">
             <option value="all">Tất cả từ loại</option>
             <option value="danh từ">Danh từ (n.)</option>
             <option value="động từ">Động từ (v.)</option>
@@ -632,9 +632,30 @@
             <option value="liên từ">Liên từ (conj.)</option>
             <option value="lượng từ">Lượng từ (cl.)</option>
           </select>
+          <select id="filter-warehouse-sort" class="form-control" style="width: 175px;">
+            <option value="sort_order" selected>📌 Thứ tự file Excel</option>
+            <option value="pinyin">🔤 Pinyin (A - Z)</option>
+            <option value="hanzi">🀄 Chữ Hán (A - Z)</option>
+            <option value="created_at">🕒 Mới thêm gần đây</option>
+          </select>
           <button type="button" id="btn-search-warehouse" class="btn btn-outline btn-sm" style="padding: 0 14px;">
             🔍 Tìm
           </button>
+        </div>
+
+        <!-- Thanh công cụ thao tác chọn nhanh & Hướng dẫn Shift + Click -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 6px 10px; background: var(--bg-subtle); border-radius: 8px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="btn-select-all-filtered-vocab" class="btn btn-outline btn-sm" style="height: 28px; padding: 0 10px; font-size: 12px;">
+              ✅ Chọn tất cả kết quả đang lọc
+            </button>
+            <button type="button" id="btn-deselect-all-vocab" class="btn btn-outline btn-sm" style="height: 28px; padding: 0 10px; font-size: 12px;">
+              ❎ Bỏ chọn tất cả
+            </button>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+            <span>💡 <em>Giữ phím <strong>Shift</strong> + click ô để chọn nhanh dải nhiều từ liên tiếp</em></span>
+          </div>
         </div>
 
         <!-- Danh sách từ trong kho -->
@@ -645,6 +666,7 @@
                 <th style="width: 40px; text-align: center;">
                   <input type="checkbox" id="check-all-warehouse-vocab" style="width: 16px; height: 16px;">
                 </th>
+                <th style="width: 50px; text-align: center;">STT</th>
                 <th style="width: 110px;">Chữ Hán</th>
                 <th style="width: 110px;">Phiên âm</th>
                 <th>Nghĩa tiếng Việt</th>
@@ -654,7 +676,7 @@
             </thead>
             <tbody id="warehouse-vocab-table-body">
               <tr>
-                <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
                   Nhập từ khóa hoặc bấm "Tìm" để nạp từ trong kho.
                 </td>
               </tr>

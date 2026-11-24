@@ -45,6 +45,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     const classes = await window.Admin.getClasses();
     filterClass.innerHTML = '<option value="">-- Tất cả các lớp học --</option>' +
       (classes || []).map(c => `<option value="${c.id}">${c.name} (${c.level})</option>`).join('');
+
+    // Đọc tham số URL (nếu dẫn từ trang chi tiết lớp sang)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramClass = urlParams.get('classId');
+    const paramStatus = urlParams.get('status');
+    if (paramClass) filterClass.value = paramClass;
+    if (paramStatus) filterStatus.value = paramStatus;
   } catch (err) {
     console.warn('Lỗi nạp danh sách lớp học:', err);
   }
@@ -149,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         return `
-          <div class="grading-card" id="rec-card-${rec.id}" style="${isGraded ? 'opacity: 0.95;' : 'border-left: 4px solid var(--primary);'}">
+          <div class="grading-card" id="rec-card-${rec.id}" data-student-id="${rec.student_id || ''}" style="${isGraded ? 'opacity: 0.95;' : 'border-left: 4px solid var(--primary);'}">
             <!-- Thông tin học sinh & Lớp học -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
               <div>
@@ -671,6 +678,28 @@ document.addEventListener('DOMContentLoaded', async function () {
           }
         });
       });
+
+      // Nếu có tham số submissionId hoặc studentId trên URL -> Tự động cuộn tới bài đó và làm nổi bật
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetSubId = urlParams.get('submissionId');
+      const targetStudentId = urlParams.get('studentId');
+      if (targetSubId) {
+        const card = document.getElementById(`rec-card-${targetSubId}`);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.style.outline = '3px solid var(--primary)';
+          card.style.transition = 'outline 0.3s ease';
+          setTimeout(() => { card.style.outline = 'none'; }, 4000);
+        }
+      } else if (targetStudentId) {
+        const firstCard = gradingListContainer.querySelector(`[data-student-id="${targetStudentId}"]`);
+        if (firstCard) {
+          firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstCard.style.outline = '3px solid var(--primary)';
+          firstCard.style.transition = 'outline 0.3s ease';
+          setTimeout(() => { firstCard.style.outline = 'none'; }, 4000);
+        }
+      }
 
     } catch (err) {
       console.error('Lỗi chi tiết khi tải bài ghi âm:', err);

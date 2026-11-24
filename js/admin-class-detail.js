@@ -853,108 +853,470 @@ document.addEventListener('DOMContentLoaded', async function () {
   const viewSubmissionsSubtitle = document.getElementById('view-submissions-subtitle');
   const submissionsListContainer = document.getElementById('submissions-list-container');
 
+  // Trình quản lý phát âm thanh trong modal xem bài nộp
+  let currentModalAudio = null;
+  let currentPlayingBtn = null;
+
+  function stopModalAudio() {
+    if (currentModalAudio) {
+      try {
+        currentModalAudio.pause();
+        currentModalAudio.currentTime = 0;
+      } catch (e) {}
+      currentModalAudio = null;
+    }
+    if (currentPlayingBtn) {
+      currentPlayingBtn.innerHTML = currentPlayingBtn.dataset.originalText || '▶️ Nghe';
+      currentPlayingBtn.disabled = false;
+      currentPlayingBtn = null;
+    }
+  }
+
+  function closeModalViewSubmissions() {
+    stopModalAudio();
+    if (modalViewSubmissions) modalViewSubmissions.classList.remove('active');
+  }
+
   document.querySelectorAll('[data-close="modal-view-submissions"]').forEach(btn => {
-    btn.addEventListener('click', () => { modalViewSubmissions.classList.remove('active'); });
+    btn.addEventListener('click', closeModalViewSubmissions);
   });
+
+  // Đóng modal khi bấm phím Esc hoặc bấm ra ngoài vùng nội dung
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalViewSubmissions && modalViewSubmissions.classList.contains('active')) {
+      closeModalViewSubmissions();
+    }
+  });
+
+  if (modalViewSubmissions) {
+    modalViewSubmissions.addEventListener('click', (e) => {
+      if (e.target === modalViewSubmissions) {
+        closeModalViewSubmissions();
+      }
+    });
+  }
+
+  // Hàm tiện ích định dạng an toàn thông tin học viên (chống undefined / null)
+  function formatStudentInfo(student) {
+    if (!student) {
+      return {
+        name: 'Học viên đã xóa',
+        username: '',
+        initials: '?',
+        avatarUrl: null
+      };
+    }
+    const displayName = (student.display_name && typeof student.display_name === 'string') ? student.display_name.trim() : '';
+    const username = (student.username && typeof student.username === 'string') ? student.username.trim() : '';
+    const name = displayName || username || 'Học viên';
+    const initials = name.charAt(0).toUpperCase();
+    return {
+      name,
+      username: username ? `@${username}` : '',
+      initials,
+      avatarUrl: student.avatar_url || null
+    };
+  }
+
+  function formatDuration(sec) {
+    const s = parseInt(sec, 10) || 0;
+    const m = String(Math.floor(s / 60)).padStart(2, '0');
+    const remS = String(s % 60).padStart(2, '0');
+    return `${m}:${remS}`;
+  }
+
+  function formatSubmissionDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleString('vi-VN', {
+        hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
+      });
+    } catch (e) {
+      return '';
+    }
+  }
 
   async function openSubmissionsModal(assignId, assignTitle, assignType) {
     viewSubmissionsTitle.textContent = `Bài tập: ${assignTitle}`;
     viewSubmissionsSubtitle.textContent = `Loại bài: ${assignType} · Lớp: ${currentClass ? currentClass.name : ''}`;
-    submissionsListContainer.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--text-muted);">Đang tải danh sách bài nộp...</div>`;
+    submissionsListContainer.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+        <div style="font-size: 28px; margin-bottom: 8px;">⏳</div>
+        <div>Đang tải danh sách bài nộp của học sinh...</div>
+      </div>
+    `;
     modalViewSubmissions.classList.add('active');
 
-    try {
-      const records = await window.Admin.getAssignmentSubmissions(assignId, classId);
+    async function loadData() {
+      try {
+        const records = await window.Admin.getAssignmentSubmissions(assignId, classId);
 
-      if (!records || records.length === 0) {
-        submissionsListContainer.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--text-muted);">Lớp chưa có học sinh nào.</div>`;
-        return;
-      }
+        if (!records || records.length === 0) {
+          submissionsListContainer.innerHTML = `
+            <div style="text-align: center; padding: 36px 20px; color: var(--text-muted);">
+              <div style="font-size: 32px; margin-bottom: 8px;">👥</div>
+              <div style="font-size: 15px; font-weight: 600; color: var(--text-main);">Lớp chưa có học sinh nào</div>
+              <div style="font-size: 13px; margin-top: 4px;">Hãy ghi danh học sinh vào lớp ở Tab "Học sinh" để giao bài tập.</div>
+            </div>
+          `;
+          return;
+        }
 
-      submissionsListContainer.innerHTML = `
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Học sinh</th>
-                <th>Trạng thái</th>
-                <th>Điểm số</th>
-                <th>Nội dung nộp</th>
-                <th>Nhận xét</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${records.map(r => {
-                const s = r.submission;
-                let statusHtml = '<span class="badge-status badge-paused" style="background: rgba(148, 163, 184, 0.2); color: var(--text-muted);">⚪ Chưa nộp</span>';
-                if (s) {
-                  if (s.status === 'graded') {
-                    statusHtml = '<span class="badge-status badge-ongoing">🟢 Đã chấm</span>';
-                  } else if (s.status === 'completed' || s.status === 'submitted') {
-                    statusHtml = '<span class="badge-status" style="background: rgba(56, 189, 248, 0.2); color: #0284c7;">🔵 Đã nộp</span>';
-                  } else if (s.status === 'late') {
-                    statusHtml = '<span class="badge-status badge-paused">🟡 Nộp muộn</span>';
-                  }
-                }
+        // Trạng thái tìm kiếm, lọc và sắp xếp
+        let currentSearch = '';
+        let currentStatusFilter = 'all';
+        let currentSort = 'name-asc';
 
-                let contentHtml = '<span style="color: var(--text-muted); font-size: 12px;">Chưa có</span>';
-                if (s && s.audio_url) {
-                  contentHtml = `
-                    <button type="button" class="btn btn-outline btn-sm btn-play-submission-audio" data-url="${s.audio_url}" style="padding: 2px 8px; font-size: 12px;">
-                      🔊 Nghe ghi âm
-                    </button>
-                  `;
-                } else if (s && s.score !== null) {
-                  contentHtml = `<span style="font-size: 13px; font-weight: 700; color: #16a34a;">${s.score}/100</span>`;
-                }
+        // Hàm tính toán thống kê
+        function getSummaryStats() {
+          const total = records.length;
+          let submitted = 0;
+          let graded = 0;
+          records.forEach(r => {
+            const s = r.submission;
+            if (s) {
+              submitted++;
+              if (s.status === 'graded') graded++;
+            }
+          });
+          const unsubmitted = total - submitted;
+          return { total, submitted, graded, unsubmitted };
+        }
 
-                return `
+        // Hàm lọc và sắp xếp
+        function getFilteredAndSortedRecords() {
+          let list = records.filter(r => {
+            const info = formatStudentInfo(r.student);
+            const query = currentSearch.toLowerCase();
+
+            // Lọc theo tìm kiếm
+            const matchSearch = !query ||
+              info.name.toLowerCase().includes(query) ||
+              info.username.toLowerCase().includes(query);
+
+            if (!matchSearch) return false;
+
+            // Lọc theo trạng thái
+            const s = r.submission;
+            if (currentStatusFilter === 'all') return true;
+            if (currentStatusFilter === 'unsubmitted') return !s;
+            if (currentStatusFilter === 'graded') return s && s.status === 'graded';
+            if (currentStatusFilter === 'submitted') return s && (s.status === 'completed' || s.status === 'submitted' || s.status === 'late');
+            return true;
+          });
+
+          // Sắp xếp
+          list.sort((a, b) => {
+            const infoA = formatStudentInfo(a.student);
+            const infoB = formatStudentInfo(b.student);
+            const sA = a.submission;
+            const sB = b.submission;
+
+            if (currentSort === 'name-asc') {
+              return infoA.name.localeCompare(infoB.name, 'vi');
+            }
+            if (currentSort === 'name-desc') {
+              return infoB.name.localeCompare(infoA.name, 'vi');
+            }
+            if (currentSort === 'pending-first') {
+              // Chờ chấm (submitted) lên đầu -> Chưa nộp -> Đã chấm
+              const weightA = !sA ? 2 : (sA.status === 'graded' ? 3 : 1);
+              const weightB = !sB ? 2 : (sB.status === 'graded' ? 3 : 1);
+              return weightA - weightB || infoA.name.localeCompare(infoB.name, 'vi');
+            }
+            if (currentSort === 'unsubmitted-first') {
+              const weightA = !sA ? 1 : (sA.status === 'graded' ? 3 : 2);
+              const weightB = !sB ? 1 : (sB.status === 'graded' ? 3 : 2);
+              return weightA - weightB || infoA.name.localeCompare(infoB.name, 'vi');
+            }
+            if (currentSort === 'score-desc') {
+              const scoreA = (sA && sA.score !== null && sA.score !== undefined) ? sA.score : -1;
+              const scoreB = (sB && sB.score !== null && sB.score !== undefined) ? sB.score : -1;
+              return scoreB - scoreA || infoA.name.localeCompare(infoB.name, 'vi');
+            }
+            return 0;
+          });
+
+          return list;
+        }
+
+        function renderSubmissionsTable() {
+          const stats = getSummaryStats();
+          const filtered = getFilteredAndSortedRecords();
+
+          submissionsListContainer.innerHTML = `
+            <!-- Thanh thống kê & Bộ lọc -->
+            <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 600;">
+                  <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: var(--primary);">👥 Tổng: ${stats.total} học viên</span>
+                  <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📤 Đã nộp: ${stats.submitted}/${stats.total}</span>
+                  <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #0ea5e9;">🟢 Đã chấm: ${stats.graded}</span>
+                  <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-muted);">⚪ Chưa nộp: ${stats.unsubmitted}</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted);">
+                  Hiển thị: <strong>${filtered.length}</strong> / ${stats.total} học viên
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="sub-filter-search" class="form-control" placeholder="🔍 Tìm tên hoặc @username..." value="${currentSearch.replace(/"/g, '&quot;')}" style="max-width: 250px; height: 36px; font-size: 13px;">
+                <select id="sub-filter-status" class="form-control" style="width: auto; height: 36px; font-size: 13px;">
+                  <option value="all" ${currentStatusFilter === 'all' ? 'selected' : ''}>Tất cả trạng thái</option>
+                  <option value="submitted" ${currentStatusFilter === 'submitted' ? 'selected' : ''}>🔵 Chờ chấm / Đã nộp (${stats.submitted - stats.graded})</option>
+                  <option value="graded" ${currentStatusFilter === 'graded' ? 'selected' : ''}>🟢 Đã chấm (${stats.graded})</option>
+                  <option value="unsubmitted" ${currentStatusFilter === 'unsubmitted' ? 'selected' : ''}>⚪ Chưa nộp (${stats.unsubmitted})</option>
+                </select>
+                <select id="sub-filter-sort" class="form-control" style="width: auto; height: 36px; font-size: 13px;">
+                  <option value="name-asc" ${currentSort === 'name-asc' ? 'selected' : ''}>Tên: A → Z</option>
+                  <option value="name-desc" ${currentSort === 'name-desc' ? 'selected' : ''}>Tên: Z → A</option>
+                  <option value="pending-first" ${currentSort === 'pending-first' ? 'selected' : ''}>Ưu tiên: Chờ chấm lên đầu</option>
+                  <option value="unsubmitted-first" ${currentSort === 'unsubmitted-first' ? 'selected' : ''}>Ưu tiên: Chưa nộp lên đầu</option>
+                  <option value="score-desc" ${currentSort === 'score-desc' ? 'selected' : ''}>Điểm: Cao → Thấp</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Bảng danh sách bài nộp -->
+            <div class="table-responsive">
+              <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
                   <tr>
-                    <td>
-                      <div style="font-weight: 700; color: var(--text-main);">${r.student.full_name || 'Học sinh'}</div>
-                      <div style="font-size: 11px; color: var(--text-muted);">${r.student.email}</div>
-                    </td>
-                    <td>${statusHtml}</td>
-                    <td>${s && s.score !== null && s.score !== undefined ? `<strong>${s.score}</strong>/100` : '<span style="color: var(--text-muted);">-</span>'}</td>
-                    <td>${contentHtml}</td>
-                    <td style="font-size: 12px; color: var(--text-muted); max-width: 200px;">
-                      ${s && s.teacher_comment ? s.teacher_comment : '<em>Chưa có</em>'}
-                    </td>
+                    <th style="min-width: 170px;">Học sinh</th>
+                    <th style="min-width: 120px;">Trạng thái</th>
+                    <th style="min-width: 90px;">Điểm số</th>
+                    <th style="min-width: 230px;">Nội dung nộp</th>
+                    <th style="min-width: 240px;">Nhận xét của giáo viên</th>
                   </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
+                </thead>
+                <tbody>
+                  ${filtered.length === 0 ? `
+                    <tr>
+                      <td colspan="5" style="text-align: center; padding: 32px; color: var(--text-muted);">
+                        Không tìm thấy học viên nào phù hợp với bộ lọc hiện tại.
+                      </td>
+                    </tr>
+                  ` : filtered.map(r => {
+                    const info = formatStudentInfo(r.student);
+                    const s = r.submission;
+                    const stId = r.student ? r.student.id : '';
 
-      // Gắn sự kiện nghe audio
-      submissionsListContainer.querySelectorAll('.btn-play-submission-audio').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const rawUrl = btn.dataset.url;
-          btn.textContent = '⏳ Đang tải...';
-          btn.disabled = true;
-          try {
-            const playUrl = await window.Admin.getAudioPlayUrl(rawUrl);
-            const audio = new Audio(playUrl);
-            audio.play();
-            btn.textContent = '▶️ Đang phát...';
-            audio.onended = () => {
-              btn.textContent = '🔊 Nghe ghi âm';
-              btn.disabled = false;
-            };
-          } catch (e) {
-            alert('Lỗi phát âm thanh: ' + (e.message || e));
-            btn.textContent = '🔊 Nghe ghi âm';
-            btn.disabled = false;
+                    // 1. Trạng thái nộp bài
+                    let statusHtml = '<span class="badge-status badge-paused" style="background: rgba(148, 163, 184, 0.2); color: var(--text-muted);">⚪ Chưa nộp</span>';
+                    if (s) {
+                      if (s.status === 'graded') {
+                        statusHtml = '<span class="badge-status badge-ongoing">🟢 Đã chấm</span>';
+                      } else if (s.status === 'late') {
+                        statusHtml = '<span class="badge-status badge-paused" style="background: rgba(234, 179, 8, 0.2); color: #ca8a04;">🟡 Nộp muộn</span>';
+                      } else {
+                        statusHtml = '<span class="badge-status" style="background: rgba(56, 189, 248, 0.2); color: #0284c7;">🔵 Chờ chấm</span>';
+                      }
+                    }
+
+                    // 2. Điểm số
+                    const scoreHtml = (s && s.score !== null && s.score !== undefined)
+                      ? `<strong style="font-size: 15px; color: #16a34a;">${s.score}</strong><span style="font-size: 12px; color: var(--text-muted);">/100</span>`
+                      : '<span style="color: var(--text-muted);">-</span>';
+
+                    // 3. Nội dung nộp
+                    let contentHtml = '<span style="color: var(--text-muted); font-size: 12px; font-style: italic;">Chưa nộp bài</span>';
+                    if (s) {
+                      if (s.recordings && Array.isArray(s.recordings) && s.recordings.length > 0) {
+                        contentHtml = `
+                          <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="font-size: 12px; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 4px;">
+                              🎙️ ${s.recordings.length} bản ghi âm:
+                            </div>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                              ${s.recordings.map((take, tIdx) => `
+                                <button type="button" class="btn btn-outline btn-sm btn-play-audio-track" data-url="${take.storage_path}" style="padding: 2px 8px; font-size: 11px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                                  ▶️ Bản ${take.position || tIdx + 1} ${take.duration_seconds > 0 ? `(${formatDuration(take.duration_seconds)})` : ''}
+                                </button>
+                              `).join('')}
+                            </div>
+                          </div>
+                        `;
+                      } else if (s.audio_url) {
+                        contentHtml = `
+                          <button type="button" class="btn btn-outline btn-sm btn-play-audio-track" data-url="${s.audio_url}" style="padding: 2px 10px; font-size: 12px;">
+                            ▶️ Nghe bài ghi âm
+                          </button>
+                        `;
+                      } else if (s.answers_payload) {
+                        const totalAns = Array.isArray(s.answers_payload) ? s.answers_payload.length : Object.keys(s.answers_payload).length;
+                        contentHtml = `<span style="font-size: 12px; color: var(--text-main); font-weight: 600;">📝 Đã hoàn thành (${totalAns} câu)</span>`;
+                      } else {
+                        contentHtml = `<span style="font-size: 12px; color: var(--text-main);">✅ Đã nộp bài tập</span>`;
+                      }
+                    }
+
+                    // 4. Nhận xét của giáo viên (chữ & giọng nói)
+                    let feedbackHtml = '';
+                    const hasTextComment = s && s.teacher_comment && s.teacher_comment.trim();
+                    const hasVoiceComment = s && s.teacher_audio_url && s.teacher_audio_url.trim();
+
+                    if (hasTextComment || hasVoiceComment) {
+                      feedbackHtml = `
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                          ${hasTextComment ? `
+                            <div style="font-size: 12px; color: var(--text-main); line-height: 1.4; word-break: break-word;" title="${s.teacher_comment.replace(/"/g, '&quot;')}">
+                              💬 "${s.teacher_comment.length > 60 ? s.teacher_comment.substring(0, 60) + '...' : s.teacher_comment}"
+                            </div>
+                          ` : ''}
+                          ${hasVoiceComment ? `
+                            <div>
+                              <button type="button" class="btn btn-primary btn-sm btn-play-audio-track" data-url="${s.teacher_audio_url}" style="padding: 2px 8px; font-size: 11px; border-radius: 4px;">
+                                🎙️ Nghe cô nhận xét ${s.teacher_audio_duration > 0 ? `(${formatDuration(s.teacher_audio_duration)})` : ''}
+                              </button>
+                            </div>
+                          ` : ''}
+                        </div>
+                      `;
+                    } else {
+                      feedbackHtml = '<span style="color: var(--text-muted); font-size: 12px; font-style: italic;">Chưa có</span>';
+                    }
+
+                    // Nút Chấm bài / Xem chi tiết dẫn sang admin/grading.html
+                    const gradeLinkHtml = (s && stId) ? `
+                      <div style="margin-top: 6px;">
+                        <a href="grading.html?classId=${classId}&studentId=${stId}&submissionId=${s.recording_id || ''}" target="_blank" class="btn btn-outline btn-sm" style="font-size: 11px; padding: 2px 8px; color: var(--primary); border-color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Mở trang chấm bài cho học viên này">
+                          ${s.status === 'graded' ? '🔍 Xem bài chấm' : '📝 Chấm bài ngay'}
+                        </a>
+                      </div>
+                    ` : '';
+
+                    return `
+                      <tr>
+                        <!-- Cột Học sinh -->
+                        <td>
+                          <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="width: 34px; height: 34px; border-radius: 50%; background: rgba(59, 130, 246, 0.18); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0;">
+                              ${info.initials}
+                            </div>
+                            <div>
+                              <div style="font-weight: 700; color: var(--text-main); font-size: 13.5px;">${info.name}</div>
+                              ${info.username ? `<div style="font-size: 11.5px; color: var(--text-muted); font-weight: 500;">${info.username}</div>` : ''}
+                            </div>
+                          </div>
+                        </td>
+
+                        <!-- Cột Trạng thái -->
+                        <td>
+                          <div>${statusHtml}</div>
+                          ${s && s.completed_at ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">⏱️ ${formatSubmissionDate(s.completed_at)}</div>` : ''}
+                        </td>
+
+                        <!-- Cột Điểm số -->
+                        <td>${scoreHtml}</td>
+
+                        <!-- Cột Nội dung nộp -->
+                        <td>${contentHtml}</td>
+
+                        <!-- Cột Nhận xét -->
+                        <td>
+                          ${feedbackHtml}
+                          ${gradeLinkHtml}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+
+          // Gắn sự kiện ô tìm kiếm
+          const searchInput = document.getElementById('sub-filter-search');
+          if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+              currentSearch = e.target.value.trim();
+              renderSubmissionsTable();
+            });
           }
-        });
-      });
 
-    } catch (err) {
-      console.error('Lỗi tải bài nộp:', err);
-      submissionsListContainer.innerHTML = `<div style="color: red; text-align: center; padding: 20px;">Lỗi: ${err.message || err}</div>`;
+          // Gắn sự kiện lọc trạng thái
+          const statusSelect = document.getElementById('sub-filter-status');
+          if (statusSelect) {
+            statusSelect.addEventListener('change', (e) => {
+              currentStatusFilter = e.target.value;
+              renderSubmissionsTable();
+            });
+          }
+
+          // Gắn sự kiện sắp xếp
+          const sortSelect = document.getElementById('sub-filter-sort');
+          if (sortSelect) {
+            sortSelect.addEventListener('change', (e) => {
+              currentSort = e.target.value;
+              renderSubmissionsTable();
+            });
+          }
+
+          // Gắn sự kiện phát âm thanh
+          submissionsListContainer.querySelectorAll('.btn-play-audio-track').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const rawUrl = btn.dataset.url;
+              if (!rawUrl) return;
+
+              // Nếu đang phát chính nút này -> Tạm dừng / Dừng
+              if (currentPlayingBtn === btn && currentModalAudio) {
+                stopModalAudio();
+                return;
+              }
+
+              // Dừng bài đang phát trước đó nếu có
+              stopModalAudio();
+
+              const origText = btn.innerHTML;
+              btn.dataset.originalText = origText;
+              btn.innerHTML = '⏳ Đang tải...';
+              btn.disabled = true;
+              currentPlayingBtn = btn;
+
+              try {
+                const playUrl = await window.Admin.getAudioPlayUrl(rawUrl);
+                const audio = new Audio(playUrl);
+                currentModalAudio = audio;
+                btn.disabled = false;
+                btn.innerHTML = '⏸️ Đang phát';
+
+                audio.play();
+                audio.onended = () => { stopModalAudio(); };
+                audio.onerror = () => {
+                  alert('Không thể phát file âm thanh này.');
+                  stopModalAudio();
+                };
+              } catch (e) {
+                alert('Lỗi lấy link âm thanh: ' + (e.message || e));
+                stopModalAudio();
+              }
+            });
+          });
+        }
+
+        renderSubmissionsTable();
+
+      } catch (err) {
+        console.error('Lỗi tải bài nộp:', err);
+        submissionsListContainer.innerHTML = `
+          <div style="color: var(--danger); text-align: center; padding: 36px 20px;">
+            <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+            <div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;">Không thể tải kết quả bài nộp của học sinh</div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">${err.message || err}</div>
+            <button type="button" class="btn btn-outline btn-sm btn-retry-submissions" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 6px;">
+              🔄 Thử lại
+            </button>
+          </div>
+        `;
+        const btnRetry = submissionsListContainer.querySelector('.btn-retry-submissions');
+        if (btnRetry) {
+          btnRetry.addEventListener('click', loadData);
+        }
+      }
     }
+
+    await loadData();
   }
 
   formCreateAssignment.addEventListener('submit', async function (e) {
