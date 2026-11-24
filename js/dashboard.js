@@ -118,6 +118,24 @@ document.addEventListener('DOMContentLoaded', async function () {
     let recordTimerInterval = null;
     let recordSeconds = 0;
 
+    // Hàm nhận diện chuẩn loại bài tập (có dự phòng thông minh cho bài tập cũ)
+    function getEffectiveAssignmentType(a) {
+      if (a.assignment_type && a.assignment_type !== 'vocabulary') {
+        return a.assignment_type;
+      }
+      const titleLower = (a.title || '').toLowerCase();
+      if (a.speaking_prompt || titleLower.includes('ghi âm') || titleLower.includes('nói') || titleLower.includes('phát âm') || titleLower.includes('speaking')) {
+        return 'speaking';
+      }
+      if (a.listening_audio_url || titleLower.includes('nghe') || titleLower.includes('listening')) {
+        return 'listening';
+      }
+      if (titleLower.includes('quiz') || titleLower.includes('trắc nghiệm')) {
+        return 'quiz';
+      }
+      return a.assignment_type || 'vocabulary';
+    }
+
     async function loadDashboardAssignments() {
       try {
         const assignments = await window.Student.getClassAssignments(activeClass.id);
@@ -132,12 +150,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         assignmentsContainer.innerHTML = assignments.map(a => {
+          const type = getEffectiveAssignmentType(a);
+          a.effectiveType = type;
+
           let typeBadge = '<span class="badge-status" style="background: rgba(74, 222, 128, 0.18); color: #16a34a;">📖 Từ vựng</span>';
-          if (a.assignment_type === 'listening') {
+          if (type === 'listening') {
             typeBadge = '<span class="badge-status" style="background: rgba(56, 189, 248, 0.18); color: #0284c7;">🎧 Nghe hiểu</span>';
-          } else if (a.assignment_type === 'speaking') {
+          } else if (type === 'speaking') {
             typeBadge = '<span class="badge-status" style="background: rgba(248, 113, 113, 0.18); color: #dc2626;">🎙️ Nói / Ghi âm</span>';
-          } else if (a.assignment_type === 'quiz') {
+          } else if (type === 'quiz') {
             typeBadge = '<span class="badge-status" style="background: rgba(168, 85, 247, 0.18); color: #9333ea;">📝 Quiz</span>';
           }
 
@@ -147,39 +168,47 @@ document.addEventListener('DOMContentLoaded', async function () {
 
           if (a.userStatus === 'graded') {
             statusBadge = `<span class="badge-status badge-ongoing">🟢 Đã chấm: ${sub.score}/100</span>`;
-            actionBtn = `<span style="font-size: 13px; color: #16a34a; font-weight: 700;">+${Math.round((sub.score / 100) * (a.reward_xp || 30))} XP</span>`;
+            if (type === 'speaking') {
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-speaking" data-id="${a.id}">Xem bài nộp 🎙️</button>`;
+            } else {
+              actionBtn = `<span style="font-size: 13px; color: #16a34a; font-weight: 700;">+${Math.round((sub.score / 100) * (a.reward_xp || 30))} XP</span>`;
+            }
           } else if (a.userStatus === 'completed' || a.userStatus === 'submitted') {
-            if (a.assignment_type === 'speaking') {
+            if (type === 'speaking') {
               statusBadge = '<span class="badge-status badge-paused">🟡 Đã nộp (Chờ cô giáo chấm)</span>';
-              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-speaking" data-id="${a.id}">Xem bài / Ghi lại</button>`;
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-speaking" data-id="${a.id}">Xem bài nộp 🎙️</button>`;
             } else {
               statusBadge = '<span class="badge-status badge-ongoing" style="background: rgba(74, 222, 128, 0.2); color: #16a34a;">🟢 Đã hoàn thành</span>';
               actionBtn = `<span style="font-size: 13px; color: #16a34a; font-weight: 600;">+${a.reward_xp || 30} XP</span>`;
             }
           } else if (a.userStatus === 'late') {
             statusBadge = '<span class="badge-status badge-paused">🟡 Đã nộp muộn</span>';
-            actionBtn = `<span style="font-size: 13px; color: var(--text-muted);">Đã nộp</span>`;
+            if (type === 'speaking') {
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-speaking" data-id="${a.id}">Xem bài nộp 🎙️</button>`;
+            } else {
+              actionBtn = `<span style="font-size: 13px; color: var(--text-muted);">Đã nộp</span>`;
+            }
           } else if (a.isPastDue) {
             statusBadge = '<span class="badge-status badge-completed" style="background: rgba(248, 113, 113, 0.2); color: #dc2626;">🔴 Quá hạn</span>';
-            if (a.assignment_type === 'listening') {
-              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-listening" data-id="${a.id}">Làm bù bài nghe</button>`;
-            } else if (a.assignment_type === 'speaking') {
-              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-speaking" data-id="${a.id}">Ghi âm bù</button>`;
+            if (type === 'listening') {
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-listening" data-id="${a.id}">Làm bù bài nghe 🎧</button>`;
+            } else if (type === 'speaking') {
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-speaking" data-id="${a.id}">Ghi âm bù 🎙️</button>`;
             } else if (a.lesson_id) {
               actionBtn = `<a href="lesson.html?id=${a.lesson_id}&class_id=${activeClass.id}" class="btn btn-outline btn-sm">Làm bù</a>`;
             } else {
-              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-submit-task" data-id="${a.id}">Nộp bù</button>`;
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-detail" data-id="${a.id}">Xem chi tiết 📋</button>`;
             }
           } else {
             statusBadge = '<span class="badge-status badge-paused" style="background: rgba(148, 163, 184, 0.2); color: var(--text-muted);">⚪ Chưa làm</span>';
-            if (a.assignment_type === 'listening') {
+            if (type === 'listening') {
               actionBtn = `<button type="button" class="btn btn-primary btn-sm btn-open-listening" data-id="${a.id}">Làm bài nghe 🎧</button>`;
-            } else if (a.assignment_type === 'speaking') {
+            } else if (type === 'speaking') {
               actionBtn = `<button type="button" class="btn btn-primary btn-sm btn-open-speaking" data-id="${a.id}">Ghi âm nộp bài 🎙️</button>`;
             } else if (a.lesson_id) {
               actionBtn = `<a href="lesson.html?id=${a.lesson_id}&class_id=${activeClass.id}" class="btn btn-primary btn-sm">Vào bài học 🚀</a>`;
             } else {
-              actionBtn = `<button type="button" class="btn btn-primary btn-sm btn-submit-task" data-id="${a.id}">Xác nhận nộp bài</button>`;
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-detail" data-id="${a.id}">Xem chi tiết 📋</button>`;
             }
           }
 
@@ -188,8 +217,8 @@ document.addEventListener('DOMContentLoaded', async function () {
           });
 
           return `
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-              <div>
+            <div class="assignment-card-item" data-id="${a.id}" data-type="${type}" style="background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;">
+              <div style="flex: 1; min-width: 260px;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                   ${typeBadge}
                   <span style="font-weight: 700; font-size: 15px; color: var(--text-main);">${a.title}</span>
@@ -200,8 +229,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                   ${a.lesson ? `<span>📖 Bài ${a.lesson.order_index}: ${a.lesson.title_zh}</span>` : ''}
                 </div>
                 ${sub && sub.teacher_comment ? `
-                  <div style="font-size: 12px; color: var(--primary); margin-top: 4px; background: var(--bg-subtle); padding: 4px 8px; border-radius: 4px; display: inline-block;">
-                    💬 Nhận xét của cô: "${sub.teacher_comment}"
+                  <div style="font-size: 12px; color: var(--primary); margin-top: 6px; background: var(--bg-subtle); padding: 4px 10px; border-radius: 4px; display: inline-block;">
+                    💬 Nhận xét của cô giáo: "${sub.teacher_comment}"
                   </div>
                 ` : ''}
               </div>
@@ -213,39 +242,53 @@ document.addEventListener('DOMContentLoaded', async function () {
           `;
         }).join('');
 
+        // Bấm vào cả thẻ bài tập để mở hộp thoại chi tiết
+        document.querySelectorAll('.assignment-card-item').forEach(card => {
+          card.addEventListener('click', (e) => {
+            // Không mở nếu người dùng bấm trúng liên kết <a> hoặc nút bấm con
+            if (e.target.closest('button') || e.target.closest('a')) return;
+            const assignId = card.getAttribute('data-id');
+            const assign = assignments.find(x => x.id === assignId);
+            if (!assign) return;
+
+            const type = assign.effectiveType || assign.assignment_type;
+            if (type === 'speaking') {
+              openSpeakingModal(assign);
+            } else if (type === 'listening') {
+              openListeningModal(assign);
+            } else {
+              openAssignmentDetailModal(assign);
+            }
+          });
+        });
+
         // Gắn sự kiện mở bài nghe
         document.querySelectorAll('.btn-open-listening').forEach(btn => {
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             const assignId = btn.getAttribute('data-id');
             const assign = assignments.find(x => x.id === assignId);
             if (assign) openListeningModal(assign);
           });
         });
 
-        // Gắn sự kiện mở bài nói
+        // Gắn sự kiện mở bài nói / ghi âm
         document.querySelectorAll('.btn-open-speaking').forEach(btn => {
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
             const assignId = btn.getAttribute('data-id');
             const assign = assignments.find(x => x.id === assignId);
             if (assign) openSpeakingModal(assign);
           });
         });
 
-        // Gắn sự kiện nộp bài tự do
-        document.querySelectorAll('.btn-submit-task').forEach(btn => {
-          btn.addEventListener('click', async () => {
-            const taskId = btn.getAttribute('data-id');
-            try {
-              btn.disabled = true;
-              btn.textContent = 'Đang nộp...';
-              await window.Student.completeAssignment(taskId);
-              alert('🎉 Chúc mừng bạn đã hoàn thành bài tập!');
-              await loadDashboardAssignments();
-            } catch (err) {
-              alert('Lỗi: ' + (err.message || err));
-              btn.disabled = false;
-              btn.textContent = 'Thử lại';
-            }
+        // Gắn sự kiện mở chi tiết bài tập chung
+        document.querySelectorAll('.btn-open-detail').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const assignId = btn.getAttribute('data-id');
+            const assign = assignments.find(x => x.id === assignId);
+            if (assign) openAssignmentDetailModal(assign);
           });
         });
 
@@ -369,11 +412,16 @@ document.addEventListener('DOMContentLoaded', async function () {
     const speakingModalTitle = document.getElementById('speaking-modal-title');
     const speakingModalDesc = document.getElementById('speaking-modal-desc');
     const speakingModalAlert = document.getElementById('speaking-modal-alert');
+    const speakingModalDue = document.getElementById('speaking-modal-due');
+    const speakingModalXp = document.getElementById('speaking-modal-xp');
+    const speakingModalLessonBox = document.getElementById('speaking-modal-lesson-box');
+    const speakingModalLesson = document.getElementById('speaking-modal-lesson');
     const speakingPromptHanzi = document.getElementById('speaking-prompt-hanzi');
     const speakingPromptPinyin = document.getElementById('speaking-prompt-pinyin');
     const speakingSampleAudioBox = document.getElementById('speaking-sample-audio-box');
     const btnPlaySpeakingSample = document.getElementById('btn-play-speaking-sample');
 
+    const speakingRecordWrapper = document.getElementById('speaking-record-wrapper');
     const recorderStatusText = document.getElementById('recorder-status-text');
     const recorderTimer = document.getElementById('recorder-timer');
     const btnStartRecord = document.getElementById('btn-start-record');
@@ -384,6 +432,111 @@ document.addEventListener('DOMContentLoaded', async function () {
     const micPermissionGuide = document.getElementById('mic-permission-guide');
     const speakingPrevSubmissionInfo = document.getElementById('speaking-prev-submission-info');
     const btnSubmitSpeaking = document.getElementById('btn-submit-speaking');
+
+    // Modal Chi tiết bài tập chung (từ vựng / quiz / bài tập chung)
+    const modalAssignmentDetail = document.getElementById('modal-assignment-detail');
+    const detailAssignBadge = document.getElementById('detail-assign-badge');
+    const detailAssignTitle = document.getElementById('detail-assign-title');
+    const detailAssignDue = document.getElementById('detail-assign-due');
+    const detailAssignXp = document.getElementById('detail-assign-xp');
+    const detailAssignLessonBox = document.getElementById('detail-assign-lesson-box');
+    const detailAssignLesson = document.getElementById('detail-assign-lesson');
+    const detailAssignDesc = document.getElementById('detail-assign-desc');
+    const detailAssignStatusBox = document.getElementById('detail-assign-status-box');
+    const detailAssignActionContainer = document.getElementById('detail-assign-action-container');
+    const detailAssignAlert = document.getElementById('detail-assign-alert');
+
+    document.querySelectorAll('[data-close="modal-assignment-detail"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (modalAssignmentDetail) modalAssignmentDetail.classList.remove('active');
+      });
+    });
+
+    function openAssignmentDetailModal(assign) {
+      if (!modalAssignmentDetail) return;
+      if (detailAssignAlert) {
+        detailAssignAlert.className = 'alert';
+        detailAssignAlert.textContent = '';
+      }
+
+      const type = assign.effectiveType || assign.assignment_type || 'vocabulary';
+      let typeText = '📖 Bài tập Từ vựng';
+      let badgeStyle = 'background: rgba(74, 222, 128, 0.18); color: #16a34a;';
+      if (type === 'quiz') {
+        typeText = '📝 Quiz kiểm tra';
+        badgeStyle = 'background: rgba(168, 85, 247, 0.18); color: #9333ea;';
+      }
+      if (detailAssignBadge) {
+        detailAssignBadge.innerHTML = `<span class="badge-status" style="${badgeStyle}">${typeText}</span>`;
+      }
+
+      if (detailAssignTitle) detailAssignTitle.textContent = assign.title;
+      if (detailAssignDue) {
+        detailAssignDue.textContent = new Date(assign.due_date).toLocaleString('vi-VN', {
+          hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+      }
+      if (detailAssignXp) detailAssignXp.textContent = `+${assign.reward_xp || 30} XP`;
+      if (detailAssignDesc) {
+        detailAssignDesc.textContent = assign.description || 'Hoàn thành bài tập theo yêu cầu của giáo viên trước hạn chót.';
+      }
+
+      if (detailAssignLessonBox && detailAssignLesson) {
+        if (assign.lesson) {
+          detailAssignLessonBox.style.display = 'inline';
+          detailAssignLesson.textContent = `Bài ${assign.lesson.order_index}: ${assign.lesson.title_zh} (${assign.lesson.title_vi || ''})`;
+        } else {
+          detailAssignLessonBox.style.display = 'none';
+        }
+      }
+
+      const isDone = (assign.userStatus === 'completed' || assign.userStatus === 'graded' || assign.userStatus === 'late');
+      if (isDone) {
+        detailAssignStatusBox.style.background = 'rgba(74, 222, 128, 0.15)';
+        detailAssignStatusBox.style.color = '#16a34a';
+        detailAssignStatusBox.innerHTML = '🟢 Bạn đã hoàn thành bài tập này và nhận thưởng XP!';
+        detailAssignActionContainer.innerHTML = '';
+      } else {
+        detailAssignStatusBox.style.background = assign.isPastDue ? 'rgba(248, 113, 113, 0.15)' : 'rgba(251, 191, 36, 0.15)';
+        detailAssignStatusBox.style.color = assign.isPastDue ? '#dc2626' : '#d97706';
+        detailAssignStatusBox.innerHTML = assign.isPastDue ? '🔴 Bài tập đã quá hạn nộp.' : '⚪ Bài tập chưa hoàn thành.';
+
+        if (assign.lesson_id) {
+          detailAssignActionContainer.innerHTML = `
+            <a href="lesson.html?id=${assign.lesson_id}&class_id=${activeClass.id}" class="btn btn-primary">
+              Vào bài học ngay 🚀
+            </a>
+          `;
+        } else {
+          detailAssignActionContainer.innerHTML = `
+            <button type="button" class="btn btn-primary btn-modal-confirm-complete" data-id="${assign.id}">
+              Xác nhận hoàn thành (+${assign.reward_xp || 30} XP)
+            </button>
+          `;
+          detailAssignActionContainer.querySelector('.btn-modal-confirm-complete').addEventListener('click', async (e) => {
+            const btn = e.target;
+            try {
+              btn.disabled = true;
+              btn.textContent = 'Đang lưu...';
+              await window.Student.completeAssignment(assign.id);
+              detailAssignAlert.className = 'alert alert-success show';
+              detailAssignAlert.textContent = '🎉 Chúc mừng bạn đã hoàn thành bài tập!';
+              await loadDashboardAssignments();
+              setTimeout(() => {
+                modalAssignmentDetail.classList.remove('active');
+              }, 1200);
+            } catch (err) {
+              detailAssignAlert.className = 'alert alert-danger show';
+              detailAssignAlert.textContent = err.message || 'Lỗi khi hoàn thành bài tập';
+              btn.disabled = false;
+              btn.textContent = 'Thử lại';
+            }
+          });
+        }
+      }
+
+      modalAssignmentDetail.classList.add('active');
+    }
 
     document.querySelectorAll('[data-close="modal-speaking-assignment"]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -406,16 +559,34 @@ document.addEventListener('DOMContentLoaded', async function () {
     async function openSpeakingModal(assign) {
       currentSpeakingAssign = assign;
       speakingModalTitle.textContent = `🎙️ ${assign.title}`;
-      speakingModalDesc.textContent = assign.description || 'Đọc to rõ ràng câu/đoạn tiếng Trung bên dưới';
+      speakingModalDesc.textContent = assign.description || 'Đọc to rõ ràng câu/đoạn tiếng Trung bên dưới và nộp bản ghi âm để cô giáo chấm điểm.';
       speakingModalAlert.className = 'alert';
       speakingModalAlert.textContent = '';
       if (micPermissionGuide) micPermissionGuide.style.display = 'none';
 
-      // Thiết lập đề bài
+      // Thiết lập thông tin hạn chót & XP
+      if (speakingModalDue) {
+        speakingModalDue.textContent = new Date(assign.due_date).toLocaleString('vi-VN', {
+          hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+      }
+      if (speakingModalXp) {
+        speakingModalXp.textContent = `+${assign.reward_xp || 30} XP`;
+      }
+      if (speakingModalLessonBox && speakingModalLesson) {
+        if (assign.lesson) {
+          speakingModalLessonBox.style.display = 'inline';
+          speakingModalLesson.textContent = `Bài ${assign.lesson.order_index}: ${assign.lesson.title_zh}`;
+        } else {
+          speakingModalLessonBox.style.display = 'none';
+        }
+      }
+
+      // Thiết lập đề bài chữ Hán & Pinyin
       speakingPromptHanzi.textContent = assign.speaking_prompt || assign.title;
       speakingPromptPinyin.textContent = assign.speaking_pinyin || '';
 
-      // Audio mẫu
+      // Audio đọc mẫu của giáo viên (nếu có)
       if (assign.speaking_sample_audio_url) {
         speakingSampleAudioBox.style.display = 'block';
         btnPlaySpeakingSample.onclick = () => {
@@ -426,42 +597,70 @@ document.addEventListener('DOMContentLoaded', async function () {
         speakingSampleAudioBox.style.display = 'none';
       }
 
-      // Trạng thái bài nộp trước đó (nếu có)
+      // Trạng thái bài nộp trước đó (nếu đã nộp)
       const sub = assign.submission;
       if (sub && sub.audio_url) {
         speakingPrevSubmissionInfo.style.display = 'block';
+        const isGraded = (sub.status === 'graded');
+        const scoreBadge = isGraded
+          ? `<span class="badge-status badge-ongoing">🟢 Đã chấm: ${sub.score}/100</span>`
+          : `<span class="badge-status badge-paused">🟡 Đã nộp (Chờ cô giáo chấm)</span>`;
+
         speakingPrevSubmissionInfo.innerHTML = `
-          <div style="font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
-            📌 Trạng thái bài nộp trước:
+          <div style="font-weight: 700; color: var(--text-main); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+            <span>📌 Bài nộp ghi âm của bạn:</span>
+            ${scoreBadge}
           </div>
-          <div>Trạng thái: <strong>${sub.status === 'graded' ? '🟢 Đã có điểm (' + sub.score + '/100)' : '🟡 Chờ chấm'}</strong></div>
-          ${sub.teacher_comment ? `<div style="color: var(--primary); margin-top: 4px;">💬 Nhận xét: "${sub.teacher_comment}"</div>` : ''}
-          <div style="margin-top: 6px;">
+          ${isGraded ? `<div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 4px;">⚡ Điểm thưởng đạt được: +${Math.round((sub.score / 100) * (assign.reward_xp || 30))} XP</div>` : ''}
+          ${sub.teacher_comment ? `<div style="color: var(--primary); font-weight: 600; margin: 8px 0; background: var(--bg-card); padding: 8px 12px; border-radius: 6px; border: 1px dashed var(--border-color);">💬 Nhận xét của cô giáo: "${sub.teacher_comment}"</div>` : ''}
+          <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <button type="button" class="btn btn-outline btn-sm btn-play-my-old-rec" data-url="${sub.audio_url}">
-              🔊 Nghe lại bản ghi âm cũ của bạn
+              🔊 Nghe lại bản ghi âm của bạn
             </button>
+            ${!isGraded ? `<button type="button" class="btn btn-outline btn-sm btn-toggle-rerecord" style="border-color: var(--warning); color: var(--warning);">🔄 Ghi âm nộp lại</button>` : ''}
           </div>
         `;
+
         speakingPrevSubmissionInfo.querySelector('.btn-play-my-old-rec').addEventListener('click', async (e) => {
           const raw = e.target.dataset.url;
-          e.target.textContent = '⏳ Đang tải...';
+          e.target.textContent = '⏳ Đang nạp...';
           try {
             const playUrl = await window.Student.getRecordingPlayUrl(raw);
             const a = new Audio(playUrl);
             a.play();
             e.target.textContent = '▶️ Đang phát...';
-            a.onended = () => { e.target.textContent = '🔊 Nghe lại bản ghi âm cũ của bạn'; };
+            a.onended = () => { e.target.textContent = '🔊 Nghe lại bản ghi âm của bạn'; };
           } catch (err) {
             alert('Lỗi phát lại: ' + (err.message || err));
-            e.target.textContent = '🔊 Nghe lại bản ghi âm cũ của bạn';
+            e.target.textContent = '🔊 Nghe lại bản ghi âm của bạn';
           }
         });
+
+        const btnToggleRe = speakingPrevSubmissionInfo.querySelector('.btn-toggle-rerecord');
+        if (btnToggleRe) {
+          btnToggleRe.addEventListener('click', () => {
+            if (speakingRecordWrapper) speakingRecordWrapper.style.display = 'block';
+            if (btnSubmitSpeaking) btnSubmitSpeaking.style.display = 'inline-flex';
+            resetRecordingUi();
+            btnToggleRe.style.display = 'none';
+          });
+        }
+
+        // Nếu đã nộp và chưa yêu cầu ghi lại -> Ẩn khung ghi âm đi để tránh nộp trùng
+        if (speakingRecordWrapper) {
+          speakingRecordWrapper.style.display = 'none';
+        }
+        if (btnSubmitSpeaking) {
+          btnSubmitSpeaking.style.display = 'none';
+        }
+
       } else {
         speakingPrevSubmissionInfo.style.display = 'none';
+        if (speakingRecordWrapper) speakingRecordWrapper.style.display = 'block';
+        if (btnSubmitSpeaking) btnSubmitSpeaking.style.display = 'inline-flex';
+        resetRecordingUi();
       }
 
-      // Reset giao diện ghi âm
-      resetRecordingUi();
       modalSpeaking.classList.add('active');
     }
 
@@ -475,18 +674,25 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (btnStopRecord) btnStopRecord.style.display = 'none';
       if (btnReRecord) btnReRecord.style.display = 'none';
       if (previewAudioContainer) previewAudioContainer.style.display = 'none';
-      if (btnSubmitSpeaking) btnSubmitSpeaking.disabled = true;
+      if (btnSubmitSpeaking) {
+        btnSubmitSpeaking.disabled = true;
+        btnSubmitSpeaking.textContent = '📤 Nộp bài ghi âm';
+      }
     }
 
     if (btnStartRecord) {
       btnStartRecord.addEventListener('click', async () => {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          alert('Trình duyệt của bạn không hỗ trợ ghi âm trực tiếp qua Micro!');
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+          speakingModalAlert.className = 'alert alert-danger show';
+          speakingModalAlert.textContent = 'Trình duyệt của bạn không hỗ trợ ghi âm trực tiếp qua Micro. Vui lòng sử dụng Google Chrome, Microsoft Edge hoặc Safari phiên bản mới nhất.';
           return;
         }
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          if (micPermissionGuide) micPermissionGuide.style.display = 'none';
+          speakingModalAlert.className = 'alert';
+          speakingModalAlert.textContent = '';
 
           // Hỗ trợ mime types nén webm hoặc mp4
           let mimeType = 'audio/webm;codecs=opus';
@@ -514,7 +720,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             btnStopRecord.style.display = 'none';
             btnReRecord.style.display = 'inline-flex';
             btnSubmitSpeaking.disabled = false;
-            recorderStatusText.textContent = 'Đã ghi âm xong! Bạn hãy nghe lại bản ghi trước khi nộp nhé.';
+            recorderStatusText.textContent = 'Đã ghi âm xong! Bạn hãy nghe lại bản ghi ở dưới trước khi nộp nhé.';
           };
 
           mediaRecorder.start(250); // Thu theo từng chunk nhỏ
@@ -530,7 +736,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             recordSeconds++;
             const mm = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
             const ss = String(recordSeconds % 60).padStart(2, '0');
-            recorderTimer.innerHTML = `<span style="color: var(--danger);">${mm}:${ss}</span> <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>`;
+            recorderTimer.innerHTML = `<span style="color: var(--danger); font-weight: 800;">${mm}:${ss}</span> <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>`;
 
             if (recordSeconds >= 60) {
               clearInterval(recordTimerInterval);
@@ -545,7 +751,13 @@ document.addEventListener('DOMContentLoaded', async function () {
           console.error('Lỗi truy cập Microphone:', err);
           if (micPermissionGuide) micPermissionGuide.style.display = 'block';
           speakingModalAlert.className = 'alert alert-danger show';
-          speakingModalAlert.textContent = 'Không thể truy cập Microphone: Quyền ghi âm bị từ chối hoặc micro đang bận!';
+          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            speakingModalAlert.textContent = '⚠️ Quyền Microphone bị từ chối! Vui lòng bấm vào biểu tượng 🔒 trên thanh địa chỉ của trình duyệt, chọn Cho phép (Allow) Microphone và thử lại.';
+          } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            speakingModalAlert.textContent = '⚠️ Không tìm thấy thiết bị Microphone trên máy tính/điện thoại của bạn!';
+          } else {
+            speakingModalAlert.textContent = 'Không thể truy cập Microphone: ' + (err.message || 'Micro đang bận hoặc bị từ chối.');
+          }
         }
       });
     }
@@ -570,28 +782,46 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     if (btnSubmitSpeaking) {
       btnSubmitSpeaking.addEventListener('click', async () => {
-        if (!audioBlob || !currentSpeakingAssign) return;
+        if (!audioBlob || !currentSpeakingAssign) {
+          alert('Vui lòng thực hiện ghi âm trước khi nộp bài!');
+          return;
+        }
 
         try {
           btnSubmitSpeaking.disabled = true;
-          btnSubmitSpeaking.textContent = 'Đang tải lên Supabase...';
+          btnSubmitSpeaking.textContent = '⏳ Đang tải file ghi âm lên...';
           speakingModalAlert.className = 'alert';
           speakingModalAlert.textContent = '';
 
-          // 1. Tải file âm thanh lên bucket 'recordings'
+          // 1. Tải file âm thanh lên bucket 'recordings' qua Storage API
           const studentId = authData.user.id;
           const audioPath = await window.Student.uploadRecordingAudio(audioBlob, studentId);
 
-          btnSubmitSpeaking.textContent = 'Đang nộp bài...';
+          btnSubmitSpeaking.textContent = '⏳ Đang lưu bài nộp và nhận XP...';
 
           // 2. Gửi đường dẫn nộp bài vào database
           const res = await window.Student.submitSpeakingAssignment(currentSpeakingAssign.id, audioPath);
 
+          const xpBonusText = res.xp_awarded > 0 ? ` Bạn đã được thưởng +${res.xp_awarded} XP!` : '';
           speakingModalAlert.className = 'alert alert-success show';
-          speakingModalAlert.textContent = '🎉 ' + (res.message || 'Đã nộp bài ghi âm thành công!');
+          speakingModalAlert.textContent = '🎉 ' + (res.message || 'Đã nộp bài ghi âm thành công!') + xpBonusText;
 
           btnSubmitSpeaking.textContent = '✅ Đã nộp thành công';
+
+          // Cập nhật lại danh sách bài tập trên dashboard
           await loadDashboardAssignments();
+
+          // Cập nhật lại XP hiển thị trên trang nếu được cộng điểm
+          if (res.xp_awarded > 0 && typeof window.Auth.getProfile === 'function') {
+            try {
+              const updatedProfile = await window.Auth.getProfile(authData.user.id);
+              if (updatedProfile) {
+                window.Auth.renderNavbarUserInfo(updatedProfile);
+                const statXp = document.getElementById('stat-lifetime-xp');
+                if (statXp) statXp.textContent = (updatedProfile.lifetime_xp || 0).toLocaleString();
+              }
+            } catch (e) {}
+          }
 
           if (window.FeedbackPopup) {
             window.FeedbackPopup.show('speaking', {
@@ -599,6 +829,10 @@ document.addEventListener('DOMContentLoaded', async function () {
                 modalSpeaking.classList.remove('active');
               }
             });
+          } else {
+            setTimeout(() => {
+              modalSpeaking.classList.remove('active');
+            }, 1800);
           }
 
         } catch (err) {

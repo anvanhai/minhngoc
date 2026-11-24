@@ -17,14 +17,27 @@ document.addEventListener('DOMContentLoaded', async function () {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // 1. Kiểm tra xác thực quyền Admin / Giáo viên
-  const authData = await window.Auth.requireRole(['admin', 'teacher']);
-  if (!authData) return;
-
-  // Cập nhật tên hiển thị
-  const displayNameEl = document.querySelector('.user-display-name');
-  if (displayNameEl) {
-    displayNameEl.textContent = authData.profile ? (authData.profile.full_name || authData.user.email) : 'Giáo viên';
+  // 1. Kiểm tra xác thực quyền Admin / Giáo viên (bọc try/catch đảm bảo header không bị kẹt)
+  let authData = null;
+  try {
+    authData = await window.Auth.requireAuth(['admin', 'teacher'], '../index.html');
+    if (!authData) return;
+    window.Auth.renderNavbarUserInfo(authData.profile);
+  } catch (authErr) {
+    console.error('Lỗi xác thực quyền truy cập trang chấm bài:', authErr);
+    const displayNameEl = document.querySelector('.user-display-name');
+    if (displayNameEl) displayNameEl.textContent = 'Chưa đăng nhập';
+    if (gradingListContainer) {
+      gradingListContainer.innerHTML = `
+        <div class="card" style="text-align: center; padding: 36px 20px; color: var(--danger);">
+          <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+          <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Không thể xác thực quyền Quản trị / Giáo viên</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">${authErr.message || authErr}</div>
+          <a href="../index.html" class="btn btn-primary btn-sm">Đăng nhập lại</a>
+        </div>
+      `;
+    }
+    return;
   }
 
   // 2. Nạp danh sách lớp học vào dropdown bộ lọc
@@ -33,14 +46,37 @@ document.addEventListener('DOMContentLoaded', async function () {
     filterClass.innerHTML = '<option value="">-- Tất cả các lớp học --</option>' +
       (classes || []).map(c => `<option value="${c.id}">${c.name} (${c.level})</option>`).join('');
   } catch (err) {
-    console.warn('Lỗi nạp lớp học:', err);
+    console.warn('Lỗi nạp danh sách lớp học:', err);
+  }
+
+  // Hàm đếm số lượng bài chờ chấm chính xác từ DB
+  async function updatePendingCount(classId) {
+    try {
+      const db = window.getDb ? window.getDb() : null;
+      if (!db || !badgePendingCount) return;
+      let query = db
+        .from('recording_submissions')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'submitted');
+
+      if (classId && classId !== 'all') {
+        query = query.eq('class_id', classId);
+      }
+      const { count, error } = await query;
+      if (!error && count !== null) {
+        badgePendingCount.textContent = count;
+      }
+    } catch (e) {
+      console.warn('Lỗi cập nhật số bài chờ chấm:', e);
+    }
   }
 
   // 3. Tải và hiển thị danh sách bài ghi âm
   async function loadRecordings() {
     gradingListContainer.innerHTML = `
       <div style="text-align: center; padding: 48px; color: var(--text-muted);">
-        Đang tải danh sách bài tập ghi âm...
+        <div style="font-size: 28px; margin-bottom: 8px;">⏳</div>
+        <div>Đang tải danh sách bài tập ghi âm...</div>
       </div>
     `;
 
@@ -48,23 +84,22 @@ document.addEventListener('DOMContentLoaded', async function () {
       const classId = filterClass.value || null;
       const status = filterStatus.value || 'submitted';
 
-      const list = await window.Admin.getRecordingsForGrading({ classId, status });
-
-      // Đếm số lượng chờ chấm
-      const pendingCount = (list || []).filter(r => r.status === 'submitted').length;
-      if (badgePendingCount) {
-        badgePendingCount.textContent = pendingCount;
-      }
+      // Chạy song song: Lấy danh sách bài nộp và cập nhật số bài chờ chấm
+      const [list] = await Promise.all([
+        window.Admin.getRecordingsForGrading({ classId, status }),
+        updatePendingCount(classId)
+      ]);
 
       if (!list || list.length === 0) {
+        const isFilterPending = (status === 'submitted');
         gradingListContainer.innerHTML = `
           <div class="card" style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
             <div style="font-size: 36px; margin-bottom: 12px;">🎉</div>
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
-              Không có bài ghi âm nào theo bộ lọc hiện tại!
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+              ${isFilterPending ? 'Chưa có bài nộp nào cần chấm!' : 'Không có bài ghi âm nào theo bộ lọc hiện tại!'}
             </div>
             <div style="font-size: 13px;">
-              ${status === 'submitted' ? 'Toàn bộ bài tập ghi âm đã được chấm xong.' : 'Hãy chọn bộ lọc khác để xem lại các bài đã nộp.'}
+              ${isFilterPending ? 'Toàn bộ bài tập ghi âm của học sinh đã được chấm xong hoặc chưa có bài mới.' : 'Hãy chọn bộ lọc khác để xem lại các bài nộp.'}
             </div>
           </div>
         `;
@@ -72,9 +107,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
 
       gradingListContainer.innerHTML = list.map(rec => {
-        const student = rec.student || { full_name: 'Học sinh', email: '' };
-        const className = rec.class ? rec.class.name : 'Lớp học';
-        const assignTitle = rec.assignment ? rec.assignment.title : 'Bài tập ghi âm';
+        const student = rec.student || {};
+        const studentName = student.display_name || student.username || 'Học sinh';
+        const studentUsername = student.username ? `@${student.username}` : '';
+        const className = rec.class ? `${rec.class.name} (${rec.class.level || ''})` : 'Lớp học';
+        const assignTitle = rec.assignment ? rec.assignment.title : (rec.lesson ? `Bài ${rec.lesson.order_index}: ${rec.lesson.title_zh}` : 'Bài tập ghi âm');
         const rewardXp = rec.assignment ? (rec.assignment.reward_xp || 30) : 30;
         const submittedDate = new Date(rec.created_at).toLocaleString('vi-VN', {
           hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
@@ -89,13 +126,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
               <div>
                 <div style="display: flex; align-items: center; gap: 8px;">
-                  <strong style="font-size: 16px; color: var(--text-main);">${student.full_name}</strong>
-                  <span style="font-size: 12px; color: var(--text-muted);">(${student.email})</span>
+                  <strong style="font-size: 16px; color: var(--text-main);">${studentName}</strong>
+                  ${studentUsername ? `<span style="font-size: 12px; color: var(--text-muted); font-weight: 500;">(${studentUsername})</span>` : ''}
                   <span class="badge-status ${isGraded ? 'badge-ongoing' : 'badge-paused'}">
                     ${isGraded ? '🟢 Đã chấm' : '🟡 Chờ chấm'}
                   </span>
                 </div>
-                <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
                   Lớp: <strong>${className}</strong> · Bài: <strong>${assignTitle}</strong> · Nộp lúc: ${submittedDate}
                 </div>
               </div>
@@ -112,7 +149,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 Đề bài luyện đọc tiếng Trung:
               </div>
               <div style="font-size: 18px; font-weight: 800; color: var(--text-main); font-family: 'PingFang SC', sans-serif;">
-                ${rec.prompt_text}
+                ${rec.prompt_text || 'Bài đọc tiếng Trung'}
               </div>
               ${rec.prompt_pinyin ? `
                 <div style="font-size: 14px; color: var(--primary); font-family: sans-serif; margin-top: 2px;">
@@ -258,6 +295,7 @@ document.addEventListener('DOMContentLoaded', async function () {
               showAlert('Đã xóa bản ghi âm thành công!', 'success');
               const card = document.getElementById(`rec-card-${recId}`);
               if (card) card.remove();
+              updatePendingCount(filterClass.value || null);
             } catch (err) {
               alert('Lỗi xóa bản ghi: ' + (err.message || err));
               btn.disabled = false;
@@ -268,12 +306,21 @@ document.addEventListener('DOMContentLoaded', async function () {
       });
 
     } catch (err) {
-      console.error('Lỗi tải bài ghi âm:', err);
+      console.error('Lỗi chi tiết khi tải bài ghi âm:', err);
       gradingListContainer.innerHTML = `
-        <div class="card" style="color: var(--danger); text-align: center; padding: 24px;">
-          Lỗi tải bài ghi âm: ${err.message || err}
+        <div class="card" style="color: var(--danger); text-align: center; padding: 36px 20px;">
+          <div style="font-size: 32px; margin-bottom: 8px;">⚠️</div>
+          <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px;">Không thể tải danh sách bài tập ghi âm</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">${err.message || err}</div>
+          <button type="button" class="btn btn-outline btn-sm btn-retry-load" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 6px;">
+            🔄 Thử lại
+          </button>
         </div>
       `;
+      const btnRetry = gradingListContainer.querySelector('.btn-retry-load');
+      if (btnRetry) {
+        btnRetry.addEventListener('click', loadRecordings);
+      }
     }
   }
 

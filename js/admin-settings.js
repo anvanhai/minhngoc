@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   let allFeedbacks = [];
   let currentEventFilter = 'all';
   let pendingUploadFile = null;
+  let existingImageUrl = '';
 
   const pageAlert = document.getElementById('page-alert');
   const feedbacksContainer = document.getElementById('feedbacks-container');
@@ -43,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   const btnBrowseImg = document.getElementById('btn-browse-img');
   const fileChosenName = document.getElementById('file-chosen-name');
   const inputImageUrl = document.getElementById('f-image-url');
+  const btnClearImg = document.getElementById('btn-clear-img');
   const imgPreviewTag = document.getElementById('img-preview-tag');
   const imgPreviewPlaceholder = document.getElementById('img-preview-placeholder');
   const inputTitle = document.getElementById('f-title');
@@ -209,6 +211,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     feedbackModalAlert.textContent = '';
     formFeedbackEditor.reset();
     pendingUploadFile = null;
+    existingImageUrl = '';
 
     inputId.value = '';
     modalFeedbackTitle.textContent = 'Thêm Cấu Hình Thông Báo Mới';
@@ -223,7 +226,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     updateScoreRangeVisibility();
     resetImagePreview();
 
+    fileInput.value = '';
+    inputImageUrl.value = '';
     fileChosenName.textContent = 'Chưa chọn file';
+    fileChosenName.style.color = 'var(--text-muted)';
+    if (btnClearImg) btnClearImg.style.display = 'none';
+
     inputBtnText.value = 'Tiếp tục';
     inputSortOrder.value = '1';
     checkIsActive.checked = true;
@@ -242,6 +250,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     feedbackModalAlert.textContent = '';
     formFeedbackEditor.reset();
     pendingUploadFile = null;
+    existingImageUrl = fb.image_url || '';
 
     inputId.value = fb.id;
     modalFeedbackTitle.textContent = 'Chỉnh Sửa Cấu Hình Thông Báo';
@@ -255,10 +264,14 @@ document.addEventListener('DOMContentLoaded', async function () {
       inputMaxScore.value = (fb.max_score !== null) ? fb.max_score : 100;
     }
 
+    fileInput.value = '';
     inputImageUrl.value = fb.image_url || '';
     setImagePreviewUrl(fb.image_url);
 
-    fileChosenName.textContent = 'Đã có ảnh hiện tại';
+    fileChosenName.textContent = fb.image_url ? 'Đang dùng ảnh hiện tại' : 'Chưa chọn file';
+    fileChosenName.style.color = fb.image_url ? 'var(--primary)' : 'var(--text-muted)';
+    if (btnClearImg) btnClearImg.style.display = fb.image_url ? 'inline-block' : 'none';
+
     inputTitle.value = fb.title || '';
     inputMessage.value = fb.message || '';
     inputBtnText.value = fb.btn_text || 'Tiếp tục';
@@ -291,17 +304,20 @@ document.addEventListener('DOMContentLoaded', async function () {
   selectEvent.addEventListener('change', updateScoreRangeVisibility);
 
   // ===========================================================================
-  // 4. XỬ LÝ CHỌN ẢNH VÀ XEM TRƯỚC TỨC THÌ
+  // 4. XỬ LÝ CHỌN ẢNH VÀ XEM TRƯỚC TỨC THÌ (HAI CÁCH LOẠI TRỪ NHAU)
   // ===========================================================================
   btnBrowseImg.addEventListener('click', () => fileInput.click());
 
+  // Cách 1: Tải file ảnh từ máy tính
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     // Kiểm tra định dạng
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowed.includes(file.type)) {
+    const ext = file.name ? file.name.split('.').pop().toLowerCase() : '';
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
       alert('Định dạng file không hợp lệ! Vui lòng chỉ chọn file ảnh JPG, PNG, WEBP hoặc GIF.');
       fileInput.value = '';
       return;
@@ -309,38 +325,84 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Kiểm tra dung lượng 2MB
     if (file.size > 2 * 1024 * 1024) {
-      alert(`Dung lượng ảnh vượt quá 2MB (kích thước: ${(file.size / (1024 * 1024)).toFixed(1)}MB)! Vui lòng nén nhỏ lại.`);
+      alert(`Dung lượng ảnh vượt quá 2MB (kích thước hiện tại: ${(file.size / (1024 * 1024)).toFixed(1)}MB)! Vui lòng nén nhỏ lại dưới 2MB.`);
       fileInput.value = '';
       return;
     }
 
     pendingUploadFile = file;
-    fileChosenName.textContent = file.name;
+
+    // Khi chọn file thì làm trống ô URL để hai cách loại trừ nhau, không ghi [File cục bộ]
+    inputImageUrl.value = '';
+    fileChosenName.textContent = `📁 ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+    fileChosenName.style.color = '#16a34a';
+    if (btnClearImg) btnClearImg.style.display = 'inline-block';
 
     // Hiển thị xem trước ảnh ngay lập tức bằng FileReader
     const reader = new FileReader();
     reader.onload = function (evt) {
       setImagePreviewUrl(evt.target.result);
-      // Ghi chú tạm vào ô URL
-      inputImageUrl.value = `[File cục bộ]: ${file.name}`;
     };
     reader.readAsDataURL(file);
   });
 
+  // Cách 2: Dán trực tiếp URL ảnh
   inputImageUrl.addEventListener('input', () => {
     const val = inputImageUrl.value.trim();
-    if (val && !val.startsWith('[File cục bộ]')) {
+    if (val) {
+      // Khi dán URL -> Hủy bỏ file máy tính đã chọn
       pendingUploadFile = null;
-      fileChosenName.textContent = 'Chưa chọn file (Dùng link)';
+      fileInput.value = '';
+      fileChosenName.textContent = 'Đang dùng link ảnh trực tuyến';
+      fileChosenName.style.color = 'var(--text-muted)';
+      if (btnClearImg) btnClearImg.style.display = 'inline-block';
       setImagePreviewUrl(val);
+    } else {
+      if (!pendingUploadFile) {
+        if (existingImageUrl) {
+          fileChosenName.textContent = 'Đang dùng ảnh hiện tại';
+          fileChosenName.style.color = 'var(--primary)';
+          setImagePreviewUrl(existingImageUrl);
+        } else {
+          fileChosenName.textContent = 'Chưa chọn file';
+          fileChosenName.style.color = 'var(--text-muted)';
+          resetImagePreview();
+        }
+      }
     }
   });
 
+  // Nút đặt lại ảnh
+  if (btnClearImg) {
+    btnClearImg.addEventListener('click', () => {
+      pendingUploadFile = null;
+      fileInput.value = '';
+      inputImageUrl.value = '';
+      if (existingImageUrl) {
+        fileChosenName.textContent = 'Đang dùng ảnh hiện tại';
+        fileChosenName.style.color = 'var(--primary)';
+        setImagePreviewUrl(existingImageUrl);
+      } else {
+        fileChosenName.textContent = 'Chưa chọn file';
+        fileChosenName.style.color = 'var(--text-muted)';
+        resetImagePreview();
+      }
+      btnClearImg.style.display = 'none';
+    });
+  }
+
   function setImagePreviewUrl(url) {
-    if (url) {
+    if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('/'))) {
+      imgPreviewTag.onload = function () {
+        imgPreviewTag.style.display = 'block';
+        imgPreviewPlaceholder.style.display = 'none';
+      };
+      imgPreviewTag.onerror = function () {
+        imgPreviewTag.style.display = 'none';
+        imgPreviewPlaceholder.style.display = 'block';
+        imgPreviewPlaceholder.textContent = '⚠️ Không thể tải trước ảnh từ liên kết này';
+      };
       imgPreviewTag.src = url;
-      imgPreviewTag.style.display = 'block';
-      imgPreviewPlaceholder.style.display = 'none';
     } else {
       resetImagePreview();
     }
@@ -350,6 +412,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     imgPreviewTag.src = '';
     imgPreviewTag.style.display = 'none';
     imgPreviewPlaceholder.style.display = 'block';
+    imgPreviewPlaceholder.textContent = 'Chưa có ảnh xem trước';
   }
 
   // ===========================================================================
@@ -398,14 +461,43 @@ document.addEventListener('DOMContentLoaded', async function () {
       feedbackModalAlert.className = 'alert';
       feedbackModalAlert.textContent = '';
 
-      let finalImageUrl = inputImageUrl.value.trim();
+      let finalImageUrl = '';
 
-      // Nếu người dùng chọn file ảnh từ máy tính -> Tải lên Storage bucket 'feedback-images'
+      // Trường hợp 1: Admin chọn file ảnh từ máy tính -> Upload lên Supabase Storage
       if (pendingUploadFile) {
-        btnSubmitFeedback.textContent = 'Đang tải ảnh lên Storage...';
-        finalImageUrl = await window.Admin.uploadFeedbackImage(pendingUploadFile);
-      } else if (!finalImageUrl || finalImageUrl.startsWith('[File cục bộ]')) {
-        throw new Error('Vui lòng chọn file ảnh hoặc nhập đường dẫn ảnh hợp lệ!');
+        btnSubmitFeedback.textContent = '⏳ Đang tải ảnh lên Storage...';
+        try {
+          finalImageUrl = await window.Admin.uploadFeedbackImage(pendingUploadFile);
+        } catch (uploadErr) {
+          console.error('Lỗi tải ảnh lên Storage:', uploadErr);
+          feedbackModalAlert.className = 'alert alert-danger show';
+          feedbackModalAlert.textContent = 'Lỗi tải ảnh lên Storage: ' + (uploadErr.message || 'Không thể tải file lên hệ thống');
+          btnSubmitFeedback.disabled = false;
+          btnSubmitFeedback.textContent = id ? 'Lưu thay đổi' : 'Lưu cấu hình';
+          return;
+        }
+      } else {
+        // Trường hợp 2: Dùng URL trực tuyến hoặc giữ nguyên ảnh cũ
+        const urlVal = inputImageUrl.value.trim();
+        if (urlVal) {
+          if (!urlVal.startsWith('http://') && !urlVal.startsWith('https://') && !urlVal.startsWith('data:') && !urlVal.startsWith('/')) {
+            feedbackModalAlert.className = 'alert alert-danger show';
+            feedbackModalAlert.textContent = 'Đường dẫn ảnh phải bắt đầu bằng http:// hoặc https://!';
+            btnSubmitFeedback.disabled = false;
+            btnSubmitFeedback.textContent = id ? 'Lưu thay đổi' : 'Lưu cấu hình';
+            return;
+          }
+          finalImageUrl = urlVal;
+        } else if (id && existingImageUrl) {
+          // Khi chỉnh sửa mà không đổi ảnh -> Giữ nguyên URL ảnh cũ
+          finalImageUrl = existingImageUrl;
+        } else {
+          feedbackModalAlert.className = 'alert alert-danger show';
+          feedbackModalAlert.textContent = 'Vui lòng chọn ảnh từ máy tính HOẶC dán đường dẫn ảnh (URL) hợp lệ!';
+          btnSubmitFeedback.disabled = false;
+          btnSubmitFeedback.textContent = id ? 'Lưu thay đổi' : 'Lưu cấu hình';
+          return;
+        }
       }
 
       btnSubmitFeedback.textContent = 'Đang lưu vào database...';

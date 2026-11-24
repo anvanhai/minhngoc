@@ -350,6 +350,13 @@
       <div class="modal-body">
         <div id="speaking-modal-alert" class="alert"></div>
 
+        <!-- Thông tin hạn chót, phần thưởng XP & bài học -->
+        <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px; color: var(--text-muted); background: var(--bg-subtle); padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <span>⏰ Hạn chót: <strong id="speaking-modal-due" style="color: var(--text-main);">--</strong></span>
+          <span>⚡ Thưởng: <strong id="speaking-modal-xp" style="color: #ca8a04;">+30 XP</strong></span>
+          <span id="speaking-modal-lesson-box" style="display: none;">📖 <strong id="speaking-modal-lesson" style="color: var(--text-main);">--</strong></span>
+        </div>
+
         <!-- Khung Đề bài câu/đoạn tiếng Trung cần đọc -->
         <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px; border: 1.5px solid var(--border-color); text-align: center;">
           <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">
@@ -368,7 +375,7 @@
         </div>
 
         <!-- Khung Ghi âm MediaRecorder -->
-        <div style="background: var(--bg-card); border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 20px; text-align: center; margin-bottom: 14px;">
+        <div id="speaking-record-wrapper" style="background: var(--bg-card); border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 20px; text-align: center; margin-bottom: 14px;">
           <!-- Trạng thái ghi âm & Timer -->
           <div id="recorder-status-text" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
             Nhấn nút tròn đỏ bên dưới để bắt đầu ghi âm
@@ -393,25 +400,62 @@
 
           <!-- Trình phát nghe lại bản ghi của học sinh -->
           <div id="preview-audio-container" style="display: none; margin-top: 14px;">
-            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Bản ghi của bạn:</div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">🎧 Nghe lại bản ghi vừa thu:</div>
             <audio id="preview-audio-player" controls style="width: 100%; max-width: 380px;"></audio>
           </div>
         </div>
 
         <!-- Hướng dẫn cấp quyền Microphone nếu bị chặn -->
-        <div id="mic-permission-guide" style="display: none; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; color: var(--warning); line-height: 1.5;">
+        <div id="mic-permission-guide" style="display: none; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; color: var(--warning); line-height: 1.5; margin-bottom: 14px;">
           <strong>⚠️ Quyền truy cập Micro bị chặn:</strong>
-          Vui lòng bấm vào biểu tượng chiếc ổ khóa 🔒 (hoặc micro) ở góc trái thanh địa chỉ trình duyệt, chọn <em>"Cho phép (Allow) Microphone"</em>, sau đó tải lại trang để ghi âm nhé!
+          Vui lòng bấm vào biểu tượng chiếc ổ khóa 🔒 (hoặc micro) ở góc trái thanh địa chỉ trình duyệt, chọn <em>"Cho phép (Allow) Microphone"</em>, sau đó thử lại nhé!
         </div>
 
         <!-- Trạng thái chấm điểm đã có trước đó (nếu học sinh xem lại) -->
-        <div id="speaking-prev-submission-info" style="display: none; background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 12px; font-size: 13px;"></div>
+        <div id="speaking-prev-submission-info" style="display: none; background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; border: 1px solid var(--border-color);"></div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-close="modal-speaking-assignment">Hủy</button>
+        <button type="button" class="btn btn-secondary" data-close="modal-speaking-assignment">Đóng</button>
         <button type="button" id="btn-submit-speaking" class="btn btn-primary" disabled>
           📤 Nộp bài ghi âm
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: XEM CHI TIẾT BÀI TẬP (TỪ VỰNG / QUIZ / BÀI TẬP CHUNG) -->
+  <div id="modal-assignment-detail" class="modal-overlay">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <div>
+          <div id="detail-assign-badge" style="margin-bottom: 4px;"></div>
+          <h3 class="modal-title" id="detail-assign-title">Chi Tiết Bài Tập</h3>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-assignment-detail">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="detail-assign-alert" class="alert"></div>
+
+        <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; font-size: 13px; color: var(--text-muted); background: var(--bg-subtle); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <span>⏰ Hạn chót: <strong id="detail-assign-due" style="color: var(--text-main);">--</strong></span>
+          <span>⚡ Phần thưởng: <strong id="detail-assign-xp" style="color: #ca8a04;">+30 XP</strong></span>
+          <span id="detail-assign-lesson-box" style="display: none;">📖 <strong id="detail-assign-lesson" style="color: var(--text-main);">--</strong></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 700; color: var(--text-main);">Mô tả & Hướng dẫn:</label>
+          <div id="detail-assign-desc" style="font-size: 14px; line-height: 1.6; color: var(--text-main); background: var(--bg-card); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); white-space: pre-wrap;">
+            Không có mô tả thêm.
+          </div>
+        </div>
+
+        <!-- Trạng thái hoàn thành -->
+        <div id="detail-assign-status-box" style="padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; margin-top: 10px;">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-assignment-detail">Đóng</button>
+        <div id="detail-assign-action-container"></div>
       </div>
     </div>
   </div>
@@ -421,14 +465,14 @@
   </footer>
 
   <!-- Scripts -->
-  <script src="js/theme.js?v=3.0"></script>
+  <script src="js/theme.js?v=5.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/xp.js"></script>
-  <script src="js/student.js"></script>
-  <script src="js/feedback-popup.js?v=3.0"></script>
-  <script src="js/dashboard.js"></script>
+  <script src="js/config.js?v=5.0"></script>
+  <script src="js/db.js?v=5.0"></script>
+  <script src="js/auth.js?v=5.0"></script>
+  <script src="js/xp.js?v=5.0"></script>
+  <script src="js/student.js?v=5.0"></script>
+  <script src="js/feedback-popup.js?v=5.0"></script>
+  <script src="js/dashboard.js?v=5.0"></script>
 </body>
 </html>

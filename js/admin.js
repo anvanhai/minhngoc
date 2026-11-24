@@ -662,7 +662,7 @@ window.Admin = (function () {
     const uniquePaths = Array.from(new Set(recordingPaths));
     if (uniquePaths.length > 0) {
       try {
-        await db.storage.from('assignment-recordings').remove(uniquePaths);
+        await db.storage.from('recordings').remove(uniquePaths);
       } catch (storageErr) {
         console.warn('Lỗi dọn file Storage ghi âm:', storageErr);
       }
@@ -798,21 +798,46 @@ window.Admin = (function () {
     });
   }
 
-  async function createAssignment({ classId, lessonId, title, description, dueDate, rewardXp }) {
+  async function createAssignment({
+    classId,
+    lessonId,
+    title,
+    description,
+    dueDate,
+    rewardXp,
+    assignmentType,
+    speakingPrompt,
+    speakingPinyin,
+    speakingSampleAudioUrl,
+    listeningAudioUrl,
+    listeningQuestions
+  }) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
 
+    const payload = {
+      class_id: classId,
+      lesson_id: lessonId || null,
+      title: title.trim(),
+      description: description ? description.trim() : null,
+      due_date: dueDate,
+      reward_xp: parseInt(rewardXp || 30, 10),
+      allow_late: true,
+      assignment_type: assignmentType || 'vocabulary'
+    };
+
+    if (assignmentType === 'speaking') {
+      payload.speaking_prompt = speakingPrompt ? speakingPrompt.trim() : null;
+      payload.speaking_pinyin = speakingPinyin ? speakingPinyin.trim() : null;
+      payload.speaking_sample_audio_url = speakingSampleAudioUrl ? speakingSampleAudioUrl.trim() : null;
+    } else if (assignmentType === 'listening') {
+      payload.listening_audio_url = listeningAudioUrl ? listeningAudioUrl.trim() : null;
+      payload.listening_questions = listeningQuestions || null;
+    }
+
     const { data, error } = await db
       .from('assignments')
-      .insert([{
-        class_id: classId,
-        lesson_id: lessonId || null,
-        title: title.trim(),
-        description: description ? description.trim() : null,
-        due_date: dueDate,
-        reward_xp: parseInt(rewardXp || 30, 10),
-        allow_late: true
-      }])
+      .insert([payload])
       .select()
       .single();
 
@@ -860,9 +885,10 @@ window.Admin = (function () {
       .from('recording_submissions')
       .select(`
         *,
-        student:profiles!recording_submissions_student_id_fkey(id, display_name, username),
-        class:classes!recording_submissions_class_id_fkey(id, name, level),
-        lesson:lessons!recording_submissions_lesson_id_fkey(id, order_index, title_zh, title_vi)
+        student:profiles!recording_submissions_student_id_fkey(id, display_name, username, avatar_url),
+        class:classes(id, name, level),
+        lesson:lessons(id, order_index, title_zh, title_vi),
+        assignment:assignments(id, title, reward_xp)
       `);
     if (classId && classId !== 'all') query = query.eq('class_id', classId);
     if (status && status !== 'all') query = query.eq('status', status);
@@ -1068,9 +1094,11 @@ window.Admin = (function () {
     if (!db) throw new Error('Database chưa kết nối');
     if (!file) throw new Error('Chưa chọn file ảnh');
 
+    const ext = file.name ? file.name.split('.').pop().toLowerCase() : '';
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      throw new Error('Định dạng ảnh không hợp lệ! Chỉ chấp nhận JPG, PNG, WEBP, GIF.');
+    if (!allowedTypes.includes(file.type) && !allowedExts.includes(ext)) {
+      throw new Error('Định dạng ảnh không hợp lệ! Chỉ chấp nhận file ảnh JPG, PNG, WEBP hoặc GIF.');
     }
 
     const maxSize = 2 * 1024 * 1024; // 2 MB
@@ -1078,8 +1106,8 @@ window.Admin = (function () {
       throw new Error(`Dung lượng ảnh vượt quá 2MB (kích thước hiện tại: ${(file.size / (1024 * 1024)).toFixed(1)}MB)! Vui lòng nén nhỏ lại.`);
     }
 
-    const ext = file.name ? file.name.split('.').pop().toLowerCase() : 'png';
-    const filePath = `feedback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const safeExt = allowedExts.includes(ext) ? ext : 'png';
+    const filePath = `feedback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${safeExt}`;
 
     const { error: uploadErr } = await db.storage
       .from('feedback-images')
@@ -1087,7 +1115,7 @@ window.Admin = (function () {
 
     if (uploadErr) {
       console.error('Lỗi tải ảnh lên Supabase Storage:', uploadErr);
-      throw uploadErr;
+      throw new Error('Không thể tải ảnh lên Supabase Storage: ' + (uploadErr.message || uploadErr));
     }
 
     const { data: pubData } = db.storage.from('feedback-images').getPublicUrl(filePath);
