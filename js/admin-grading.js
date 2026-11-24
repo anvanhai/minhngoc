@@ -260,24 +260,32 @@ document.addEventListener('DOMContentLoaded', async function () {
 
           const score = parseInt(scoreInput.value, 10);
           const comment = commentInput.value.trim();
+          const originalBtnHtml = submitBtn.innerHTML;
 
           try {
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Đang lưu...';
+            submitBtn.textContent = '⏳ Đang lưu...';
 
             const res = await window.Admin.gradeRecording({
               recordingId: recId,
+              submissionId: recId,
               score,
               comment
             });
 
-            showAlert(`Đã lưu điểm ${score}/100 và tự động cộng +${res.xp_awarded || 0} XP cho học sinh!`, 'success');
+            const xpBonus = (res && res.xp_awarded > 0)
+              ? ` và tự động cộng +${res.xp_awarded} XP cho học sinh!`
+              : (res && res.already_rewarded ? ' (Điểm XP của bài tập này đã được cộng trước đó)' : '!');
+            showAlert(`Đã lưu điểm ${score}/100${xpBonus}`, 'success');
+
+            // Cập nhật lại danh sách và số lượng chờ chấm
             await loadRecordings();
 
           } catch (err) {
+            console.error('Lỗi khi chấm bài:', err);
             alert('Lỗi khi chấm bài: ' + (err.message || err));
             submitBtn.disabled = false;
-            submitBtn.textContent = '💾 Thử lại';
+            submitBtn.innerHTML = originalBtnHtml || '💾 Lưu điểm';
           }
         });
       });

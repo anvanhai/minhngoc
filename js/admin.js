@@ -898,13 +898,23 @@ window.Admin = (function () {
     return data || [];
   }
 
-  async function gradeRecording({ submissionId, score, comment }) {
+  async function gradeRecording({ submissionId, recordingId, score, comment }) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
+
+    const recId = recordingId || submissionId;
+    if (!recId) throw new Error('Thiếu mã bài nộp ghi âm (recordingId)');
+
+    const parsedScore = parseInt(score, 10);
+    if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > 100) {
+      throw new Error('Điểm số phải là số từ 0 đến 100');
+    }
+
     const { data, error } = await db.rpc('grade_recording_submission', {
-      p_submission_id: submissionId,
-      p_score: parseInt(score, 10),
-      p_comment: comment ? comment.trim() : null
+      p_recording_id: recId,
+      p_submission_id: recId,
+      p_score: parsedScore,
+      p_comment: comment ? comment.trim() : ''
     });
     if (error) throw error;
     return data;
@@ -925,8 +935,19 @@ window.Admin = (function () {
   async function deleteRecordingFile(recordingId, audioPath) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
-    if (audioPath && !audioPath.startsWith('http')) {
-      await db.storage.from('recordings').remove([audioPath]);
+    if (audioPath) {
+      let cleanPath = audioPath;
+      if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+        const parts = cleanPath.split('/recordings/');
+        if (parts.length > 1) {
+          cleanPath = parts[1].split('?')[0];
+        }
+      }
+      try {
+        await db.storage.from('recordings').remove([cleanPath]);
+      } catch (storageErr) {
+        console.warn('Lỗi khi xóa file Storage:', storageErr);
+      }
     }
     const { error } = await db.from('recording_submissions').delete().eq('id', recordingId);
     if (error) throw error;
