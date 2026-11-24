@@ -9,3 +9,5 @@ Thumbs.db
 
 # Nhật ký & Logs
 *.log
+
+supabase/
