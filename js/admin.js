@@ -1175,6 +1175,7 @@ window.Admin = (function () {
       .from('recording_submissions')
       .select(`
         *,
+        recordings:submission_recordings(id, position, storage_path, mime_type, duration_seconds),
         student:profiles!recording_submissions_student_id_fkey(id, display_name, username, avatar_url),
         class:classes(id, name, level),
         lesson:lessons(id, order_index, title_zh, title_vi),
@@ -1185,10 +1186,64 @@ window.Admin = (function () {
     query = query.order('created_at', { ascending: false });
     const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+
+    const list = data || [];
+    // Chuẩn hóa danh sách bản ghi con (takes)
+    list.forEach(rec => {
+      if (rec.recordings && Array.isArray(rec.recordings) && rec.recordings.length > 0) {
+        rec.recordings.sort((a, b) => (a.position || 1) - (b.position || 1));
+      } else if (rec.audio_url) {
+        rec.recordings = [{
+          id: `legacy-${rec.id}`,
+          submission_id: rec.id,
+          position: 1,
+          storage_path: rec.audio_url,
+          mime_type: 'audio/webm',
+          duration_seconds: 0
+        }];
+      } else {
+        rec.recordings = [];
+      }
+    });
+
+    return list;
   }
 
-  async function gradeRecording({ submissionId, recordingId, score, comment }) {
+  /**
+   * Tải file nhận xét bằng giọng nói của giáo viên lên bucket 'recordings'
+   * @param {Blob} audioBlob
+   * @param {string} teacherId
+   * @param {string} submissionId
+   */
+  async function uploadTeacherVoiceFeedback(audioBlob, teacherId, submissionId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const mime = audioBlob.type || 'audio/webm';
+    let ext = 'webm';
+    if (mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac')) ext = 'mp4';
+    else if (mime.includes('wav')) ext = 'wav';
+    else if (mime.includes('ogg')) ext = 'ogg';
+
+    const safeSubId = submissionId || 'feedback';
+    const fileName = `teacher_feedback/${safeSubId}_${Date.now()}.${ext}`;
+
+    const { data, error } = await db.storage
+      .from('recordings')
+      .upload(fileName, audioBlob, {
+        contentType: mime,
+        upsert: true
+      });
+
+    if (error) throw error;
+    return {
+      path: data.path,
+      mime_type: mime,
+      extension: ext
+    };
+  }
+
+  async function gradeRecording({ submissionId, recordingId, score, comment, teacherAudioUrl, teacherAudioMime, teacherAudioDuration }) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
 
@@ -1204,7 +1259,10 @@ window.Admin = (function () {
       p_recording_id: recId,
       p_submission_id: recId,
       p_score: parsedScore,
-      p_comment: comment ? comment.trim() : ''
+      p_comment: comment ? comment.trim() : '',
+      p_teacher_audio_url: teacherAudioUrl || null,
+      p_teacher_audio_mime: teacherAudioMime || 'audio/webm',
+      p_teacher_audio_duration: teacherAudioDuration || 0
     });
     if (error) throw error;
     return data;
@@ -1222,11 +1280,15 @@ window.Admin = (function () {
     return data.signedUrl;
   }
 
-  async function deleteRecordingFile(recordingId, audioPath) {
+  /**
+   * Xóa một bản ghi con (take) cụ thể bằng Storage API
+   */
+  async function deleteRecordingTake(takeId, storagePath) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
-    if (audioPath) {
-      let cleanPath = audioPath;
+
+    if (storagePath) {
+      let cleanPath = storagePath;
       if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
         const parts = cleanPath.split('/recordings/');
         if (parts.length > 1) {
@@ -1236,9 +1298,66 @@ window.Admin = (function () {
       try {
         await db.storage.from('recordings').remove([cleanPath]);
       } catch (storageErr) {
-        console.warn('Lỗi khi xóa file Storage:', storageErr);
+        console.warn('Lỗi khi xóa file Storage của take:', storageErr);
       }
     }
+
+    if (takeId && !takeId.startsWith('legacy-')) {
+      const { error } = await db.from('submission_recordings').delete().eq('id', takeId);
+      if (error) throw error;
+    }
+    return true;
+  }
+
+  async function deleteRecordingFile(recordingId, audioPath) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    // 1. Tìm tất cả các file storage liên quan đến bài nộp (cả takes và voice feedback)
+    const filesToDelete = [];
+    if (audioPath) {
+      let clean = audioPath;
+      if (clean.includes('/recordings/')) clean = clean.split('/recordings/')[1].split('?')[0];
+      filesToDelete.push(clean);
+    }
+
+    try {
+      const { data: takes } = await db
+        .from('submission_recordings')
+        .select('storage_path')
+        .eq('submission_id', recordingId);
+
+      if (takes && takes.length > 0) {
+        takes.forEach(t => {
+          if (t.storage_path) {
+            let p = t.storage_path;
+            if (p.includes('/recordings/')) p = p.split('/recordings/')[1].split('?')[0];
+            if (!filesToDelete.includes(p)) filesToDelete.push(p);
+          }
+        });
+      }
+
+      // Kiểm tra xem có file audio nhận xét của giáo viên không
+      const { data: recRow } = await db
+        .from('recording_submissions')
+        .select('teacher_audio_url')
+        .eq('id', recordingId)
+        .maybeSingle();
+
+      if (recRow && recRow.teacher_audio_url) {
+        let tp = recRow.teacher_audio_url;
+        if (tp.includes('/recordings/')) tp = tp.split('/recordings/')[1].split('?')[0];
+        if (!filesToDelete.includes(tp)) filesToDelete.push(tp);
+      }
+
+      // Xóa tất cả các file trong Storage bằng Storage API
+      if (filesToDelete.length > 0) {
+        await db.storage.from('recordings').remove(filesToDelete);
+      }
+    } catch (storageErr) {
+      console.warn('Lỗi khi dọn dẹp Storage:', storageErr);
+    }
+
     const { error } = await db.from('recording_submissions').delete().eq('id', recordingId);
     if (error) throw error;
     return true;
@@ -1866,6 +1985,8 @@ window.Admin = (function () {
     gradeRecording,
     getAudioPlayUrl,
     deleteRecordingFile,
+    deleteRecordingTake,
+    uploadTeacherVoiceFeedback,
     // Cấu thành bài học nâng cao
     getLessonFullComposition,
     reorderLessonVocabularies,

@@ -385,18 +385,23 @@ window.Student = (function () {
 
   /**
    * Tải file ghi âm của học sinh lên Supabase Storage bucket 'recordings'
+   * @param {Blob} audioBlob
+   * @param {string} studentId
+   * @param {string} [customSuffix] - Hậu tố định danh bản ghi (ví dụ: take_1, take_2)
    */
-  async function uploadRecordingAudio(audioBlob, studentId) {
+  async function uploadRecordingAudio(audioBlob, studentId, customSuffix = '') {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
 
     const mime = audioBlob.type || 'audio/webm';
     let ext = 'webm';
-    if (mime.includes('mp4') || mime.includes('m4a')) ext = 'mp4';
+    if (mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac')) ext = 'mp4';
     else if (mime.includes('wav')) ext = 'wav';
     else if (mime.includes('ogg')) ext = 'ogg';
+    else if (mime.includes('mpeg') || mime.includes('mp3')) ext = 'mp3';
 
-    const fileName = `${studentId}/${Date.now()}_recording.${ext}`;
+    const suffix = customSuffix ? `_${customSuffix}` : '_recording';
+    const fileName = `${studentId}/${Date.now()}${suffix}.${ext}`;
 
     const { data, error } = await db.storage
       .from('recordings')
@@ -406,23 +411,86 @@ window.Student = (function () {
       });
 
     if (error) throw error;
-    return data.path;
+    const finalPath = (data && (data.path || data.Key || data.fullPath)) ? (data.path || data.Key || data.fullPath) : fileName;
+    return {
+      path: finalPath,
+      mime_type: mime,
+      extension: ext,
+      toString() { return finalPath; }
+    };
   }
 
   /**
-   * Nộp bài tập Nói & Ghi âm (gửi audio path vào hàng chờ giáo viên chấm)
+   * Nộp bài tập Nói & Ghi âm (hỗ trợ nhiều bản ghi âm con - takes)
+   * @param {string} assignmentId
+   * @param {string} audioUrl - Đường dẫn bản ghi chính (hoặc bản ghi đầu tiên)
+   * @param {Array<Object>} [recordings] - Danh sách các bản ghi [{position, storage_path, mime_type, duration_seconds}]
    */
-  async function submitSpeakingAssignment(assignmentId, audioUrl) {
+  async function submitSpeakingAssignment(assignmentId, audioUrl, recordings = null) {
     const db = getDb();
     if (!db) throw new Error('Database chưa kết nối');
 
-    const { data, error } = await db.rpc('submit_speaking_assignment', {
+    let normalizedRecordings = null;
+    let mainAudioUrl = (typeof audioUrl === 'string') ? audioUrl.trim() : '';
+
+    if (recordings && Array.isArray(recordings) && recordings.length > 0) {
+      normalizedRecordings = recordings.map((rec, idx) => {
+        const path = (rec.storage_path || rec.path || (typeof rec === 'string' ? rec : '') || '').toString().trim();
+        return {
+          position: typeof rec.position === 'number' ? rec.position : (idx + 1),
+          storage_path: path,
+          mime_type: rec.mime_type || rec.mimeType || 'audio/webm',
+          duration_seconds: typeof rec.duration_seconds === 'number' ? rec.duration_seconds : (rec.durationSeconds || 0)
+        };
+      }).filter(r => !!r.storage_path);
+
+      if (!mainAudioUrl && normalizedRecordings.length > 0) {
+        mainAudioUrl = normalizedRecordings[0].storage_path;
+      }
+    }
+
+    if (!mainAudioUrl && normalizedRecordings && normalizedRecordings.length > 0) {
+      mainAudioUrl = normalizedRecordings[0].storage_path;
+    }
+
+    const payload = {
       p_assignment_id: assignmentId,
-      p_audio_url: audioUrl
-    });
+      p_audio_url: mainAudioUrl
+    };
+    if (normalizedRecordings && normalizedRecordings.length > 0) {
+      payload.p_recordings = normalizedRecordings;
+    }
+
+    const { data, error } = await db.rpc('submit_speaking_assignment', payload);
 
     if (error) throw error;
     return data;
+  }
+
+  /**
+   * Lấy danh sách các bản ghi âm con (takes) của một bài nộp
+   * @param {string} submissionId - ID của bản ghi trong recording_submissions
+   */
+  async function getSubmissionRecordings(submissionId) {
+    const db = getDb();
+    if (!db || !submissionId) return [];
+
+    try {
+      const { data, error } = await db
+        .from('submission_recordings')
+        .select('*')
+        .eq('submission_id', submissionId)
+        .order('position', { ascending: true });
+
+      if (error) {
+        console.warn('Lỗi lấy danh sách bản ghi con:', error);
+        return [];
+      }
+      return data || [];
+    } catch (e) {
+      console.warn('Lỗi getSubmissionRecordings:', e);
+      return [];
+    }
   }
 
   /**
@@ -552,6 +620,7 @@ window.Student = (function () {
     submitListeningAssignment,
     uploadRecordingAudio,
     submitSpeakingAssignment,
+    getSubmissionRecordings,
     getRecordingPlayUrl,
     getClassLeaderboard,
     updateDailyStreak,

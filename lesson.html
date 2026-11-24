@@ -503,30 +503,59 @@
         </div>
 
         <!-- Khung Ghi âm MediaRecorder -->
-        <div id="speaking-record-wrapper" style="background: var(--bg-card); border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 20px; text-align: center; margin-bottom: 14px;">
-          <div id="recorder-status-text" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
-            Nhấn nút tròn đỏ bên dưới để bắt đầu ghi âm
+        <div id="speaking-record-wrapper" style="background: var(--bg-card); border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 18px; margin-bottom: 14px;">
+          <!-- Trạng thái ghi âm & Timer -->
+          <div style="text-align: center;">
+            <div id="recorder-status-text" style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">
+              Nhấn nút bên dưới để bắt đầu ghi Bản ghi 1
+            </div>
+
+            <div id="recorder-timer" style="font-size: 28px; font-weight: 800; color: var(--text-main); font-family: monospace; margin-bottom: 14px;">
+              00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>
+            </div>
+
+            <!-- Nút điều khiển Ghi âm -->
+            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+              <button type="button" id="btn-start-record" class="btn btn-primary" style="border-radius: var(--radius-full); padding: 0 20px;">
+                🎙️ Bắt đầu ghi âm
+              </button>
+              <button type="button" id="btn-stop-record" class="btn btn-danger" style="display: none; border-radius: var(--radius-full); padding: 0 20px;">
+                ⏹️ Dừng ghi âm
+              </button>
+              <button type="button" id="btn-cancel-record" class="btn btn-outline btn-sm" style="display: none;">
+                ❌ Hủy
+              </button>
+              <button type="button" id="btn-re-record" class="btn btn-outline" style="display: none;">
+                🔄 Ghi lại
+              </button>
+            </div>
+
+            <!-- Trình phát nghe lại tạm thời -->
+            <div id="preview-audio-container" style="display: none; margin-top: 10px;">
+              <audio id="preview-audio-player" controls style="width: 100%; max-width: 380px;"></audio>
+            </div>
           </div>
 
-          <div id="recorder-timer" style="font-size: 28px; font-weight: 800; color: var(--text-main); font-family: monospace; margin-bottom: 16px;">
-            00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>
-          </div>
+          <!-- Danh sách các bản ghi (Takes List) -->
+          <div id="speaking-takes-wrapper" style="margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-weight: 700; font-size: 13px; color: var(--text-main);">
+                📋 Danh sách bản ghi (<span id="takes-count-badge">0/10</span>):
+              </span>
+              <button type="button" id="btn-add-take" class="btn btn-outline btn-sm" style="display: none; font-size: 12px; padding: 4px 10px;">
+                ➕ Thêm bản ghi
+              </button>
+            </div>
 
-          <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
-            <button type="button" id="btn-start-record" class="btn btn-primary" style="border-radius: var(--radius-full); padding: 0 20px;">
-              🎙️ Bắt đầu ghi âm
-            </button>
-            <button type="button" id="btn-stop-record" class="btn btn-danger" style="display: none; border-radius: var(--radius-full); padding: 0 20px;">
-              ⏹️ Dừng ghi âm
-            </button>
-            <button type="button" id="btn-re-record" class="btn btn-outline" style="display: none;">
-              🔄 Ghi lại
-            </button>
-          </div>
+            <div id="speaking-takes-list" style="display: flex; flex-direction: column; gap: 8px;">
+              <div id="takes-empty-hint" style="font-size: 12px; color: var(--text-muted); text-align: center; padding: 8px 0; font-style: italic;">
+                Chưa có bản ghi nào. Hãy bấm "Bắt đầu ghi âm" ở trên để tạo bản ghi đầu tiên (tối đa 10 bản).
+              </div>
+            </div>
 
-          <div id="preview-audio-container" style="display: none; margin-top: 14px;">
-            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">🎧 Nghe lại bản ghi vừa thu:</div>
-            <audio id="preview-audio-player" controls style="width: 100%; max-width: 380px;"></audio>
+            <div id="takes-max-notice" style="display: none; font-size: 12px; color: var(--warning); margin-top: 8px; text-align: center; font-weight: 600;">
+              ⚠️ Đã đạt tối đa 10 bản ghi cho một lần nộp.
+            </div>
           </div>
         </div>
 

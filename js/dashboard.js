@@ -114,7 +114,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     let currentSpeakingAssign = null;
     let mediaRecorder = null;
     let audioChunks = [];
-    let audioBlob = null;
     let recordTimerInterval = null;
     let recordSeconds = 0;
 
@@ -426,12 +425,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     const recorderTimer = document.getElementById('recorder-timer');
     const btnStartRecord = document.getElementById('btn-start-record');
     const btnStopRecord = document.getElementById('btn-stop-record');
+    const btnCancelRecord = document.getElementById('btn-cancel-record');
     const btnReRecord = document.getElementById('btn-re-record');
     const previewAudioContainer = document.getElementById('preview-audio-container');
     const previewAudioPlayer = document.getElementById('preview-audio-player');
     const micPermissionGuide = document.getElementById('mic-permission-guide');
     const speakingPrevSubmissionInfo = document.getElementById('speaking-prev-submission-info');
     const btnSubmitSpeaking = document.getElementById('btn-submit-speaking');
+    const btnAddTake = document.getElementById('btn-add-take');
+    const speakingTakesList = document.getElementById('speaking-takes-list');
+    const takesCountBadge = document.getElementById('takes-count-badge');
+    const takesEmptyHint = document.getElementById('takes-empty-hint');
+    const takesMaxNotice = document.getElementById('takes-max-notice');
 
     // Modal Chi tiết bài tập chung (từ vựng / quiz / bài tập chung)
     const modalAssignmentDetail = document.getElementById('modal-assignment-detail');
@@ -538,12 +543,169 @@ document.addEventListener('DOMContentLoaded', async function () {
       modalAssignmentDetail.classList.add('active');
     }
 
-    document.querySelectorAll('[data-close="modal-speaking-assignment"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        stopRecordingCleanup();
-        modalSpeaking.classList.remove('active');
+    // Biến quản lý nhiều bản ghi âm (Takes)
+    let recordedTakes = [];
+    let activeReplaceIndex = -1;
+    let activeStream = null;
+
+    function formatDuration(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function renderTakesList() {
+      if (takesCountBadge) {
+        takesCountBadge.textContent = `${recordedTakes.length}/10`;
+      }
+
+      if (recordedTakes.length === 0) {
+        if (takesEmptyHint) takesEmptyHint.style.display = 'block';
+        if (speakingTakesList) {
+          speakingTakesList.innerHTML = '';
+          if (takesEmptyHint) speakingTakesList.appendChild(takesEmptyHint);
+        }
+        if (btnAddTake) btnAddTake.style.display = 'none';
+        if (takesMaxNotice) takesMaxNotice.style.display = 'none';
+        if (btnSubmitSpeaking) {
+          btnSubmitSpeaking.disabled = true;
+          btnSubmitSpeaking.textContent = '📤 Nộp bài ghi âm';
+        }
+        if (recorderStatusText && activeReplaceIndex === -1) {
+          recorderStatusText.textContent = 'Nhấn nút bên dưới để bắt đầu ghi Bản ghi 1';
+        }
+        return;
+      }
+
+      if (takesEmptyHint) takesEmptyHint.style.display = 'none';
+
+      if (speakingTakesList) {
+        speakingTakesList.innerHTML = recordedTakes.map((take, idx) => `
+          <div class="take-item" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg-subtle); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 110px;">
+              <span style="font-weight: 700; font-size: 13px; color: var(--text-main);">🎙️ Bản ghi ${idx + 1}</span>
+              <span style="font-size: 11px; background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: 600;">
+                ${formatDuration(take.durationSeconds || 0)}
+              </span>
+            </div>
+
+            <audio controls src="${take.objectUrl}" style="height: 32px; flex: 1; min-width: 180px; max-width: 280px;"></audio>
+
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button type="button" class="btn btn-outline btn-sm btn-replace-take" data-index="${idx}" style="font-size: 11px; padding: 3px 8px;" title="Ghi âm lại để thay thế bản ghi này">
+                🔄 Ghi lại
+              </button>
+              <button type="button" class="btn btn-outline btn-sm btn-delete-take" data-index="${idx}" style="color: var(--danger); border-color: var(--danger-border); font-size: 11px; padding: 3px 8px;" title="Xóa bản ghi này">
+                🗑️ Xóa
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+        // Khắc phục lỗi Chromium hiển thị 0:00 cho audio WebM dạng live Blob
+        speakingTakesList.querySelectorAll('audio').forEach(audioEl => {
+          audioEl.addEventListener('loadedmetadata', function () {
+            if (audioEl.duration === Infinity || isNaN(audioEl.duration) || audioEl.duration === 0) {
+              const prevTime = audioEl.currentTime;
+              audioEl.currentTime = 1e101;
+              audioEl.ontimeupdate = function () {
+                this.ontimeupdate = null;
+                this.currentTime = prevTime;
+              };
+            }
+          });
+        });
+
+        // Gắn sự kiện Ghi lại từng bản
+        speakingTakesList.querySelectorAll('.btn-replace-take').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.index, 10);
+            if (isNaN(idx) || idx < 0 || idx >= recordedTakes.length) return;
+            activeReplaceIndex = idx;
+            if (recorderStatusText) {
+              recorderStatusText.innerHTML = `<span style="color: var(--danger); font-weight: 700;">🔴 Đang chuẩn bị thu âm thay thế cho: Bản ghi ${idx + 1}</span>`;
+            }
+            if (btnCancelRecord) btnCancelRecord.style.display = 'inline-flex';
+            if (btnStartRecord) btnStartRecord.style.display = 'inline-flex';
+            if (btnStopRecord) btnStopRecord.style.display = 'none';
+            if (btnAddTake) btnAddTake.style.display = 'none';
+            if (recorderTimer) {
+              recorderTimer.innerHTML = '00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>';
+            }
+          });
+        });
+
+        // Gắn sự kiện Xóa từng bản (tự động đánh số lại các bản còn lại)
+        speakingTakesList.querySelectorAll('.btn-delete-take').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.index, 10);
+            if (isNaN(idx) || idx < 0 || idx >= recordedTakes.length) return;
+            if (confirm(`Bạn có chắc muốn xóa Bản ghi ${idx + 1}?`)) {
+              if (recordedTakes[idx] && recordedTakes[idx].objectUrl) {
+                URL.revokeObjectURL(recordedTakes[idx].objectUrl);
+              }
+              recordedTakes.splice(idx, 1);
+              recordedTakes.forEach((t, i) => { t.position = i + 1; });
+              if (activeReplaceIndex === idx) {
+                activeReplaceIndex = -1;
+                if (btnCancelRecord) btnCancelRecord.style.display = 'none';
+              } else if (activeReplaceIndex > idx) {
+                activeReplaceIndex--;
+              }
+              renderTakesList();
+            }
+          });
+        });
+      }
+
+      const total = recordedTakes.length;
+      if (btnSubmitSpeaking) {
+        btnSubmitSpeaking.disabled = false;
+        btnSubmitSpeaking.textContent = `📤 Nộp ${total} bản ghi`;
+      }
+
+      if (total >= 10) {
+        if (btnAddTake) btnAddTake.style.display = 'none';
+        if (takesMaxNotice) takesMaxNotice.style.display = 'block';
+        if (btnStartRecord && activeReplaceIndex === -1) btnStartRecord.style.display = 'none';
+        if (recorderStatusText && activeReplaceIndex === -1) {
+          recorderStatusText.textContent = 'Đã đạt tối đa 10 bản ghi. Bạn có thể nghe lại, thu lại từng bản hoặc nộp bài.';
+        }
+      } else {
+        if (takesMaxNotice) takesMaxNotice.style.display = 'none';
+        if (activeReplaceIndex === -1) {
+          if (btnAddTake) btnAddTake.style.display = 'inline-flex';
+          if (btnStartRecord) btnStartRecord.style.display = 'inline-flex';
+          if (recorderStatusText) {
+            recorderStatusText.textContent = `Bấm "+ Thêm bản ghi" hoặc "Bắt đầu ghi âm" để ghi Bản ghi ${total + 1}`;
+          }
+        }
+      }
+    }
+
+    function resetRecordingUi() {
+      recordedTakes.forEach(t => {
+        if (t.objectUrl) URL.revokeObjectURL(t.objectUrl);
       });
-    });
+      recordedTakes = [];
+      activeReplaceIndex = -1;
+      audioChunks = [];
+      recordSeconds = 0;
+
+      if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
+      }
+
+      if (recorderTimer) recorderTimer.innerHTML = '00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>';
+      if (recorderStatusText) recorderStatusText.textContent = 'Nhấn nút bên dưới để bắt đầu ghi Bản ghi 1';
+      if (btnStartRecord) btnStartRecord.style.display = 'inline-flex';
+      if (btnStopRecord) btnStopRecord.style.display = 'none';
+      if (btnCancelRecord) btnCancelRecord.style.display = 'none';
+      if (btnReRecord) btnReRecord.style.display = 'none';
+      if (previewAudioContainer) previewAudioContainer.style.display = 'none';
+      renderTakesList();
+    }
 
     function stopRecordingCleanup() {
       if (recordTimerInterval) {
@@ -553,7 +715,56 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
       }
+      if (activeStream) {
+        activeStream.getTracks().forEach(t => t.stop());
+        activeStream = null;
+      }
       if (previewAudioPlayer) previewAudioPlayer.pause();
+    }
+
+    // Cảnh báo người dùng khi thoát hoặc tải lại trang nếu còn bản ghi chưa nộp
+    window.addEventListener('beforeunload', (e) => {
+      if (recordedTakes && recordedTakes.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+    // Sự kiện đóng modal có kiểm tra bản ghi chưa nộp
+    document.querySelectorAll('[data-close="modal-speaking-assignment"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        if (recordedTakes && recordedTakes.length > 0) {
+          if (!confirm('Bạn có các bản ghi âm chưa nộp. Nếu đóng cửa sổ này, các bản ghi sẽ bị hủy. Bạn có chắc chắn muốn đóng?')) {
+            e.stopPropagation();
+            return;
+          }
+        }
+        stopRecordingCleanup();
+        resetRecordingUi();
+        modalSpeaking.classList.remove('active');
+      });
+    });
+
+    if (btnCancelRecord) {
+      btnCancelRecord.addEventListener('click', () => {
+        activeReplaceIndex = -1;
+        btnCancelRecord.style.display = 'none';
+        if (recorderTimer) recorderTimer.innerHTML = '00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>';
+        renderTakesList();
+      });
+    }
+
+    if (btnAddTake) {
+      btnAddTake.addEventListener('click', () => {
+        if (recordedTakes.length >= 10) return;
+        activeReplaceIndex = -1;
+        if (btnCancelRecord) btnCancelRecord.style.display = 'none';
+        if (btnStartRecord) {
+          btnStartRecord.style.display = 'inline-flex';
+          btnStartRecord.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          btnStartRecord.click();
+        }
+      });
     }
 
     async function openSpeakingModal(assign) {
@@ -607,34 +818,128 @@ document.addEventListener('DOMContentLoaded', async function () {
           : `<span class="badge-status badge-paused">🟡 Đã nộp (Chờ cô giáo chấm)</span>`;
 
         speakingPrevSubmissionInfo.innerHTML = `
-          <div style="font-weight: 700; color: var(--text-main); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+          <div style="font-weight: 700; color: var(--text-main); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
             <span>📌 Bài nộp ghi âm của bạn:</span>
             ${scoreBadge}
           </div>
-          ${isGraded ? `<div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 4px;">⚡ Điểm thưởng đạt được: +${Math.round((sub.score / 100) * (assign.reward_xp || 30))} XP</div>` : ''}
-          ${sub.teacher_comment ? `<div style="color: var(--primary); font-weight: 600; margin: 8px 0; background: var(--bg-card); padding: 8px 12px; border-radius: 6px; border: 1px dashed var(--border-color);">💬 Nhận xét của cô giáo: "${sub.teacher_comment}"</div>` : ''}
-          <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <button type="button" class="btn btn-outline btn-sm btn-play-my-old-rec" data-url="${sub.audio_url}">
-              🔊 Nghe lại bản ghi âm của bạn
-            </button>
+          ${isGraded ? `<div style="font-size: 13px; color: #16a34a; font-weight: 700; margin-bottom: 6px;">⚡ Điểm thưởng đạt được: +${Math.round((sub.score / 100) * (assign.reward_xp || 30))} XP</div>` : ''}
+
+          <!-- Lời nhận xét bằng giọng nói của cô giáo (nếu có) -->
+          ${sub.teacher_audio_url ? `
+            <div style="margin: 10px 0; background: rgba(59, 130, 246, 0.08); border: 1.5px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-sm); padding: 10px 14px;">
+              <div style="font-weight: 700; color: var(--primary); font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                🎙️ Nhận xét bằng giọng nói của cô giáo:
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-primary btn-sm btn-play-teacher-voice" data-url="${sub.teacher_audio_url}">
+                  ▶️ Nghe cô giáo nhận xét
+                </button>
+                <span class="teacher-voice-status" style="font-size: 12px; color: var(--text-muted); font-style: italic;"></span>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Lời nhận xét bằng chữ (nếu có) -->
+          ${sub.teacher_comment ? `
+            <div style="color: var(--primary); font-weight: 600; margin: 8px 0; background: var(--bg-card); padding: 10px 14px; border-radius: 6px; border: 1px dashed var(--border-color); line-height: 1.5;">
+              💬 Nhận xét của cô giáo: "${sub.teacher_comment}"
+            </div>
+          ` : ''}
+
+          <!-- Danh sách các bản ghi âm con đã nộp -->
+          <div style="margin-top: 12px;">
+            <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 6px;">
+              🎧 Các bản ghi âm bạn đã nộp:
+            </div>
+            <div id="prev-submitted-takes-list" style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="font-size: 12px; color: var(--text-muted); font-style: italic;">Đang tải danh sách bản ghi...</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             ${!isGraded ? `<button type="button" class="btn btn-outline btn-sm btn-toggle-rerecord" style="border-color: var(--warning); color: var(--warning);">🔄 Ghi âm nộp lại</button>` : ''}
           </div>
         `;
 
-        speakingPrevSubmissionInfo.querySelector('.btn-play-my-old-rec').addEventListener('click', async (e) => {
-          const raw = e.target.dataset.url;
-          e.target.textContent = '⏳ Đang nạp...';
+        // Tải danh sách takes từ database
+        (async () => {
+          const takesContainer = speakingPrevSubmissionInfo.querySelector('#prev-submitted-takes-list');
+          if (!takesContainer) return;
           try {
-            const playUrl = await window.Student.getRecordingPlayUrl(raw);
-            const a = new Audio(playUrl);
-            a.play();
-            e.target.textContent = '▶️ Đang phát...';
-            a.onended = () => { e.target.textContent = '🔊 Nghe lại bản ghi âm của bạn'; };
-          } catch (err) {
-            alert('Lỗi phát lại: ' + (err.message || err));
-            e.target.textContent = '🔊 Nghe lại bản ghi âm của bạn';
+            let takes = await window.Student.getSubmissionRecordings(sub.id);
+            if (!takes || takes.length === 0) {
+              takes = [{ id: 'default', position: 1, storage_path: sub.audio_url, duration_seconds: 0 }];
+            }
+            takesContainer.innerHTML = takes.map((t, idx) => `
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg-card); padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <strong style="font-size: 13px;">🎙️ Bản ghi ${t.position || idx + 1}</strong>
+                  ${t.duration_seconds > 0 ? `<span style="font-size: 11px; color: var(--text-muted);">(${formatDuration(t.duration_seconds)})</span>` : ''}
+                </div>
+                <button type="button" class="btn btn-outline btn-sm btn-play-prev-take" data-url="${t.storage_path}" style="font-size: 12px; padding: 2px 10px;">
+                  ▶️ Nghe
+                </button>
+              </div>
+            `).join('');
+
+            takesContainer.querySelectorAll('.btn-play-prev-take').forEach(btn => {
+              btn.addEventListener('click', async () => {
+                const rawUrl = btn.dataset.url;
+                const origText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = '⏳...';
+                try {
+                  const playUrl = await window.Student.getRecordingPlayUrl(rawUrl);
+                  const a = new Audio(playUrl);
+                  a.play();
+                  btn.textContent = '⏸️ Đang phát';
+                  a.onended = () => { btn.textContent = origText; btn.disabled = false; };
+                  a.onerror = () => { btn.textContent = 'Lỗi file'; btn.disabled = false; };
+                } catch (err) {
+                  alert('Lỗi nghe bản ghi: ' + (err.message || err));
+                  btn.textContent = origText;
+                  btn.disabled = false;
+                }
+              });
+            });
+          } catch (e) {
+            takesContainer.innerHTML = `<div style="font-size: 12px; color: var(--danger);">Không thể nạp danh sách bản ghi: ${e.message || e}</div>`;
           }
-        });
+        })();
+
+        // Gắn sự kiện nghe nhận xét giọng nói của cô giáo
+        const btnTeacherVoice = speakingPrevSubmissionInfo.querySelector('.btn-play-teacher-voice');
+        if (btnTeacherVoice) {
+          btnTeacherVoice.addEventListener('click', async () => {
+            const rawUrl = btnTeacherVoice.dataset.url;
+            const statusSpan = speakingPrevSubmissionInfo.querySelector('.teacher-voice-status');
+            btnTeacherVoice.disabled = true;
+            btnTeacherVoice.textContent = '⏳ Đang tải nhận xét...';
+            if (statusSpan) statusSpan.textContent = 'Đang tải âm thanh...';
+            try {
+              const playUrl = await window.Student.getRecordingPlayUrl(rawUrl);
+              const a = new Audio(playUrl);
+              a.play();
+              btnTeacherVoice.textContent = '⏸️ Đang nghe cô giáo...';
+              if (statusSpan) statusSpan.textContent = 'Đang phát lời nhận xét';
+              a.onended = () => {
+                btnTeacherVoice.textContent = '▶️ Nghe lại nhận xét';
+                btnTeacherVoice.disabled = false;
+                if (statusSpan) statusSpan.textContent = 'Đã nghe xong';
+              };
+              a.onerror = () => {
+                btnTeacherVoice.textContent = '▶️ Nghe cô giáo nhận xét';
+                btnTeacherVoice.disabled = false;
+                if (statusSpan) statusSpan.textContent = 'Lỗi phát file';
+              };
+            } catch (err) {
+              alert('Không thể phát file nhận xét: ' + (err.message || err));
+              btnTeacherVoice.textContent = '▶️ Nghe cô giáo nhận xét';
+              btnTeacherVoice.disabled = false;
+              if (statusSpan) statusSpan.textContent = '';
+            }
+          });
+        }
 
         const btnToggleRe = speakingPrevSubmissionInfo.querySelector('.btn-toggle-rerecord');
         if (btnToggleRe) {
@@ -664,22 +969,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       modalSpeaking.classList.add('active');
     }
 
-    function resetRecordingUi() {
-      audioBlob = null;
-      audioChunks = [];
-      recordSeconds = 0;
-      if (recorderTimer) recorderTimer.innerHTML = '00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>';
-      if (recorderStatusText) recorderStatusText.textContent = 'Nhấn nút tròn đỏ bên dưới để bắt đầu ghi âm';
-      if (btnStartRecord) btnStartRecord.style.display = 'inline-flex';
-      if (btnStopRecord) btnStopRecord.style.display = 'none';
-      if (btnReRecord) btnReRecord.style.display = 'none';
-      if (previewAudioContainer) previewAudioContainer.style.display = 'none';
-      if (btnSubmitSpeaking) {
-        btnSubmitSpeaking.disabled = true;
-        btnSubmitSpeaking.textContent = '📤 Nộp bài ghi âm';
-      }
-    }
-
     if (btnStartRecord) {
       btnStartRecord.addEventListener('click', async () => {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
@@ -690,16 +979,20 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          activeStream = stream;
           if (micPermissionGuide) micPermissionGuide.style.display = 'none';
           speakingModalAlert.className = 'alert';
           speakingModalAlert.textContent = '';
 
-          // Hỗ trợ mime types nén webm hoặc mp4
+          // Tự động nhận diện định dạng nén tương thích cao nhất
           let mimeType = 'audio/webm;codecs=opus';
           if (!MediaRecorder.isTypeSupported(mimeType)) {
-            mimeType = 'audio/mp4';
+            mimeType = 'audio/webm';
             if (!MediaRecorder.isTypeSupported(mimeType)) {
-              mimeType = '';
+              mimeType = 'audio/mp4';
+              if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = '';
+              }
             }
           }
 
@@ -707,31 +1000,75 @@ document.addEventListener('DOMContentLoaded', async function () {
           audioChunks = [];
 
           mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) audioChunks.push(e.data);
+            if (e.data && e.data.size > 0) audioChunks.push(e.data);
           };
 
           mediaRecorder.onstop = () => {
-            stream.getTracks().forEach(t => t.stop());
-            audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-            previewAudioPlayer.src = URL.createObjectURL(audioBlob);
-            previewAudioContainer.style.display = 'block';
+            if (activeStream) {
+              activeStream.getTracks().forEach(t => t.stop());
+              activeStream = null;
+            }
 
-            btnStartRecord.style.display = 'none';
-            btnStopRecord.style.display = 'none';
-            btnReRecord.style.display = 'inline-flex';
-            btnSubmitSpeaking.disabled = false;
-            recorderStatusText.textContent = 'Đã ghi âm xong! Bạn hãy nghe lại bản ghi ở dưới trước khi nộp nhé.';
+            const mime = mediaRecorder.mimeType || 'audio/webm';
+            const blob = new Blob(audioChunks, { type: mime });
+
+            // Kiểm tra dung lượng tối đa 5MB
+            if (blob.size > 5 * 1024 * 1024) {
+              alert(`Dung lượng bản ghi ${(blob.size / (1024 * 1024)).toFixed(1)}MB vượt quá giới hạn cho phép 5MB. Vui lòng ghi âm ngắn hơn.`);
+              if (btnStartRecord) btnStartRecord.style.display = 'inline-flex';
+              if (btnStopRecord) btnStopRecord.style.display = 'none';
+              if (btnCancelRecord) btnCancelRecord.style.display = 'none';
+              return;
+            }
+
+            const duration = Math.max(recordSeconds, 1);
+            const objectUrl = URL.createObjectURL(blob);
+
+            if (activeReplaceIndex >= 0 && activeReplaceIndex < recordedTakes.length) {
+              // Ghi đè thay thế bản ghi được chọn
+              if (recordedTakes[activeReplaceIndex].objectUrl) {
+                URL.revokeObjectURL(recordedTakes[activeReplaceIndex].objectUrl);
+              }
+              recordedTakes[activeReplaceIndex].blob = blob;
+              recordedTakes[activeReplaceIndex].mimeType = mime;
+              recordedTakes[activeReplaceIndex].durationSeconds = duration;
+              recordedTakes[activeReplaceIndex].objectUrl = objectUrl;
+              delete recordedTakes[activeReplaceIndex].uploadedPath;
+              activeReplaceIndex = -1;
+            } else {
+              // Thêm bản ghi mới
+              recordedTakes.push({
+                id: 'take_' + Date.now(),
+                position: recordedTakes.length + 1,
+                blob,
+                mimeType: mime,
+                durationSeconds: duration,
+                objectUrl
+              });
+            }
+
+            if (btnStartRecord) btnStartRecord.style.display = 'inline-flex';
+            if (btnStopRecord) btnStopRecord.style.display = 'none';
+            if (btnCancelRecord) btnCancelRecord.style.display = 'none';
+            if (recorderTimer) {
+              recorderTimer.innerHTML = '00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>';
+            }
+
+            renderTakesList();
           };
 
-          mediaRecorder.start(250); // Thu theo từng chunk nhỏ
+          mediaRecorder.start(250); // Thu theo từng chunk 250ms
           recordSeconds = 0;
           btnStartRecord.style.display = 'none';
           btnStopRecord.style.display = 'inline-flex';
-          btnReRecord.style.display = 'none';
-          previewAudioContainer.style.display = 'none';
-          recorderStatusText.textContent = '🔴 Đang thu âm... Hãy đọc to rõ ràng';
+          if (btnCancelRecord) btnCancelRecord.style.display = 'none';
 
-          // Bộ đếm thời gian (Tối đa 60 giây)
+          const targetLabel = activeReplaceIndex >= 0
+            ? `Bản ghi ${activeReplaceIndex + 1} (Ghi lại)`
+            : `Bản ghi ${recordedTakes.length + 1}`;
+          recorderStatusText.innerHTML = `<span style="color: var(--danger); font-weight: 700;">🔴 Đang thu âm cho ${targetLabel}... Hãy đọc to rõ ràng</span>`;
+
+          // Bộ đếm thời gian (Tối đa 60 giây mỗi bản)
           recordTimerInterval = setInterval(() => {
             recordSeconds++;
             const mm = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
@@ -782,31 +1119,71 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     if (btnSubmitSpeaking) {
       btnSubmitSpeaking.addEventListener('click', async () => {
-        if (!audioBlob || !currentSpeakingAssign) {
-          alert('Vui lòng thực hiện ghi âm trước khi nộp bài!');
+        if (!recordedTakes || recordedTakes.length === 0 || !currentSpeakingAssign) {
+          alert('Vui lòng thực hiện ít nhất 1 bản ghi âm trước khi nộp bài!');
           return;
         }
 
         try {
           btnSubmitSpeaking.disabled = true;
-          btnSubmitSpeaking.textContent = '⏳ Đang tải file ghi âm lên...';
           speakingModalAlert.className = 'alert';
           speakingModalAlert.textContent = '';
 
-          // 1. Tải file âm thanh lên bucket 'recordings' qua Storage API
           const studentId = authData.user.id;
-          const audioPath = await window.Student.uploadRecordingAudio(audioBlob, studentId);
+          const totalTakes = recordedTakes.length;
+          const uploadedTakes = [];
 
+          // 1. Tải tuần tự từng file lên Supabase Storage với chỉ báo tiến độ (có cache đường dẫn khi thử nộp lại)
+          for (let i = 0; i < totalTakes; i++) {
+            const take = recordedTakes[i];
+            btnSubmitSpeaking.textContent = `⏳ Đang tải ${i + 1}/${totalTakes} bản ghi...`;
+            speakingModalAlert.className = 'alert alert-info show';
+            speakingModalAlert.textContent = `Đang tải Bản ghi ${i + 1}/${totalTakes} lên máy chủ...`;
+
+            try {
+              if (!take.uploadedPath) {
+                const uploadRes = await window.Student.uploadRecordingAudio(
+                  take.blob,
+                  studentId,
+                  `take_${take.position || (i + 1)}`
+                );
+                take.uploadedPath = uploadRes.path;
+                take.mimeType = uploadRes.mime_type || take.mimeType;
+              }
+              uploadedTakes.push({
+                position: take.position || (i + 1),
+                storage_path: take.uploadedPath,
+                mime_type: take.mimeType || 'audio/webm',
+                duration_seconds: take.durationSeconds || 0
+              });
+            } catch (upErr) {
+              console.error(`Lỗi tải Bản ghi ${take.position || (i + 1)}:`, upErr);
+              throw new Error(`Tải Bản ghi ${take.position || (i + 1)} thất bại: ${upErr.message || upErr}. Các bản ghi của bạn vẫn được giữ nguyên, hãy bấm "Thử nộp lại".`);
+            }
+          }
+
+          // 2. Gửi danh sách tất cả các bản ghi vào database
           btnSubmitSpeaking.textContent = '⏳ Đang lưu bài nộp và nhận XP...';
+          speakingModalAlert.textContent = 'Đang hoàn tất nộp bài và cập nhật điểm thưởng...';
 
-          // 2. Gửi đường dẫn nộp bài vào database
-          const res = await window.Student.submitSpeakingAssignment(currentSpeakingAssign.id, audioPath);
+          const primaryPath = (uploadedTakes[0] && uploadedTakes[0].storage_path) ? uploadedTakes[0].storage_path : '';
+          const res = await window.Student.submitSpeakingAssignment(
+            currentSpeakingAssign.id,
+            primaryPath,
+            uploadedTakes
+          );
 
           const xpBonusText = res.xp_awarded > 0 ? ` Bạn đã được thưởng +${res.xp_awarded} XP!` : '';
           speakingModalAlert.className = 'alert alert-success show';
           speakingModalAlert.textContent = '🎉 ' + (res.message || 'Đã nộp bài ghi âm thành công!') + xpBonusText;
 
           btnSubmitSpeaking.textContent = '✅ Đã nộp thành công';
+
+          // Dọn dẹp bộ nhớ tạm
+          recordedTakes.forEach(t => {
+            if (t.objectUrl) URL.revokeObjectURL(t.objectUrl);
+          });
+          recordedTakes = [];
 
           // Cập nhật lại danh sách bài tập trên dashboard
           await loadDashboardAssignments();
@@ -839,7 +1216,7 @@ document.addEventListener('DOMContentLoaded', async function () {
           speakingModalAlert.className = 'alert alert-danger show';
           speakingModalAlert.textContent = err.message || 'Lỗi khi nộp bài ghi âm';
           btnSubmitSpeaking.disabled = false;
-          btnSubmitSpeaking.textContent = 'Thử nộp lại';
+          btnSubmitSpeaking.textContent = `Thử nộp lại (${recordedTakes.length} bản ghi)`;
         }
       });
     }
