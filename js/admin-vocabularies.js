@@ -1,5 +1,7 @@
 /**
  * LOGIC KHO TỪ VỰNG & NHẬP EXCEL / CSV (admin/vocabularies.html)
+ * Phiên bản 5.2: Phân trang phía Server (Server-Side Pagination), Tìm kiếm Debounce,
+ * Bộ lọc linh hoạt, Ghi nhớ trạng thái và Xuất file Excel
  */
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -7,15 +9,23 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (!authData) return;
   window.Auth.renderNavbarUserInfo(authData.profile);
 
-  let parsedExcelWords = [];
+  // Trạng thái phân trang & lọc
+  let currentPage = 1;
+  let pageSize = 50;
+  let totalWords = 0;
+  let totalPages = 1;
   let currentWordsList = [];
+  let parsedExcelWords = [];
+  let searchDebounceTimer = null;
 
+  // DOM Elements
   const pageAlert = document.getElementById('page-alert');
   const searchInput = document.getElementById('search-vocab-input');
   const filterHsk = document.getElementById('filter-hsk-level');
+  const filterPartOfSpeech = document.getElementById('filter-part-of-speech');
   const btnSearch = document.getElementById('btn-search-vocab');
+  const btnExportExcel = document.getElementById('btn-export-excel');
   const vocabTableBody = document.getElementById('vocab-table-body');
-  const vocabCountInfo = document.getElementById('vocab-count-info');
   const hskTabs = document.querySelectorAll('.btn-hsk-tab');
 
   // Modal Excel
@@ -63,31 +73,103 @@ document.addEventListener('DOMContentLoaded', async function () {
     importModalAlert.textContent = msg;
   }
 
-  // 1. Tải danh sách từ vựng
+  // ===========================================================================
+  // 1. QUẢN LÝ TRẠNG THÁI (SESSION STORAGE)
+  // ===========================================================================
+
+  function loadState() {
+    try {
+      const raw = sessionStorage.getItem('minhngoc_vocab_state');
+      if (raw) {
+        const state = JSON.parse(raw);
+        if (state.page && typeof state.page === 'number') currentPage = state.page;
+        if (state.pageSize && [25, 50, 100, 200].includes(state.pageSize)) pageSize = state.pageSize;
+        if (state.hskLevel !== undefined && filterHsk) filterHsk.value = state.hskLevel;
+        if (state.partOfSpeech !== undefined && filterPartOfSpeech) filterPartOfSpeech.value = state.partOfSpeech;
+        if (state.search !== undefined && searchInput) searchInput.value = state.search;
+
+        // Đồng bộ tab HSK tương ứng
+        syncHskTabs(filterHsk ? filterHsk.value : 'all');
+      }
+    } catch (e) {
+      console.warn('Không thể đọc trạng thái từ sessionStorage:', e);
+    }
+  }
+
+  function saveState() {
+    try {
+      sessionStorage.setItem('minhngoc_vocab_state', JSON.stringify({
+        page: currentPage,
+        pageSize: pageSize,
+        hskLevel: filterHsk ? filterHsk.value : 'all',
+        partOfSpeech: filterPartOfSpeech ? filterPartOfSpeech.value : 'all',
+        search: searchInput ? searchInput.value : ''
+      }));
+    } catch (e) {
+      console.warn('Không thể lưu trạng thái vào sessionStorage:', e);
+    }
+  }
+
+  function syncHskTabs(level) {
+    hskTabs.forEach(tab => {
+      if (tab.getAttribute('data-level') === String(level)) {
+        tab.classList.add('active');
+      } else {
+        tab.classList.remove('active');
+      }
+    });
+  }
+
+  // ===========================================================================
+  // 2. TẢI DANH SÁCH TỪ VỰNG PHÍA SERVER (SERVER-SIDE PAGINATION)
+  // ===========================================================================
+
   async function loadVocabulariesList() {
     try {
       vocabTableBody.innerHTML = `
-        <tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">
-          Đang tải danh sách từ vựng...
+        <tr><td colspan="7" style="text-align: center; padding: 40px 16px; color: var(--text-muted);">
+          <div style="font-size: 26px; margin-bottom: 8px;">⏳</div>
+          <div style="font-size: 14px; font-weight: 500;">Đang tải danh sách từ vựng (Trang ${currentPage})...</div>
         </td></tr>
       `;
 
-      const search = searchInput.value.trim();
-      const hskLevel = filterHsk.value;
+      const search = searchInput ? searchInput.value.trim() : '';
+      const hskLevel = filterHsk ? filterHsk.value : 'all';
+      const partOfSpeech = filterPartOfSpeech ? filterPartOfSpeech.value : 'all';
 
       const result = await window.Admin.getVocabularies({
         search,
         hskLevel,
-        limit: 150
+        partOfSpeech,
+        limit: pageSize,
+        page: currentPage
       });
 
+      totalWords = result.total || 0;
+      totalPages = result.totalPages || 1;
       currentWordsList = result.data || [];
-      vocabCountInfo.textContent = `Hiển thị ${currentWordsList.length} / tổng số ${result.total || currentWordsList.length} từ`;
 
+      // Nếu trang hiện tại bị rỗng do xóa từ hoặc đổi bộ lọc, tự động lùi về trang hợp lệ cuối cùng
+      if (currentPage > totalPages && totalPages > 0) {
+        currentPage = totalPages;
+        saveState();
+        return loadVocabulariesList();
+      }
+
+      // 1. Cập nhật giao diện phân trang (trên và dưới bảng)
+      renderPagination();
+
+      // 2. Hiển thị dữ liệu bảng
       if (currentWordsList.length === 0) {
         vocabTableBody.innerHTML = `
-          <tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">
-            Không tìm thấy từ vựng nào phù hợp. Bạn có thể nhấn <strong>"Nhập từ file Excel"</strong> hoặc <strong>"Thêm từ thủ công"</strong>!
+          <tr><td colspan="7" style="text-align: center; padding: 48px 16px; color: var(--text-muted);">
+            <div style="font-size: 36px; margin-bottom: 10px;">🔍</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+              Không tìm thấy từ vựng nào phù hợp
+            </div>
+            <div style="font-size: 13px;">
+              Thử tìm kiếm với từ khóa khác, chọn cấp độ HSK khác hoặc bấm <strong>"Nhập từ file Excel"</strong> để bổ sung!
+            </div>
           </td></tr>
         `;
         return;
@@ -99,7 +181,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             ${w.hanzi}
           </td>
           <td style="font-size: 15px; font-weight: 600; color: var(--text-muted);">${w.pinyin}</td>
-          <td>${w.meaning_vi}</td>
+          <td style="font-weight: 500;">${w.meaning_vi}</td>
           <td><span class="badge-hsk badge-hsk-${w.hsk_level}">HSK ${w.hsk_level}</span></td>
           <td><span style="font-size: 12px; color: var(--text-muted);">${w.part_of_speech || '--'}</span></td>
           <td style="font-size: 13px;">
@@ -122,67 +204,315 @@ document.addEventListener('DOMContentLoaded', async function () {
         </tr>
       `).join('');
 
-      // Gắn sự kiện phát âm
-      document.querySelectorAll('.btn-speak-word').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const hanzi = btn.getAttribute('data-hanzi');
-          window.XP.speakChinese(hanzi);
-        });
-      });
-
-      // Gắn sự kiện sửa từ
-      document.querySelectorAll('.btn-edit-word').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const id = btn.getAttribute('data-id');
-          openEditVocabModal(id);
-        });
-      });
-
-      // Gắn sự kiện xóa từ
-      document.querySelectorAll('.btn-delete-word').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const id = btn.getAttribute('data-id');
-          const hanzi = btn.getAttribute('data-hanzi');
-          openDeleteVocabModal(id, hanzi);
-        });
-      });
+      // Gắn sự kiện các nút trên từng dòng
+      bindRowActions();
 
     } catch (err) {
-      console.error('Lỗi tải từ vựng:', err);
-      vocabTableBody.innerHTML = `<tr><td colspan="7" style="color: red; text-align: center;">Lỗi tải dữ liệu</td></tr>`;
+      console.error('Lỗi tải danh sách từ vựng:', err);
+      vocabTableBody.innerHTML = `
+        <tr><td colspan="7" style="text-align: center; padding: 36px 16px; color: var(--danger);">
+          <div style="font-size: 28px; margin-bottom: 8px;">⚠️</div>
+          <div style="font-weight: 700; font-size: 15px; margin-bottom: 6px;">Không thể tải danh sách từ vựng</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">${err.message || 'Lỗi kết nối cơ sở dữ liệu'}</div>
+          <button type="button" class="btn btn-outline btn-sm btn-retry-vocab" style="margin: 0 auto; display: inline-flex; align-items: center; gap: 6px;">
+            🔄 Thử lại
+          </button>
+        </td></tr>
+      `;
+      const btnRetry = vocabTableBody.querySelector('.btn-retry-vocab');
+      if (btnRetry) btnRetry.addEventListener('click', loadVocabulariesList);
     }
   }
 
-  // Sự kiện Tabs lọc HSK nhanh
+  // ===========================================================================
+  // 3. RENDER & ĐIỀU KHIỂN THANH PHÂN TRANG (TOP & BOTTOM)
+  // ===========================================================================
+
+  function renderPagination() {
+    const from = totalWords === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const to = Math.min(currentPage * pageSize, totalWords);
+    const infoText = totalWords === 0
+      ? 'Không có từ vựng nào'
+      : `Hiển thị <strong>${from}–${to}</strong> / tổng số <strong>${totalWords.toLocaleString('vi-VN')}</strong> từ (Trang ${currentPage}/${totalPages})`;
+
+    // 1. Cập nhật text thống kê số dòng
+    document.querySelectorAll('.vocab-page-info').forEach(el => {
+      el.innerHTML = infoText;
+    });
+
+    // 2. Đồng bộ giá trị chọn số dòng mỗi trang
+    document.querySelectorAll('.select-page-size').forEach(sel => {
+      sel.value = String(pageSize);
+    });
+
+    // 3. Tạo danh sách các nút số trang (rút gọn với dấu ba chấm ...)
+    const pagerHtml = buildPagerButtonsHtml(currentPage, totalPages);
+    document.querySelectorAll('.vocab-pager').forEach(p => {
+      p.innerHTML = pagerHtml;
+    });
+
+    // 4. Đồng bộ ô nhập nhảy trang
+    document.querySelectorAll('.input-jump-page').forEach(inp => {
+      inp.value = currentPage;
+      inp.max = totalPages;
+    });
+
+    // 5. Gắn lại sự kiện cho các nút pager
+    bindPagerEvents();
+  }
+
+  function buildPagerButtonsHtml(page, total) {
+    if (total <= 1) {
+      return `
+        <button type="button" class="pager-btn" disabled title="Trang đầu">«</button>
+        <button type="button" class="pager-btn" disabled title="Trang trước">‹</button>
+        <button type="button" class="pager-btn active">1</button>
+        <button type="button" class="pager-btn" disabled title="Trang sau">›</button>
+        <button type="button" class="pager-btn" disabled title="Trang cuối">»</button>
+      `;
+    }
+
+    const isFirstDisabled = page <= 1;
+    const isLastDisabled = page >= total;
+
+    let html = `
+      <button type="button" class="pager-btn btn-pager-first" data-page="1" ${isFirstDisabled ? 'disabled' : ''} title="Trang đầu (Trang 1)">«</button>
+      <button type="button" class="pager-btn btn-pager-prev" data-page="${page - 1}" ${isFirstDisabled ? 'disabled' : ''} title="Trang trước">‹</button>
+    `;
+
+    // Tính toán số trang hiển thị dạng: 1 ... 4 5 6 ... 10
+    const pages = getPageNumbersList(page, total);
+    pages.forEach(p => {
+      if (p === '...') {
+        html += `<span class="pager-ellipsis">…</span>`;
+      } else {
+        const isActive = (p === page);
+        html += `
+          <button type="button" class="pager-btn btn-pager-num ${isActive ? 'active' : ''}" data-page="${p}">
+            ${p}
+          </button>
+        `;
+      }
+    });
+
+    html += `
+      <button type="button" class="pager-btn btn-pager-next" data-page="${page + 1}" ${isLastDisabled ? 'disabled' : ''} title="Trang sau">›</button>
+      <button type="button" class="pager-btn btn-pager-last" data-page="${total}" ${isLastDisabled ? 'disabled' : ''} title="Trang cuối (Trang ${total})">»</button>
+    `;
+
+    return html;
+  }
+
+  function getPageNumbersList(page, total) {
+    if (total <= 7) {
+      const list = [];
+      for (let i = 1; i <= total; i++) list.push(i);
+      return list;
+    }
+
+    if (page <= 4) {
+      return [1, 2, 3, 4, 5, '...', total];
+    }
+
+    if (page >= total - 3) {
+      return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    }
+
+    return [1, '...', page - 1, page, page + 1, '...', total];
+  }
+
+  function bindPagerEvents() {
+    // Nút chuyển trang (First, Prev, Next, Last, Số trang)
+    document.querySelectorAll('.vocab-pager .pager-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetPage = parseInt(btn.dataset.page, 10);
+        if (targetPage && targetPage !== currentPage && targetPage >= 1 && targetPage <= totalPages) {
+          currentPage = targetPage;
+          saveState();
+          loadVocabulariesList();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+    });
+  }
+
+  // Gắn sự kiện thay đổi số dòng mỗi trang (.select-page-size)
+  document.querySelectorAll('.select-page-size').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const newLimit = parseInt(e.target.value, 10);
+      if ([25, 50, 100, 200].includes(newLimit)) {
+        pageSize = newLimit;
+        currentPage = 1;
+        saveState();
+        loadVocabulariesList();
+      }
+    });
+  });
+
+  // Gắn sự kiện ô nhập nhảy trang (.input-jump-page)
+  document.querySelectorAll('.btn-jump-page').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const container = e.target.closest('.vocab-jump');
+      const inp = container ? container.querySelector('.input-jump-page') : null;
+      if (!inp) return;
+      const jumpVal = parseInt(inp.value, 10);
+      if (jumpVal && jumpVal >= 1 && jumpVal <= totalPages && jumpVal !== currentPage) {
+        currentPage = jumpVal;
+        saveState();
+        loadVocabulariesList();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  });
+
+  document.querySelectorAll('.input-jump-page').forEach(inp => {
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const jumpVal = parseInt(inp.value, 10);
+        if (jumpVal && jumpVal >= 1 && jumpVal <= totalPages && jumpVal !== currentPage) {
+          currentPage = jumpVal;
+          saveState();
+          loadVocabulariesList();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
+    });
+  });
+
+  // ===========================================================================
+  // 4. BỘ LỌC & TÌM KIẾM CÓ DEBOUNCE 300MS
+  // ===========================================================================
+
+  // Tìm kiếm với Debounce 300ms
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      currentPage = 1;
+      saveState();
+      loadVocabulariesList();
+    }, 300);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      clearTimeout(searchDebounceTimer);
+      currentPage = 1;
+      saveState();
+      loadVocabulariesList();
+    }
+  });
+
+  btnSearch.addEventListener('click', () => {
+    clearTimeout(searchDebounceTimer);
+    currentPage = 1;
+    saveState();
+    loadVocabulariesList();
+  });
+
+  // Lọc theo Cấp độ HSK (Dropdown)
+  filterHsk.addEventListener('change', () => {
+    syncHskTabs(filterHsk.value);
+    currentPage = 1;
+    saveState();
+    loadVocabulariesList();
+  });
+
+  // Lọc theo Cấp độ HSK (Dải Tabs chọn nhanh)
   hskTabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const level = tab.getAttribute('data-level');
-      hskTabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
       filterHsk.value = level;
+      syncHskTabs(level);
+      currentPage = 1;
+      saveState();
       loadVocabulariesList();
     });
   });
 
-  // Sự kiện tìm kiếm & lọc dropdown
-  btnSearch.addEventListener('click', loadVocabulariesList);
-  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadVocabulariesList(); });
-  filterHsk.addEventListener('change', () => {
-    const val = filterHsk.value;
-    hskTabs.forEach(t => {
-      if (t.getAttribute('data-level') === val) {
-        t.classList.add('active');
-      } else {
-        t.classList.remove('active');
+  // Lọc theo Từ loại (Danh từ, Động từ, Tính từ...)
+  if (filterPartOfSpeech) {
+    filterPartOfSpeech.addEventListener('change', () => {
+      currentPage = 1;
+      saveState();
+      loadVocabulariesList();
+    });
+  }
+
+  // ===========================================================================
+  // 5. XUẤT TOÀN BỘ KHO TỪ VỰNG RA EXCEL / CSV
+  // ===========================================================================
+
+  if (btnExportExcel) {
+    btnExportExcel.addEventListener('click', async () => {
+      try {
+        btnExportExcel.disabled = true;
+        btnExportExcel.innerHTML = '⏳ Đang kết xuất Excel...';
+
+        const search = searchInput ? searchInput.value.trim() : '';
+        const hskLevel = filterHsk ? filterHsk.value : 'all';
+        const partOfSpeech = filterPartOfSpeech ? filterPartOfSpeech.value : 'all';
+
+        const res = await window.Admin.exportVocabulariesToExcel({
+          search,
+          hskLevel,
+          partOfSpeech
+        });
+
+        showAlert(`🎉 Đã xuất thành công ${res.count.toLocaleString('vi-VN')} từ vựng ra file "${res.fileName}"!`, 'success');
+
+      } catch (err) {
+        console.error('Lỗi xuất Excel:', err);
+        showAlert('Lỗi khi xuất file Excel: ' + (err.message || err), 'danger');
+      } finally {
+        btnExportExcel.disabled = false;
+        btnExportExcel.innerHTML = '📤 Xuất file Excel';
       }
     });
-    loadVocabulariesList();
-  });
+  }
 
-  // 2. Thêm mới từ thủ công
+  // ===========================================================================
+  // 6. GẮN SỰ KIỆN PHÁT ÂM, SỬA, XÓA TRÊN TỪNG DÒNG
+  // ===========================================================================
+
+  function bindRowActions() {
+    // Phát âm chữ Hán
+    document.querySelectorAll('.btn-speak-word').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const hanzi = btn.getAttribute('data-hanzi');
+        if (window.XP && typeof window.XP.speakChinese === 'function') {
+          window.XP.speakChinese(hanzi);
+        } else if (typeof window.speakChinese === 'function') {
+          window.speakChinese(hanzi);
+        }
+      });
+    });
+
+    // Mở modal sửa từ
+    document.querySelectorAll('.btn-edit-word').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        openEditVocabModal(id);
+      });
+    });
+
+    // Mở modal xóa từ
+    document.querySelectorAll('.btn-delete-word').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const hanzi = btn.getAttribute('data-hanzi');
+        openDeleteVocabModal(id, hanzi);
+      });
+    });
+  }
+
+  // ===========================================================================
+  // 7. THÊM MỚI & SỬA TỪ THỦ CÔNG
+  // ===========================================================================
+
   btnOpenCreateVocab.addEventListener('click', () => {
     createVocabAlert.className = 'alert';
     createVocabAlert.textContent = '';
@@ -193,7 +523,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     modalCreateVocab.classList.add('active');
   });
 
-  // Mở modal Chỉnh sửa từ vựng
   function openEditVocabModal(id) {
     const word = currentWordsList.find(w => w.id === id);
     if (!word) return;
@@ -220,7 +549,64 @@ document.addEventListener('DOMContentLoaded', async function () {
     b.addEventListener('click', () => modalCreateVocab.classList.remove('active'));
   });
 
-  // Mở modal Xóa từ vựng khỏi kho
+  formCreateVocab.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const vocabId = inputVocabId.value.trim();
+    const hanzi = document.getElementById('v-hanzi').value.trim();
+    const pinyin = document.getElementById('v-pinyin').value.trim();
+    const meaningVi = document.getElementById('v-meaning').value.trim();
+    const hskLevel = parseInt(document.getElementById('v-hsk').value, 10) || 1;
+    const partOfSpeech = document.getElementById('v-pos').value.trim();
+    const exampleHanzi = document.getElementById('v-ex-hanzi').value.trim();
+    const exampleVi = document.getElementById('v-ex-vi').value.trim();
+
+    try {
+      btnSubmitVocab.disabled = true;
+      btnSubmitVocab.textContent = 'Đang xử lý...';
+
+      if (vocabId) {
+        // Cập nhật từ vựng
+        await window.Admin.updateVocabulary(vocabId, {
+          hanzi,
+          pinyin,
+          meaningVi,
+          hskLevel,
+          partOfSpeech,
+          exampleHanzi,
+          exampleVi
+        });
+        showAlert(`Đã cập nhật từ vựng "${hanzi}" (HSK ${hskLevel}) thành công!`, 'success');
+      } else {
+        // Thêm mới từ vựng
+        await window.Admin.createVocabulary({
+          hanzi,
+          pinyin,
+          meaningVi,
+          hskLevel,
+          partOfSpeech,
+          exampleHanzi,
+          exampleVi
+        });
+        showAlert(`Đã thêm từ "${hanzi}" (HSK ${hskLevel}) vào kho từ vựng!`, 'success');
+      }
+
+      modalCreateVocab.classList.remove('active');
+      saveState();
+      await loadVocabulariesList();
+
+    } catch (err) {
+      createVocabAlert.className = 'alert alert-danger show';
+      createVocabAlert.textContent = err.message || 'Lỗi khi lưu từ vựng';
+    } finally {
+      btnSubmitVocab.disabled = false;
+      btnSubmitVocab.textContent = vocabId ? 'Cập nhật thay đổi' : 'Lưu từ vựng';
+    }
+  });
+
+  // ===========================================================================
+  // 8. XÓA TỪ VỰNG KHỎI KHO
+  // ===========================================================================
+
   async function openDeleteVocabModal(id, hanzi) {
     pendingDeleteVocabId = id;
     deleteVocabHanzi.textContent = `"${hanzi}"`;
@@ -272,6 +658,15 @@ document.addEventListener('DOMContentLoaded', async function () {
       await window.Admin.deleteVocabulary(pendingDeleteVocabId);
       modalDeleteVocab.classList.remove('active');
       showAlert(`Đã xóa vĩnh viễn từ vựng khỏi kho thành công!`, 'success');
+
+      // Nếu xóa làm trang hiện tại vượt quá số trang mới, lùi lại 1 trang
+      const newTotal = Math.max(0, totalWords - 1);
+      const newMaxPages = Math.ceil(newTotal / pageSize) || 1;
+      if (currentPage > newMaxPages) {
+        currentPage = newMaxPages;
+      }
+
+      saveState();
       await loadVocabulariesList();
 
     } catch (err) {
@@ -282,61 +677,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   });
 
-  // Submit Form Thêm hoặc Sửa từ vựng
-  formCreateVocab.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const vocabId = inputVocabId.value.trim();
-    const hanzi = document.getElementById('v-hanzi').value.trim();
-    const pinyin = document.getElementById('v-pinyin').value.trim();
-    const meaningVi = document.getElementById('v-meaning').value.trim();
-    const hskLevel = parseInt(document.getElementById('v-hsk').value, 10) || 1;
-    const partOfSpeech = document.getElementById('v-pos').value.trim();
-    const exampleHanzi = document.getElementById('v-ex-hanzi').value.trim();
-    const exampleVi = document.getElementById('v-ex-vi').value.trim();
+  // ===========================================================================
+  // 9. NHẬP EXCEL / CSV BẰNG SHEETJS
+  // ===========================================================================
 
-    try {
-      btnSubmitVocab.disabled = true;
-      btnSubmitVocab.textContent = 'Đang xử lý...';
-
-      if (vocabId) {
-        // Cập nhật từ vựng
-        await window.Admin.updateVocabulary(vocabId, {
-          hanzi,
-          pinyin,
-          meaningVi,
-          hskLevel,
-          partOfSpeech,
-          exampleHanzi,
-          exampleVi
-        });
-        showAlert(`Đã cập nhật từ vựng "${hanzi}" (HSK ${hskLevel}) thành công!`, 'success');
-      } else {
-        // Thêm mới từ vựng
-        await window.Admin.createVocabulary({
-          hanzi,
-          pinyin,
-          meaningVi,
-          hskLevel,
-          partOfSpeech,
-          exampleHanzi,
-          exampleVi
-        });
-        showAlert(`Đã thêm từ "${hanzi}" (HSK ${hskLevel}) vào kho từ vựng!`, 'success');
-      }
-
-      modalCreateVocab.classList.remove('active');
-      await loadVocabulariesList();
-
-    } catch (err) {
-      createVocabAlert.className = 'alert alert-danger show';
-      createVocabAlert.textContent = err.message || 'Lỗi khi lưu từ vựng';
-    } finally {
-      btnSubmitVocab.disabled = false;
-      btnSubmitVocab.textContent = vocabId ? 'Cập nhật thay đổi' : 'Lưu từ vựng';
-    }
-  });
-
-  // 3. Xử lý Modal Import Excel / CSV
   btnOpenImportExcel.addEventListener('click', async () => {
     importModalAlert.className = 'alert';
     importModalAlert.textContent = '';
@@ -345,13 +689,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     parsedExcelWords = [];
     modalImportExcel.classList.add('active');
 
-    // Tải dropdown giáo trình nếu chưa có
+    // Tải danh sách giáo trình nếu chưa có
     try {
       const curriculums = await window.Admin.getCurriculums();
-      selectAssignCurriculum.innerHTML = '<option value="">-- Không gán bài (Chỉ lưu vào kho) --</option>' +
-        curriculums.map(c => `<option value="${c.id}">${c.title} (${c.level})</option>`).join('');
+      selectAssignCurriculum.innerHTML = '<option value="">-- Không gán (chỉ lưu vào kho chung) --</option>';
+      (curriculums || []).forEach(c => {
+        selectAssignCurriculum.innerHTML += `<option value="${c.id}">${c.title} (${c.level})</option>`;
+      });
+      selectAssignLesson.innerHTML = '<option value="">-- Hãy chọn giáo trình trước --</option>';
+      selectAssignLesson.disabled = true;
     } catch (e) {
-      console.warn('Lỗi tải giáo trình trong import modal:', e);
+      console.warn('Lỗi tải giáo trình cho modal import:', e);
     }
   });
 
@@ -359,33 +707,38 @@ document.addEventListener('DOMContentLoaded', async function () {
     b.addEventListener('click', () => modalImportExcel.classList.remove('active'));
   });
 
-  // Khi chọn giáo trình -> tải danh sách bài học
   selectAssignCurriculum.addEventListener('change', async function () {
-    const currId = selectAssignCurriculum.value;
-    if (!currId) {
-      selectAssignLesson.innerHTML = '<option value="">-- Chọn bài học --</option>';
+    const curId = selectAssignCurriculum.value;
+    if (!curId) {
+      selectAssignLesson.innerHTML = '<option value="">-- Không gán vào bài học --</option>';
       selectAssignLesson.disabled = true;
       return;
     }
 
     try {
-      const lessons = await window.Admin.getLessonsByCurriculum(currId);
+      selectAssignLesson.disabled = true;
+      selectAssignLesson.innerHTML = '<option value="">Đang nạp bài học...</option>';
+      const lessons = await window.Admin.getLessons(curId);
+
       if (!lessons || lessons.length === 0) {
-        selectAssignLesson.innerHTML = '<option value="">-- Giáo trình này chưa có bài học --</option>';
+        selectAssignLesson.innerHTML = '<option value="">(Giáo trình này chưa có bài học nào)</option>';
         selectAssignLesson.disabled = true;
         return;
       }
-      selectAssignLesson.innerHTML = lessons.map(l => `
-        <option value="${l.id}">Bài ${l.order_index}: ${l.title_zh} (${l.title_vi})</option>
-      `).join('');
+
+      selectAssignLesson.innerHTML = '<option value="">-- Chọn bài học cụ thể --</option>';
+      lessons.forEach(l => {
+        selectAssignLesson.innerHTML += `
+          <option value="${l.id}">Bài ${l.order_index}: ${l.title_zh} (${l.title_vi})</option>
+        `;
+      });
       selectAssignLesson.disabled = false;
     } catch (e) {
       selectAssignLesson.innerHTML = '<option value="">Lỗi tải bài học</option>';
-      selectAssignLesson.disabled = true;
     }
   });
 
-  // Drag & drop hoặc chọn file
+  // Kéo thả và Chọn file Excel
   excelDropzone.addEventListener('click', () => excelFileInput.click());
 
   excelDropzone.addEventListener('dragover', (e) => {
@@ -400,23 +753,20 @@ document.addEventListener('DOMContentLoaded', async function () {
   excelDropzone.addEventListener('drop', (e) => {
     e.preventDefault();
     excelDropzone.classList.remove('dragover');
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleSelectedExcelFile(e.dataTransfer.files[0]);
     }
   });
 
   excelFileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files.length > 0) {
+    if (e.target.files && e.target.files[0]) {
       handleSelectedExcelFile(e.target.files[0]);
     }
   });
 
-  /**
-   * Đọc và phân tích file Excel / CSV bằng SheetJS
-   */
   function handleSelectedExcelFile(file) {
     if (!window.XLSX) {
-      showImportAlert('Thư viện SheetJS chưa được tải. Vui lòng kiểm tra kết nối mạng!');
+      showImportAlert('Thư viện SheetJS chưa được nạp, vui lòng tải lại trang!');
       return;
     }
 
@@ -428,7 +778,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
 
-        // Chuyển sheet sang dạng JSON
         const rawRows = window.XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
         if (!rawRows || rawRows.length === 0) {
@@ -436,15 +785,13 @@ document.addEventListener('DOMContentLoaded', async function () {
           return;
         }
 
-        // Chuẩn hóa tên cột linh hoạt
         parsedExcelWords = normalizeExcelRows(rawRows);
 
         if (parsedExcelWords.length === 0) {
-          showImportAlert('Không tìm thấy dữ liệu hợp lệ! Vui lòng đảm bảo file có cột chứa chữ Hán (hanzi), pinyin và nghĩa.');
+          showImportAlert('Không tìm thấy từ vựng hợp lệ nào trong file! Hãy đảm bảo có cột Chữ Hán (hanzi), Pinyin và Nghĩa.');
           return;
         }
 
-        // Hiển thị preview 5 dòng đầu
         renderExcelPreview(parsedExcelWords);
 
       } catch (err) {
@@ -455,76 +802,64 @@ document.addEventListener('DOMContentLoaded', async function () {
     reader.readAsArrayBuffer(file);
   }
 
-  /**
-   * Chuẩn hóa dữ liệu dòng từ các tiêu đề cột tiếng Việt hoặc tiếng Anh
-   * Hỗ trợ đầy đủ cấp độ HSK 1 đến HSK 9
-   */
   function normalizeExcelRows(rows) {
-    const normalized = [];
-
-    for (const row of rows) {
-      // Tìm khóa tương ứng
-      const keys = Object.keys(row);
-      const findVal = (keywords) => {
+    return rows.map(r => {
+      const getVal = (keys) => {
         for (const k of keys) {
-          const lower = k.trim().toLowerCase();
-          if (keywords.some(kw => lower === kw || lower.includes(kw))) {
-            return String(row[k]).trim();
+          for (const rowKey in r) {
+            if (rowKey.trim().toLowerCase() === k.toLowerCase()) {
+              return String(r[rowKey]).trim();
+            }
           }
         }
         return '';
       };
 
-      const hanzi = findVal(['hanzi', 'chữ hán', 'chu han', 'chuhan', 'từ vựng', 'tu vung', 'word']);
-      const pinyin = findVal(['pinyin', 'phiên âm', 'phien am']);
-      const meaningVi = findVal(['meaning_vi', 'meaning', 'nghĩa', 'nghia', 'ý nghĩa', 'dịch']);
-      const hskVal = findVal(['hsk_level', 'hsk', 'cấp độ', 'cap do', 'level']);
-      const pos = findVal(['part_of_speech', 'từ loại', 'tu loai', 'loại từ']);
-      const exHanzi = findVal(['example_hanzi', 'ví dụ', 'vi du', 'câu ví dụ']);
-      const exVi = findVal(['example_vi', 'dịch ví dụ', 'nghĩa ví dụ']);
+      const hanzi = getVal(['hanzi', 'chữ hán', 'chuhan', 'từ vựng', 'tu vung', 'word', 'chinese']);
+      const pinyin = getVal(['pinyin', 'phiên âm', 'phien am', 'bính âm']);
+      const meaningVi = getVal(['meaning_vi', 'nghĩa', 'nghia', 'nghĩa tiếng việt', 'dịch nghĩa', 'meaning']);
+      let hskLevel = parseInt(getVal(['hsk_level', 'hsk', 'cấp độ', 'cap do', 'level']), 10);
+      if (isNaN(hskLevel) || hskLevel < 1 || hskLevel > 9) hskLevel = 1;
 
-      const rawHsk = hskVal ? hskVal.replace(/[^0-9]/g, '') : '';
-      let parsedHsk = parseInt(rawHsk, 10);
-      if (isNaN(parsedHsk) || parsedHsk < 1 || parsedHsk > 9) {
-        parsedHsk = 1;
-      }
+      const partOfSpeech = getVal(['part_of_speech', 'từ loại', 'tu loai', 'pos', 'type']);
+      const exampleHanzi = getVal(['example_hanzi', 'ví dụ', 'vi du', 'câu ví dụ', 'example']);
+      const examplePinyin = getVal(['example_pinyin', 'phiên âm ví dụ', 'pinyin ví dụ']);
+      const exampleVi = getVal(['example_vi', 'nghĩa ví dụ', 'dịch ví dụ', 'nghĩa câu']);
 
-      if (hanzi && (meaningVi || pinyin)) {
-        normalized.push({
-          hanzi: hanzi,
-          pinyin: pinyin || '',
-          meaning_vi: meaningVi || '(Chưa có nghĩa)',
-          hsk_level: parsedHsk,
-          part_of_speech: pos || null,
-          example_hanzi: exHanzi || null,
-          example_vi: exVi || null
-        });
-      }
-    }
+      if (!hanzi || !pinyin || !meaningVi) return null;
 
-    return normalized;
+      return {
+        hanzi,
+        pinyin,
+        meaning_vi: meaningVi,
+        hsk_level: hskLevel,
+        part_of_speech: partOfSpeech || null,
+        example_hanzi: exampleHanzi || null,
+        example_pinyin: examplePinyin || null,
+        example_vi: exampleVi || null
+      };
+    }).filter(Boolean);
   }
 
   function renderExcelPreview(words) {
+    previewContainer.style.display = 'block';
     previewCount.textContent = words.length;
-    const preview5 = words.slice(0, 5);
 
-    previewTableBody.innerHTML = preview5.map(w => `
+    const previewRows = words.slice(0, 10);
+    previewTableBody.innerHTML = previewRows.map(w => `
       <tr>
-        <td style="font-weight: 700; color: var(--primary);">${w.hanzi}</td>
+        <td style="font-weight: 700; color: var(--primary); font-size: 16px;">${w.hanzi}</td>
         <td>${w.pinyin}</td>
         <td>${w.meaning_vi}</td>
         <td><span class="badge-hsk badge-hsk-${w.hsk_level}">HSK ${w.hsk_level}</span></td>
+        <td>${w.part_of_speech || '--'}</td>
       </tr>
     `).join('');
 
-    previewContainer.style.display = 'block';
     btnConfirmImport.disabled = false;
-    importModalAlert.className = 'alert alert-success show';
-    importModalAlert.textContent = `✅ Đã đọc thành công ${words.length} từ vựng từ file! Nhấn nút bên dưới để tiến hành nhập.`;
+    btnConfirmImport.textContent = `🚀 Bắt đầu Nhập ${words.length} Từ Vựng`;
   }
 
-  // 4. Bắt đầu Import vào Database
   btnConfirmImport.addEventListener('click', async function () {
     if (!parsedExcelWords || parsedExcelWords.length === 0) return;
 
@@ -538,6 +873,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       modalImportExcel.classList.remove('active');
       showAlert(`🎉 Đã nhập thành công ${parsedExcelWords.length} từ vựng vào kho!`, 'success');
+
+      // Tải lại trang 1 để xem các từ mới nhập
+      currentPage = 1;
+      saveState();
       await loadVocabulariesList();
 
     } catch (err) {
@@ -570,6 +909,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // Tải danh sách từ ban đầu
+  // ===========================================================================
+  // 10. KHỞI CHẠY BAN ĐẦU
+  // ===========================================================================
+
+  loadState();
   await loadVocabulariesList();
 });

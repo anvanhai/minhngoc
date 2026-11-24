@@ -98,6 +98,47 @@
     html[data-theme="dark"] .theme-switch-icon.moon-icon, body[data-theme="dark"] .theme-switch-icon.moon-icon, .theme-switch.is-dark .theme-switch-icon.moon-icon {
       opacity: 1 !important;
     }
+
+    /* Phong cách nút phân trang Pager */
+    .pager-btn {
+      height: 32px;
+      min-width: 32px;
+      padding: 0 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--border-color, #cbd5e1);
+      background: var(--bg-card, #ffffff);
+      color: var(--text-main, #0f172a);
+      border-radius: var(--radius-sm, 6px);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .pager-btn:hover:not(:disabled) {
+      background: var(--bg-subtle, #f1f5f9);
+      border-color: var(--primary, #2563eb);
+      color: var(--primary, #2563eb);
+    }
+    .pager-btn.active {
+      background: var(--primary, #2563eb) !important;
+      border-color: var(--primary, #2563eb) !important;
+      color: #ffffff !important;
+      pointer-events: none;
+    }
+    .pager-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .pager-ellipsis {
+      padding: 0 4px;
+      color: var(--text-muted, #64748b);
+      font-size: 13px;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
@@ -147,6 +188,9 @@
         </p>
       </div>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="button" id="btn-export-excel" class="btn btn-outline" style="display: inline-flex; align-items: center; gap: 6px;">
+          📤 Xuất file Excel
+        </button>
         <button type="button" id="btn-open-import-excel" class="btn btn-primary">
           📥 Nhập từ file Excel / CSV
         </button>
@@ -187,6 +231,24 @@
           </select>
         </div>
 
+        <div style="min-width: 140px;">
+          <select id="filter-part-of-speech" class="form-control" style="height: 40px;">
+            <option value="all">Tất cả từ loại</option>
+            <option value="Danh từ">Danh từ</option>
+            <option value="Động từ">Động từ</option>
+            <option value="Tính từ">Tính từ</option>
+            <option value="Đại từ">Đại từ</option>
+            <option value="Số từ">Số từ</option>
+            <option value="Lượng từ">Lượng từ</option>
+            <option value="Phó từ">Phó từ</option>
+            <option value="Giới từ">Giới từ</option>
+            <option value="Liên từ">Liên từ</option>
+            <option value="Trợ từ">Trợ từ</option>
+            <option value="Thán từ">Thán từ</option>
+            <option value="Thành ngữ">Thành ngữ</option>
+          </select>
+        </div>
+
         <button type="button" id="btn-search-vocab" class="btn btn-secondary btn-sm" style="height: 40px;">
           Tìm kiếm
         </button>
@@ -205,6 +267,25 @@
       <button type="button" class="btn-hsk-tab" data-level="7">HSK 7</button>
       <button type="button" class="btn-hsk-tab" data-level="8">HSK 8</button>
       <button type="button" class="btn-hsk-tab" data-level="9">HSK 9</button>
+    </div>
+
+    <!-- Thanh phân trang trên bảng -->
+    <div class="vocab-pagination-bar" id="vocab-pagination-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+      <div class="vocab-page-info" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">
+        Hiển thị 0 / tổng số 0 từ
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted);">
+          <span>Số dòng:</span>
+          <select class="form-control select-page-size" style="height: 32px; padding: 2px 8px; font-size: 13px; width: 95px;">
+            <option value="25">25 / trang</option>
+            <option value="50" selected>50 / trang</option>
+            <option value="100">100 / trang</option>
+            <option value="200">200 / trang</option>
+          </select>
+        </div>
+        <div class="vocab-pager" style="display: inline-flex; align-items: center; gap: 4px;"></div>
+      </div>
     </div>
 
     <!-- Bảng danh sách từ vựng -->
@@ -231,8 +312,30 @@
       </table>
     </div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 13px; color: var(--text-muted);">
-      <span id="vocab-count-info">Hiển thị 0 từ</span>
+    <!-- Thanh phân trang dưới bảng -->
+    <div class="vocab-pagination-bar" id="vocab-pagination-bottom" style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div class="vocab-page-info" id="vocab-count-info" style="font-size: 13px; color: var(--text-muted); font-weight: 500;">
+          Hiển thị 0 / tổng số 0 từ
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted);">
+          <span>Số dòng:</span>
+          <select class="form-control select-page-size" style="height: 32px; padding: 2px 8px; font-size: 13px; width: 95px;">
+            <option value="25">25 / trang</option>
+            <option value="50" selected>50 / trang</option>
+            <option value="100">100 / trang</option>
+            <option value="200">200 / trang</option>
+          </select>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <div class="vocab-pager" style="display: inline-flex; align-items: center; gap: 4px;"></div>
+        <div class="vocab-jump" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted);">
+          <span>Đến trang:</span>
+          <input type="number" min="1" class="form-control input-jump-page" placeholder="1" style="width: 58px; height: 32px; padding: 2px 6px; text-align: center; font-size: 13px;">
+          <button type="button" class="btn btn-outline btn-sm btn-jump-page" style="height: 32px; padding: 0 10px;">Đi</button>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -421,12 +524,12 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <!-- Scripts -->
-  <script src="../js/theme.js?v=3.0"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/db.js"></script>
-  <script src="../js/auth.js"></script>
-  <script src="../js/xp.js"></script>
-  <script src="../js/admin.js"></script>
-  <script src="../js/admin-vocabularies.js"></script>
+  <script src="../js/theme.js?v=5.2"></script>
+  <script src="../js/config.js?v=5.2"></script>
+  <script src="../js/db.js?v=5.2"></script>
+  <script src="../js/auth.js?v=5.2"></script>
+  <script src="../js/xp.js?v=5.2"></script>
+  <script src="../js/admin.js?v=5.2"></script>
+  <script src="../js/admin-vocabularies.js?v=5.2"></script>
 </body>
 </html>

@@ -251,6 +251,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         const isFirst = (index === 0);
         const isLast = (index === totalLessons - 1);
 
+        const vocabCount = l.vocab_count !== undefined ? l.vocab_count : (l.total_vocabularies || 0);
+        const slideCount = l.slide_count !== undefined ? l.slide_count : 0;
+        const assignCount = l.assignment_count !== undefined ? l.assignment_count : 0;
+
         return `
           <tr data-lesson-id="${l.id}">
             <td>
@@ -273,12 +277,17 @@ document.addEventListener('DOMContentLoaded', async function () {
             <td><span style="color: #ca8a04; font-weight: 600;">+${l.reward_xp || 50} XP</span></td>
             <td>
               <button type="button" class="btn btn-outline btn-sm btn-open-vocab-manager" data-lesson-id="${l.id}" style="height: 30px; padding: 0 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
-                📖 Từ vựng
+                📖 ${vocabCount} từ
               </button>
             </td>
             <td>
               <button type="button" class="btn btn-outline btn-sm btn-open-slide-manager" data-lesson-id="${l.id}" style="height: 30px; padding: 0 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
-                📑 Slide
+                📑 ${slideCount} slide
+              </button>
+            </td>
+            <td>
+              <button type="button" class="btn btn-outline btn-sm btn-open-assign-manager" data-lesson-id="${l.id}" style="height: 30px; padding: 0 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                🎯 ${assignCount} bài
               </button>
             </td>
             <td style="text-align: right; white-space: nowrap;">
@@ -327,6 +336,15 @@ document.addEventListener('DOMContentLoaded', async function () {
           e.stopPropagation();
           const lId = btn.getAttribute('data-lesson-id');
           openLessonSlidesModal(lId);
+        });
+      });
+
+      // Gắn sự kiện mở quản lý bài tập trong bài
+      document.querySelectorAll('.btn-open-assign-manager').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const lId = btn.getAttribute('data-lesson-id');
+          openLessonAssignmentsModal(lId);
         });
       });
 
@@ -636,6 +654,40 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('edit-lesson-xp').value = l.reward_xp || 50;
     document.getElementById('edit-lesson-pass-score').value = l.pass_score_percent || 80;
 
+    const vocabCount = l.vocab_count !== undefined ? l.vocab_count : (l.total_vocabularies || 0);
+    const slideCount = l.slide_count !== undefined ? l.slide_count : 0;
+    const assignCount = l.assignment_count !== undefined ? l.assignment_count : 0;
+
+    const vocabCountEl = document.getElementById('edit-lesson-vocab-count');
+    const slideCountEl = document.getElementById('edit-lesson-slide-count');
+    const assignCountEl = document.getElementById('edit-lesson-assign-count');
+    if (vocabCountEl) vocabCountEl.textContent = `${vocabCount} từ`;
+    if (slideCountEl) slideCountEl.textContent = `${slideCount} slide`;
+    if (assignCountEl) assignCountEl.textContent = `${assignCount} bài`;
+
+    const btnVocab = document.getElementById('edit-lesson-btn-vocab');
+    const btnSlide = document.getElementById('edit-lesson-btn-slide');
+    const btnAssign = document.getElementById('edit-lesson-btn-assign');
+
+    if (btnVocab) {
+      btnVocab.onclick = () => {
+        modalEditLesson.classList.remove('active');
+        openLessonVocabModal(l.id);
+      };
+    }
+    if (btnSlide) {
+      btnSlide.onclick = () => {
+        modalEditLesson.classList.remove('active');
+        openLessonSlidesModal(l.id);
+      };
+    }
+    if (btnAssign) {
+      btnAssign.onclick = () => {
+        modalEditLesson.classList.remove('active');
+        openLessonAssignmentsModal(l.id);
+      };
+    }
+
     modalEditLesson.classList.add('active');
   }
 
@@ -756,7 +808,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   async function loadLessonVocabulariesList(lessonId) {
     try {
       lessonVocabTableBody.innerHTML = `
-        <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+        <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
           Đang tải từ vựng...
         </td></tr>
       `;
@@ -765,7 +817,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       if (!currentLessonVocabList || currentLessonVocabList.length === 0) {
         lessonVocabTableBody.innerHTML = `
-          <tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
+          <tr><td colspan="7" style="text-align: center; padding: 32px; color: var(--text-muted);">
             Bài học này chưa có từ vựng nào. Hãy bấm <strong>"➕ Thêm từ từ kho"</strong>!
           </td></tr>
         `;
@@ -774,10 +826,25 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
       }
 
-      lessonVocabTableBody.innerHTML = currentLessonVocabList.map(v => `
+      const totalWords = currentLessonVocabList.length;
+
+      lessonVocabTableBody.innerHTML = currentLessonVocabList.map((v, index) => {
+        const isFirst = (index === 0);
+        const isLast = (index === totalWords - 1);
+
+        return `
         <tr data-vocab-id="${v.id}" data-link-id="${v.linkId}">
           <td style="text-align: center;">
             <input type="checkbox" class="chk-lesson-vocab" value="${v.id}" style="width: 16px; height: 16px;">
+          </td>
+          <td style="text-align: center;">
+            <div style="display: inline-flex; align-items: center; gap: 3px;">
+              <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); min-width: 18px;">${index + 1}</span>
+              <div style="display: inline-flex; flex-direction: column; gap: 1px;">
+                <button type="button" class="btn btn-outline btn-sm btn-reorder-vocab-up" data-index="${index}" style="height: 16px; width: 20px; padding: 0; line-height: 1; font-size: 9px;" ${isFirst ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Đổi lên">▲</button>
+                <button type="button" class="btn btn-outline btn-sm btn-reorder-vocab-down" data-index="${index}" style="height: 16px; width: 20px; padding: 0; line-height: 1; font-size: 9px;" ${isLast ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Đổi xuống">▼</button>
+              </div>
+            </div>
           </td>
           <td style="font-size: 18px; font-weight: 700; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">
             ${v.hanzi}
@@ -791,7 +858,32 @@ document.addEventListener('DOMContentLoaded', async function () {
             </button>
           </td>
         </tr>
-      `).join('');
+      `}).join('');
+
+      // Gắn sự kiện đổi thứ tự từ vựng (Lên / Xuống)
+      document.querySelectorAll('.btn-reorder-vocab-up').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          if (idx <= 0) return;
+          const temp = currentLessonVocabList[idx];
+          currentLessonVocabList[idx] = currentLessonVocabList[idx - 1];
+          currentLessonVocabList[idx - 1] = temp;
+          await saveVocabOrder(lessonId);
+        });
+      });
+
+      document.querySelectorAll('.btn-reorder-vocab-down').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          if (idx >= currentLessonVocabList.length - 1) return;
+          const temp = currentLessonVocabList[idx];
+          currentLessonVocabList[idx] = currentLessonVocabList[idx + 1];
+          currentLessonVocabList[idx + 1] = temp;
+          await saveVocabOrder(lessonId);
+        });
+      });
 
       // Gắn sự kiện checkbox từng dòng
       document.querySelectorAll('.chk-lesson-vocab').forEach(chk => {
@@ -807,6 +899,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             try {
               await window.Admin.removeWordFromLesson(linkId);
               await loadLessonVocabulariesList(lessonId);
+              await loadLessons(selectedCurriculum.id);
             } catch (err) {
               alert('Lỗi gỡ từ: ' + err.message);
             }
@@ -818,7 +911,18 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     } catch (err) {
       console.error('Lỗi tải từ vựng bài học:', err);
-      lessonVocabTableBody.innerHTML = `<tr><td colspan="6" style="color: red; text-align: center;">Lỗi tải từ vựng</td></tr>`;
+      lessonVocabTableBody.innerHTML = `<tr><td colspan="7" style="color: red; text-align: center;">Lỗi tải từ vựng</td></tr>`;
+    }
+  }
+
+  async function saveVocabOrder(lessonId) {
+    try {
+      const vocabIds = currentLessonVocabList.map(v => v.id);
+      await window.Admin.reorderLessonVocabularies(lessonId, vocabIds);
+      await loadLessonVocabulariesList(lessonId);
+    } catch (err) {
+      console.error('Lỗi lưu thứ tự từ vựng:', err);
+      alert('Lỗi lưu thứ tự từ vựng: ' + (err.message || err));
     }
   }
 
@@ -897,35 +1001,54 @@ document.addEventListener('DOMContentLoaded', async function () {
     b.addEventListener('click', () => modalAddVocabToLesson.classList.remove('active'));
   });
 
+  const filterWarehousePos = document.getElementById('filter-warehouse-pos');
+  let searchWarehouseDebounceTimer = null;
+
   btnSearchWarehouse.addEventListener('click', loadWarehouseVocabularies);
   searchWarehouseVocab.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') loadWarehouseVocabularies();
   });
+  searchWarehouseVocab.addEventListener('input', () => {
+    clearTimeout(searchWarehouseDebounceTimer);
+    searchWarehouseDebounceTimer = setTimeout(() => {
+      loadWarehouseVocabularies();
+    }, 300);
+  });
   filterWarehouseHsk.addEventListener('change', loadWarehouseVocabularies);
+  if (filterWarehousePos) {
+    filterWarehousePos.addEventListener('change', loadWarehouseVocabularies);
+  }
 
   async function loadWarehouseVocabularies() {
     try {
       warehouseVocabTableBody.innerHTML = `
-        <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+        <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
           Đang nạp từ vựng từ kho...
         </td></tr>
       `;
 
       const search = searchWarehouseVocab.value.trim();
       const hskLevel = filterWarehouseHsk.value;
+      const pos = filterWarehousePos ? filterWarehousePos.value : 'all';
 
-      const res = await window.Admin.getVocabularies({
+      const res = await window.Admin.getAllVocabularies({
         search,
-        hskLevel: hskLevel === 'all' ? null : hskLevel,
-        limit: 150
+        hskLevel: hskLevel === 'all' ? null : hskLevel
       });
 
       const existingVocabIds = new Set((currentLessonVocabList || []).map(v => v.id));
-      warehouseVocabCache = (res.data || []).filter(w => !existingVocabIds.has(w.id));
+      let filtered = (res || []).filter(w => !existingVocabIds.has(w.id));
+
+      if (pos && pos !== 'all') {
+        const lowerPos = pos.toLowerCase();
+        filtered = filtered.filter(w => (w.part_of_speech || '').toLowerCase().includes(lowerPos));
+      }
+
+      warehouseVocabCache = filtered;
 
       if (warehouseVocabCache.length === 0) {
         warehouseVocabTableBody.innerHTML = `
-          <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+          <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
             Không có từ vựng nào mới phù hợp với bộ lọc (các từ khớp có thể đã nằm trong bài học này).
           </td></tr>
         `;
@@ -934,7 +1057,27 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
       }
 
-      warehouseVocabTableBody.innerHTML = warehouseVocabCache.map(w => `
+      // Kiểm tra xem các từ này đã từng xuất hiện ở bài khác trong cùng giáo trình chưa
+      let dupMap = new Map();
+      if (selectedCurriculum && activeLessonForVocab) {
+        try {
+          const wordIds = warehouseVocabCache.map(w => w.id);
+          const dups = await window.Admin.checkDuplicateVocabInCurriculum(selectedCurriculum.id, activeLessonForVocab.id, wordIds);
+          if (dups && dups.length > 0) {
+            dups.forEach(d => dupMap.set(d.vocabulary_id, d));
+          }
+        } catch (e) {
+          console.warn('Không thể kiểm tra trùng lặp từ vựng:', e);
+        }
+      }
+
+      warehouseVocabTableBody.innerHTML = warehouseVocabCache.map(w => {
+        const dup = dupMap.get(w.id);
+        const dupBadge = dup
+          ? `<span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #fef3c7; color: #b45309; font-weight: 600; display: inline-block;">⚠️ Bài ${dup.other_lesson_order}: ${dup.other_lesson_title_zh}</span>`
+          : `<span style="color: var(--text-muted); font-size: 11px;">Chưa gán</span>`;
+
+        return `
         <tr>
           <td style="text-align: center;">
             <input type="checkbox" class="chk-warehouse-vocab" value="${w.id}" style="width: 16px; height: 16px;">
@@ -945,8 +1088,9 @@ document.addEventListener('DOMContentLoaded', async function () {
           <td style="font-weight: 600; color: var(--text-muted);">${w.pinyin}</td>
           <td>${w.meaning_vi}</td>
           <td><span class="badge-hsk badge-hsk-${w.hsk_level || 1}">HSK ${w.hsk_level || 1}</span></td>
+          <td>${dupBadge}</td>
         </tr>
-      `).join('');
+      `}).join('');
 
       document.querySelectorAll('.chk-warehouse-vocab').forEach(c => {
         c.addEventListener('change', updateSelectedWarehouseVocabCount);
@@ -956,7 +1100,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     } catch (err) {
       console.error('Lỗi tải từ trong kho:', err);
-      warehouseVocabTableBody.innerHTML = `<tr><td colspan="5" style="color: red; text-align: center;">Lỗi tải dữ liệu</td></tr>`;
+      warehouseVocabTableBody.innerHTML = `<tr><td colspan="6" style="color: red; text-align: center;">Lỗi tải dữ liệu</td></tr>`;
     }
   }
 
@@ -1061,26 +1205,33 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
+  let currentLessonSlidesList = [];
+
   async function loadLessonSlidesList(lessonId) {
     try {
       slideListTableBody.innerHTML = `
-        <tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">
+        <tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">
           Đang nạp danh sách slide...
         </td></tr>
       `;
 
       const slides = await window.Admin.getLessonSlides(lessonId);
+      currentLessonSlidesList = slides || [];
 
-      if (!slides || slides.length === 0) {
+      if (!currentLessonSlidesList || currentLessonSlidesList.length === 0) {
         slideListTableBody.innerHTML = `
-          <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+          <tr><td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
             Bài học này chưa có slide nào. Hãy chọn file bên trên và bấm <strong>"Tải lên bài học"</strong>!
           </td></tr>
         `;
         return;
       }
 
-      slideListTableBody.innerHTML = slides.map(s => {
+      const totalSlides = currentLessonSlidesList.length;
+
+      slideListTableBody.innerHTML = currentLessonSlidesList.map((s, index) => {
+        const isFirst = (index === 0);
+        const isLast = (index === totalSlides - 1);
         const isPdf = s.file_type === 'pdf';
         const typeBadge = isPdf
           ? `<span class="badge-status" style="background: #fee2e2; color: #dc2626; font-weight: 800; font-size: 11px;">PDF</span>`
@@ -1090,10 +1241,17 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         return `
           <tr data-slide-id="${s.id}">
-            <td>${typeBadge}</td>
-            <td style="font-weight: 600; color: var(--text-main);">
-              ${s.title}
+            <td style="text-align: center;">
+              <div style="display: inline-flex; align-items: center; gap: 3px;">
+                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); min-width: 18px;">${index + 1}</span>
+                <div style="display: inline-flex; flex-direction: column; gap: 1px;">
+                  <button type="button" class="btn btn-outline btn-sm btn-reorder-slide-up" data-index="${index}" style="height: 16px; width: 20px; padding: 0; line-height: 1; font-size: 9px;" ${isFirst ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Đổi lên">▲</button>
+                  <button type="button" class="btn btn-outline btn-sm btn-reorder-slide-down" data-index="${index}" style="height: 16px; width: 20px; padding: 0; line-height: 1; font-size: 9px;" ${isLast ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Đổi xuống">▼</button>
+                </div>
+              </div>
             </td>
+            <td>${typeBadge}</td>
+            <td style="font-weight: 600; color: var(--text-main);">${s.title}</td>
             <td style="font-size: 12px; color: var(--text-muted);">${sizeMb}</td>
             <td>
               <button type="button" class="btn btn-outline btn-sm btn-open-slide-file" data-path="${s.file_path}" style="padding: 3px 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
@@ -1108,6 +1266,31 @@ document.addEventListener('DOMContentLoaded', async function () {
           </tr>
         `;
       }).join('');
+
+      // Gắn sự kiện đổi thứ tự slide (Lên / Xuống)
+      document.querySelectorAll('.btn-reorder-slide-up').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          if (idx <= 0) return;
+          const temp = currentLessonSlidesList[idx];
+          currentLessonSlidesList[idx] = currentLessonSlidesList[idx - 1];
+          currentLessonSlidesList[idx - 1] = temp;
+          await saveSlideOrder(lessonId);
+        });
+      });
+
+      document.querySelectorAll('.btn-reorder-slide-down').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          if (idx >= currentLessonSlidesList.length - 1) return;
+          const temp = currentLessonSlidesList[idx];
+          currentLessonSlidesList[idx] = currentLessonSlidesList[idx + 1];
+          currentLessonSlidesList[idx + 1] = temp;
+          await saveSlideOrder(lessonId);
+        });
+      });
 
       // Gắn sự kiện xem/tải file slide
       document.querySelectorAll('.btn-open-slide-file').forEach(btn => {
@@ -1134,6 +1317,7 @@ document.addEventListener('DOMContentLoaded', async function () {
               await window.Admin.deleteLessonSlide(slideId);
               await loadLessonSlidesList(lessonId);
               await loadSlideStorageStats();
+              await loadLessons(selectedCurriculum.id);
             } catch (err) {
               alert('Lỗi khi xóa slide: ' + err.message);
             }
@@ -1143,7 +1327,18 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     } catch (err) {
       console.error('Lỗi tải danh sách slide:', err);
-      slideListTableBody.innerHTML = `<tr><td colspan="5" style="color: red; text-align: center;">Lỗi tải slide</td></tr>`;
+      slideListTableBody.innerHTML = `<tr><td colspan="6" style="color: red; text-align: center;">Lỗi tải slide</td></tr>`;
+    }
+  }
+
+  async function saveSlideOrder(lessonId) {
+    try {
+      const slideIds = currentLessonSlidesList.map(s => s.id);
+      await window.Admin.reorderLessonSlides(lessonId, slideIds);
+      await loadLessonSlidesList(lessonId);
+    } catch (err) {
+      console.error('Lỗi lưu thứ tự slide:', err);
+      alert('Lỗi lưu thứ tự slide: ' + (err.message || err));
     }
   }
 
@@ -1178,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       await loadLessonSlidesList(activeLessonForSlide.id);
       await loadSlideStorageStats();
+      await loadLessons(selectedCurriculum.id);
 
     } catch (err) {
       console.error('Lỗi tải slide lên:', err);
@@ -1186,6 +1382,371 @@ document.addEventListener('DOMContentLoaded', async function () {
     } finally {
       btnSubmitUploadSlide.disabled = false;
       btnSubmitUploadSlide.textContent = 'Tải lên bài học';
+    }
+  });
+
+  // ===========================================================================
+  // 14. QUẢN LÝ BÀI TẬP TRONG BÀI HỌC (TỪ VỰNG, NGHE, GHI ÂM, QUIZ)
+  // ===========================================================================
+  const modalLessonAssignments = document.getElementById('modal-lesson-assignments');
+  const modalLessonAssignTitle = document.getElementById('modal-lesson-assign-title');
+  const modalLessonAssignMeta = document.getElementById('modal-lesson-assign-meta');
+  const lessonAssignAlert = document.getElementById('lesson-assign-alert');
+  const lessonAssignmentsTableBody = document.getElementById('lesson-assignments-table-body');
+  const btnOpenCreateAssignmentModal = document.getElementById('btn-open-create-assignment-modal');
+
+  const modalCreateAssignment = document.getElementById('modal-create-assignment');
+  const modalCreateAssignTitle = document.getElementById('modal-create-assign-title');
+  const formCreateAssignment = document.getElementById('form-create-assignment');
+  const createAssignAlert = document.getElementById('create-assign-alert');
+  const assignIdInput = document.getElementById('assign-id');
+  const assignTypeSelect = document.getElementById('assign-type');
+  const assignTitleInput = document.getElementById('assign-title');
+  const assignDescInput = document.getElementById('assign-desc');
+  const assignXpInput = document.getElementById('assign-xp');
+  const assignDueDateInput = document.getElementById('assign-due-date');
+  const assignSpeakingFields = document.getElementById('assign-speaking-fields');
+  const assignSpeakingPrompt = document.getElementById('assign-speaking-prompt');
+  const assignSpeakingPinyin = document.getElementById('assign-speaking-pinyin');
+  const assignSpeakingSampleAudio = document.getElementById('assign-speaking-sample-audio');
+  const assignListeningFields = document.getElementById('assign-listening-fields');
+  const assignListeningAudio = document.getElementById('assign-listening-audio');
+  const assignListeningQuestions = document.getElementById('assign-listening-questions');
+  const btnSubmitAssignment = document.getElementById('btn-submit-assignment');
+
+  let activeLessonForAssign = null;
+  let currentLessonAssignmentsList = [];
+
+  async function openLessonAssignmentsModal(lessonId) {
+    activeLessonForAssign = currentLessonsList.find(x => x.id === lessonId);
+    if (!activeLessonForAssign) return;
+
+    modalLessonAssignTitle.textContent = `Bài Tập: Bài ${activeLessonForAssign.order_index} - ${activeLessonForAssign.title_zh}`;
+    modalLessonAssignMeta.textContent = `${activeLessonForAssign.title_vi} · Giáo trình: ${selectedCurriculum ? selectedCurriculum.title : ''}`;
+    lessonAssignAlert.className = 'alert';
+    lessonAssignAlert.textContent = '';
+
+    modalLessonAssignments.classList.add('active');
+    await loadLessonAssignmentsList(lessonId);
+  }
+
+  document.querySelectorAll('[data-close="modal-lesson-assignments"]').forEach(b => {
+    b.addEventListener('click', () => modalLessonAssignments.classList.remove('active'));
+  });
+
+  async function loadLessonAssignmentsList(lessonId) {
+    try {
+      lessonAssignmentsTableBody.innerHTML = `
+        <tr><td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+          Đang tải danh sách bài tập...
+        </td></tr>
+      `;
+
+      const list = await window.Admin.getLessonAssignments(lessonId);
+      currentLessonAssignmentsList = list || [];
+
+      if (!currentLessonAssignmentsList || currentLessonAssignmentsList.length === 0) {
+        lessonAssignmentsTableBody.innerHTML = `
+          <tr><td colspan="5" style="text-align: center; padding: 32px; color: var(--text-muted);">
+            Bài học này chưa có bài tập nào. Hãy bấm <strong>"➕ Thêm bài tập mới"</strong> để giao bài cho học viên!
+          </td></tr>
+        `;
+        return;
+      }
+
+      const totalAssigns = currentLessonAssignmentsList.length;
+
+      lessonAssignmentsTableBody.innerHTML = currentLessonAssignmentsList.map((a, index) => {
+        const isFirst = (index === 0);
+        const isLast = (index === totalAssigns - 1);
+
+        let typeBadge = '';
+        if (a.assignment_type === 'speaking') {
+          typeBadge = '<span class="badge" style="background: #dbeafe; color: #1e40af; font-weight: 700; font-size: 11px;">🎙️ Ghi âm</span>';
+        } else if (a.assignment_type === 'listening') {
+          typeBadge = '<span class="badge" style="background: #d1fae5; color: #065f46; font-weight: 700; font-size: 11px;">🎧 Nghe hiểu</span>';
+        } else if (a.assignment_type === 'quiz') {
+          typeBadge = '<span class="badge" style="background: #fef3c7; color: #92400e; font-weight: 700; font-size: 11px;">📝 Quiz</span>';
+        } else {
+          typeBadge = '<span class="badge" style="background: #f3e8ff; color: #6b21a8; font-weight: 700; font-size: 11px;">📖 Từ vựng</span>';
+        }
+
+        return `
+          <tr data-assign-id="${a.id}">
+            <td style="text-align: center;">
+              <div style="display: inline-flex; align-items: center; gap: 3px;">
+                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); min-width: 18px;">${index + 1}</span>
+                <div style="display: inline-flex; flex-direction: column; gap: 1px;">
+                  <button type="button" class="btn btn-outline btn-sm btn-reorder-assign-up" data-index="${index}" style="height: 16px; width: 20px; padding: 0; line-height: 1; font-size: 9px;" ${isFirst ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Đổi lên">▲</button>
+                  <button type="button" class="btn btn-outline btn-sm btn-reorder-assign-down" data-index="${index}" style="height: 16px; width: 20px; padding: 0; line-height: 1; font-size: 9px;" ${isLast ? 'disabled style="opacity: 0.3; cursor: not-allowed;"' : ''} title="Đổi xuống">▼</button>
+                </div>
+              </div>
+            </td>
+            <td>${typeBadge}</td>
+            <td>
+              <div style="font-weight: 600; color: var(--text-main);">${a.title}</div>
+              ${a.description ? `<div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${a.description}</div>` : ''}
+            </td>
+            <td><span style="color: #ca8a04; font-weight: 600;">+${a.reward_xp || 30} XP</span></td>
+            <td style="text-align: right; white-space: nowrap;">
+              <button type="button" class="btn btn-outline btn-sm btn-edit-assign" data-index="${index}" style="padding: 3px 8px; font-size: 12px;" title="Sửa bài tập">
+                ✏️
+              </button>
+              <button type="button" class="btn btn-outline btn-sm btn-delete-assign" data-id="${a.id}" data-title="${a.title}" style="padding: 3px 8px; font-size: 12px; color: var(--danger); border-color: #fca5a5;" title="Xóa bài tập">
+                🗑️
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      // Gắn sự kiện đổi thứ tự bài tập (Lên / Xuống)
+      document.querySelectorAll('.btn-reorder-assign-up').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          if (idx <= 0) return;
+          const temp = currentLessonAssignmentsList[idx];
+          currentLessonAssignmentsList[idx] = currentLessonAssignmentsList[idx - 1];
+          currentLessonAssignmentsList[idx - 1] = temp;
+          await saveAssignOrder(lessonId);
+        });
+      });
+
+      document.querySelectorAll('.btn-reorder-assign-down').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          if (idx >= currentLessonAssignmentsList.length - 1) return;
+          const temp = currentLessonAssignmentsList[idx];
+          currentLessonAssignmentsList[idx] = currentLessonAssignmentsList[idx + 1];
+          currentLessonAssignmentsList[idx + 1] = temp;
+          await saveAssignOrder(lessonId);
+        });
+      });
+
+      // Gắn sự kiện sửa bài tập
+      document.querySelectorAll('.btn-edit-assign').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-index'), 10);
+          const item = currentLessonAssignmentsList[idx];
+          if (item) openEditAssignmentModal(item);
+        });
+      });
+
+      // Gắn sự kiện xóa bài tập
+      document.querySelectorAll('.btn-delete-assign').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const aId = btn.getAttribute('data-id');
+          const title = btn.getAttribute('data-title');
+          if (confirm(`Bạn có chắc chắn muốn xóa bài tập "${title}" không?`)) {
+            try {
+              await window.Admin.deleteAssignment(aId);
+              await loadLessonAssignmentsList(lessonId);
+              await loadLessons(selectedCurriculum.id);
+            } catch (err) {
+              alert('Lỗi xóa bài tập: ' + err.message);
+            }
+          }
+        });
+      });
+
+    } catch (err) {
+      console.error('Lỗi tải bài tập:', err);
+      lessonAssignmentsTableBody.innerHTML = `<tr><td colspan="5" style="color: red; text-align: center;">Lỗi tải bài tập</td></tr>`;
+    }
+  }
+
+  async function saveAssignOrder(lessonId) {
+    try {
+      const assignIds = currentLessonAssignmentsList.map(a => a.id);
+      await window.Admin.reorderLessonAssignments(lessonId, assignIds);
+      await loadLessonAssignmentsList(lessonId);
+    } catch (err) {
+      console.error('Lỗi lưu thứ tự bài tập:', err);
+      alert('Lỗi lưu thứ tự bài tập: ' + (err.message || err));
+    }
+  }
+
+  // Toggle trường chuyên biệt theo loại bài tập
+  function updateAssignmentTypeFields() {
+    const type = assignTypeSelect.value;
+    if (type === 'speaking') {
+      assignSpeakingFields.style.display = 'block';
+      assignListeningFields.style.display = 'none';
+      assignSpeakingPrompt.required = true;
+      assignListeningAudio.required = false;
+      assignListeningQuestions.required = false;
+    } else if (type === 'listening') {
+      assignSpeakingFields.style.display = 'none';
+      assignListeningFields.style.display = 'block';
+      assignSpeakingPrompt.required = false;
+      assignListeningAudio.required = true;
+      assignListeningQuestions.required = true;
+    } else {
+      assignSpeakingFields.style.display = 'none';
+      assignListeningFields.style.display = 'none';
+      assignSpeakingPrompt.required = false;
+      assignListeningAudio.required = false;
+      assignListeningQuestions.required = false;
+    }
+  }
+
+  assignTypeSelect.addEventListener('change', updateAssignmentTypeFields);
+
+  // Mở modal thêm bài tập mới
+  btnOpenCreateAssignmentModal.addEventListener('click', () => {
+    formCreateAssignment.reset();
+    assignIdInput.value = '';
+    modalCreateAssignTitle.textContent = 'Thêm Bài Tập Mới';
+    btnSubmitAssignment.textContent = 'Lưu bài tập';
+    createAssignAlert.className = 'alert';
+    createAssignAlert.textContent = '';
+    assignXpInput.value = 30;
+    updateAssignmentTypeFields();
+    modalCreateAssignment.classList.add('active');
+  });
+
+  // Mở modal sửa bài tập
+  function openEditAssignmentModal(item) {
+    formCreateAssignment.reset();
+    assignIdInput.value = item.id;
+    modalCreateAssignTitle.textContent = 'Chỉnh Sửa Bài Tập';
+    btnSubmitAssignment.textContent = 'Cập nhật bài tập';
+    createAssignAlert.className = 'alert';
+    createAssignAlert.textContent = '';
+
+    assignTypeSelect.value = item.assignment_type || 'vocabulary';
+    assignTitleInput.value = item.title || '';
+    assignDescInput.value = item.description || '';
+    assignXpInput.value = item.reward_xp || 30;
+
+    if (item.due_date) {
+      const dt = new Date(item.due_date);
+      const localIso = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      assignDueDateInput.value = localIso;
+    } else {
+      assignDueDateInput.value = '';
+    }
+
+    if (item.assignment_type === 'speaking') {
+      assignSpeakingPrompt.value = item.speaking_prompt || '';
+      assignSpeakingPinyin.value = item.speaking_pinyin || '';
+      assignSpeakingSampleAudio.value = item.speaking_sample_audio_url || '';
+    } else if (item.assignment_type === 'listening') {
+      assignListeningAudio.value = item.listening_audio_url || '';
+      if (item.listening_questions) {
+        assignListeningQuestions.value = typeof item.listening_questions === 'string'
+          ? item.listening_questions
+          : JSON.stringify(item.listening_questions, null, 2);
+      } else {
+        assignListeningQuestions.value = '';
+      }
+    }
+
+    updateAssignmentTypeFields();
+    modalCreateAssignment.classList.add('active');
+  }
+
+  document.querySelectorAll('[data-close="modal-create-assignment"]').forEach(b => {
+    b.addEventListener('click', () => modalCreateAssignment.classList.remove('active'));
+  });
+
+  // Lưu bài tập (Thêm mới hoặc Cập nhật)
+  formCreateAssignment.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (!activeLessonForAssign) return;
+
+    const assignId = assignIdInput.value;
+    const type = assignTypeSelect.value;
+    const title = assignTitleInput.value.trim();
+    const description = assignDescInput.value.trim();
+    const rewardXp = parseInt(assignXpInput.value || 30, 10);
+    const dueDate = assignDueDateInput.value ? new Date(assignDueDateInput.value).toISOString() : null;
+
+    let speakingPrompt = null;
+    let speakingPinyin = null;
+    let speakingSampleAudioUrl = null;
+    let listeningAudioUrl = null;
+    let listeningQuestions = null;
+
+    if (type === 'speaking') {
+      speakingPrompt = assignSpeakingPrompt.value.trim();
+      if (!speakingPrompt) {
+        createAssignAlert.className = 'alert alert-danger show';
+        createAssignAlert.textContent = 'Vui lòng nhập đoạn văn chữ Hán cần đọc!';
+        return;
+      }
+      speakingPinyin = assignSpeakingPinyin.value.trim();
+      speakingSampleAudioUrl = assignSpeakingSampleAudio.value.trim();
+    } else if (type === 'listening') {
+      listeningAudioUrl = assignListeningAudio.value.trim();
+      if (!listeningAudioUrl) {
+        createAssignAlert.className = 'alert alert-danger show';
+        createAssignAlert.textContent = 'Vui lòng nhập URL file âm thanh bài nghe!';
+        return;
+      }
+      const qText = assignListeningQuestions.value.trim();
+      try {
+        listeningQuestions = JSON.parse(qText);
+      } catch (err) {
+        createAssignAlert.className = 'alert alert-danger show';
+        createAssignAlert.textContent = 'Định dạng câu hỏi trắc nghiệm không phải JSON hợp lệ: ' + err.message;
+        return;
+      }
+    }
+
+    try {
+      btnSubmitAssignment.disabled = true;
+      btnSubmitAssignment.textContent = 'Đang lưu...';
+      createAssignAlert.className = 'alert';
+      createAssignAlert.textContent = '';
+
+      if (assignId) {
+        // Cập nhật bài tập
+        await window.Admin.updateAssignment(assignId, {
+          title,
+          description,
+          dueDate,
+          rewardXp,
+          assignmentType: type,
+          speakingPrompt,
+          speakingPinyin,
+          speakingSampleAudioUrl,
+          listeningAudioUrl,
+          listeningQuestions
+        });
+      } else {
+        // Tạo bài tập mới gắn trực tiếp vào bài học
+        const newSortOrder = (currentLessonAssignmentsList.length || 0) + 1;
+        await window.Admin.createAssignment({
+          classId: null,
+          lessonId: activeLessonForAssign.id,
+          title,
+          description,
+          dueDate,
+          rewardXp,
+          assignmentType: type,
+          sortOrder: newSortOrder,
+          speakingPrompt,
+          speakingPinyin,
+          speakingSampleAudioUrl,
+          listeningAudioUrl,
+          listeningQuestions
+        });
+      }
+
+      modalCreateAssignment.classList.remove('active');
+      await loadLessonAssignmentsList(activeLessonForAssign.id);
+      await loadLessons(selectedCurriculum.id);
+
+    } catch (err) {
+      console.error('Lỗi khi lưu bài tập:', err);
+      createAssignAlert.className = 'alert alert-danger show';
+      createAssignAlert.textContent = err.message || 'Lỗi khi lưu bài tập';
+    } finally {
+      btnSubmitAssignment.disabled = false;
+      btnSubmitAssignment.textContent = assignId ? 'Cập nhật bài tập' : 'Lưu bài tập';
     }
   });
 

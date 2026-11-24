@@ -200,12 +200,13 @@
                 <th>XP</th>
                 <th>Từ vựng</th>
                 <th>Slide</th>
+                <th>Bài tập</th>
                 <th style="text-align: right; width: 120px;">Thao tác</th>
               </tr>
             </thead>
             <tbody id="lessons-table-body">
               <tr>
-                <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                <td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);">
                   Chưa chọn giáo trình nào.
                 </td>
               </tr>
@@ -465,6 +466,27 @@
               <input type="number" id="edit-lesson-pass-score" class="form-control" min="50" max="100">
             </div>
           </div>
+
+          <!-- Các nút cấu thành bài học: Từ vựng, Slide, Bài tập -->
+          <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+            <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 8px;">
+              🧩 Quản lý Nội dung Cấu thành Bài học:
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+              <button type="button" id="edit-lesson-btn-vocab" class="btn btn-outline btn-sm" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 52px; font-size: 12px; line-height: 1.3;">
+                <span>📖 Từ vựng</span>
+                <span id="edit-lesson-vocab-count" style="font-size: 11px; color: var(--text-muted); font-weight: 600;">0 từ</span>
+              </button>
+              <button type="button" id="edit-lesson-btn-slide" class="btn btn-outline btn-sm" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 52px; font-size: 12px; line-height: 1.3;">
+                <span>📑 Slide bài giảng</span>
+                <span id="edit-lesson-slide-count" style="font-size: 11px; color: var(--text-muted); font-weight: 600;">0 slide</span>
+              </button>
+              <button type="button" id="edit-lesson-btn-assign" class="btn btn-outline btn-sm" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 52px; font-size: 12px; line-height: 1.3;">
+                <span>🎯 Bài tập</span>
+                <span id="edit-lesson-assign-count" style="font-size: 11px; color: var(--text-muted); font-weight: 600;">0 bài</span>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-close="modal-edit-lesson">Hủy</button>
@@ -547,6 +569,7 @@
             <thead>
               <tr>
                 <th style="width: 40px; text-align: center;">#</th>
+                <th style="width: 65px; text-align: center;">Thứ tự</th>
                 <th style="width: 110px;">Chữ Hán</th>
                 <th style="width: 110px;">Phiên âm</th>
                 <th>Nghĩa tiếng Việt</th>
@@ -556,7 +579,7 @@
             </thead>
             <tbody id="lesson-vocab-table-body">
               <tr>
-                <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
                   Đang tải từ vựng...
                 </td>
               </tr>
@@ -586,7 +609,7 @@
         <!-- Bộ lọc & tìm kiếm -->
         <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
           <input type="text" id="search-warehouse-vocab" class="form-control" placeholder="Tìm theo chữ Hán, Pinyin hoặc nghĩa tiếng Việt..." style="flex: 1; min-width: 200px;">
-          <select id="filter-warehouse-hsk" class="form-control" style="width: 130px;">
+          <select id="filter-warehouse-hsk" class="form-control" style="width: 125px;">
             <option value="all">Tất cả HSK</option>
             <option value="1">HSK 1</option>
             <option value="2">HSK 2</option>
@@ -597,6 +620,17 @@
             <option value="7">HSK 7</option>
             <option value="8">HSK 8</option>
             <option value="9">HSK 9</option>
+          </select>
+          <select id="filter-warehouse-pos" class="form-control" style="width: 135px;">
+            <option value="all">Tất cả từ loại</option>
+            <option value="danh từ">Danh từ (n.)</option>
+            <option value="động từ">Động từ (v.)</option>
+            <option value="tính từ">Tính từ (adj.)</option>
+            <option value="phó từ">Phó từ (adv.)</option>
+            <option value="đại từ">Đại từ (pron.)</option>
+            <option value="giới từ">Giới từ (prep.)</option>
+            <option value="liên từ">Liên từ (conj.)</option>
+            <option value="lượng từ">Lượng từ (cl.)</option>
           </select>
           <button type="button" id="btn-search-warehouse" class="btn btn-outline btn-sm" style="padding: 0 14px;">
             🔍 Tìm
@@ -615,11 +649,12 @@
                 <th style="width: 110px;">Phiên âm</th>
                 <th>Nghĩa tiếng Việt</th>
                 <th style="width: 80px;">Cấp độ</th>
+                <th style="width: 170px;">Trùng lặp giáo trình</th>
               </tr>
             </thead>
             <tbody id="warehouse-vocab-table-body">
               <tr>
-                <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
                   Nhập từ khóa hoặc bấm "Tìm" để nạp từ trong kho.
                 </td>
               </tr>
@@ -700,6 +735,7 @@
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 65px; text-align: center;">Thứ tự</th>
                 <th style="width: 50px;">Định dạng</th>
                 <th>Tiêu đề tài liệu</th>
                 <th style="width: 100px;">Dung lượng</th>
@@ -709,7 +745,7 @@
             </thead>
             <tbody id="slide-list-table-body">
               <tr>
-                <td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">
+                <td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">
                   Đang nạp danh sách slide...
                 </td>
               </tr>
@@ -720,6 +756,141 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-close="modal-lesson-slides">Đóng</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: QUẢN LÝ BÀI TẬP TRONG BÀI HỌC (TỪ VỰNG, NGHE, GHI ÂM, QUIZ) -->
+  <div id="modal-lesson-assignments" class="modal-overlay">
+    <div class="modal-card" style="max-width: 860px; width: 95%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="modal-lesson-assign-title">Bài Tập trong Bài Học</h3>
+          <span id="modal-lesson-assign-meta" style="font-size: 13px; color: var(--text-muted);"></span>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-lesson-assignments">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top: 12px;">
+        <div id="lesson-assign-alert" class="alert"></div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; background: var(--bg-subtle); padding: 10px 14px; border-radius: 8px;">
+          <div style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">
+            🎯 Các bài tập gắn với bài học này sẽ hiển thị cho học sinh. Hỗ trợ đủ: <strong>Từ vựng</strong>, <strong>Luyện nghe</strong>, <strong>Ghi âm nói</strong> và <strong>Quiz</strong>.
+          </div>
+          <button type="button" id="btn-open-create-assignment-modal" class="btn btn-primary btn-sm" style="height: 32px; padding: 0 12px; font-size: 13px;">
+            ➕ Thêm bài tập mới
+          </button>
+        </div>
+
+        <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 65px; text-align: center;">Thứ tự</th>
+                <th style="width: 120px;">Loại bài tập</th>
+                <th>Tiêu đề bài tập</th>
+                <th style="width: 85px;">Thưởng XP</th>
+                <th style="width: 120px; text-align: right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="lesson-assignments-table-body">
+              <tr>
+                <td colspan="5" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                  Đang tải danh sách bài tập...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-lesson-assignments">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: THÊM / CHỈNH SỬA BÀI TẬP BÀI HỌC -->
+  <div id="modal-create-assignment" class="modal-overlay">
+    <div class="modal-card" style="max-width: 640px; width: 95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-create-assign-title">Thêm Bài Tập Mới</h3>
+        <button type="button" class="modal-close" data-close="modal-create-assignment">&times;</button>
+      </div>
+      <form id="form-create-assignment">
+        <input type="hidden" id="assign-id">
+        <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+          <div id="create-assign-alert" class="alert"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="assign-type">Loại bài tập *</label>
+            <select id="assign-type" class="form-control" required>
+              <option value="vocabulary">📖 Ôn tập & Kiểm tra Từ vựng (Vocabulary)</option>
+              <option value="listening">🎧 Luyện nghe trắc nghiệm (Listening)</option>
+              <option value="speaking">🎙️ Ghi âm phát âm (Speaking)</option>
+              <option value="quiz">📝 Trắc nghiệm kiến thức (Quiz)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="assign-title">Tiêu đề bài tập *</label>
+            <input type="text" id="assign-title" class="form-control" placeholder="Ví dụ: Ghi âm đọc đoạn văn tự giới thiệu" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="assign-desc">Mô tả / Hướng dẫn học sinh</label>
+            <textarea id="assign-desc" class="form-control" rows="2" placeholder="Ghi chú các yêu cầu, phát âm hoặc nội dung cần chú ý..."></textarea>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="assign-xp">Điểm thưởng (XP) *</label>
+              <input type="number" id="assign-xp" class="form-control" value="30" min="5" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="assign-due-date">Hạn nộp (tùy chọn)</label>
+              <input type="datetime-local" id="assign-due-date" class="form-control">
+            </div>
+          </div>
+
+          <!-- Cấu hình riêng cho bài GHI ÂM (Speaking) -->
+          <div id="assign-speaking-fields" style="display: none; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-weight: 700; font-size: 13px; color: var(--primary); margin-bottom: 8px;">
+              🎙️ Cấu hình Bài tập Ghi âm phát âm:
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="assign-speaking-prompt">Đoạn văn / Câu cần đọc (Chữ Hán) *</label>
+              <textarea id="assign-speaking-prompt" class="form-control" rows="3" placeholder="Nhập chữ Hán đoạn văn hoặc câu học viên cần ghi âm đọc..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="assign-speaking-pinyin">Phiên âm Pinyin kèm theo</label>
+              <input type="text" id="assign-speaking-pinyin" class="form-control" placeholder="Pinyin kèm dấu (tùy chọn)">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="assign-speaking-sample-audio">URL file audio phát âm mẫu (tùy chọn)</label>
+              <input type="url" id="assign-speaking-sample-audio" class="form-control" placeholder="https://... file audio chuẩn">
+            </div>
+          </div>
+
+          <!-- Cấu hình riêng cho bài LUYỆN NGHE (Listening) -->
+          <div id="assign-listening-fields" style="display: none; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-weight: 700; font-size: 13px; color: #059669; margin-bottom: 8px;">
+              🎧 Cấu hình Bài tập Luyện nghe:
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="assign-listening-audio">URL file âm thanh (.mp3) *</label>
+              <input type="url" id="assign-listening-audio" class="form-control" placeholder="https://... file nghe audio">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="assign-listening-questions">Câu hỏi trắc nghiệm (JSON) *</label>
+              <textarea id="assign-listening-questions" class="form-control" rows="4" placeholder='[{"question": "Bạn nghe thấy gì?", "options": ["你好", "谢谢", "再见", "对不起"], "answer": 0}]'></textarea>
+              <small style="color: var(--text-muted); font-size: 11px;">Mảng JSON danh sách câu hỏi: question, options, answer (chỉ số 0..3).</small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-create-assignment">Hủy</button>
+          <button type="submit" id="btn-submit-assignment" class="btn btn-primary">Lưu bài tập</button>
+        </div>
+      </form>
     </div>
   </div>
 

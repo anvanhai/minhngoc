@@ -136,12 +136,13 @@
   <!-- Khung nội dung chính -->
   <main class="main-wrapper" style="padding-top: 16px;">
     <div class="lesson-studio-container">
-      <!-- 4 Tab chuyển chế độ học -->
+      <!-- 5 Tab chuyển chế độ học -->
       <div class="study-mode-tabs">
         <button type="button" class="study-mode-tab active" id="tab-btn-vocab">📖 1. Học Từ</button>
         <button type="button" class="study-mode-tab" id="tab-btn-flashcard">🗂️ 2. Flashcard</button>
         <button type="button" class="study-mode-tab" id="tab-btn-quiz">📝 3. Kiểm Tra (Quiz)</button>
         <button type="button" class="study-mode-tab" id="tab-btn-slides">📑 4. Slide Bài Giảng</button>
+        <button type="button" class="study-mode-tab" id="tab-btn-assignments">🎯 5. Bài Tập Vận Dụng</button>
       </div>
 
       <div id="lesson-alert" class="alert"></div>
@@ -404,8 +405,146 @@
           </div>
         </div>
       </div>
+
+      <!-- ================================================================= -->
+      <!-- CHẾ ĐỘ 5: BÀI TẬP VẬN DỤNG CỦA BÀI HỌC                            -->
+      <!-- ================================================================= -->
+      <div id="mode-assignments-container" style="display: none;">
+        <div class="card" style="padding: 24px; border-radius: var(--radius-lg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h2 style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
+                🎯 Nhiệm Vụ & Bài Tập Vận Dụng
+              </h2>
+              <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+                Hoàn thành các bài tập dưới đây để củng cố kiến thức và nhận thêm điểm XP.
+              </p>
+            </div>
+            <span id="lesson-assign-counter" class="badge" style="background: var(--bg-subtle); color: var(--primary); font-size: 12px; font-weight: 700; padding: 4px 10px;">
+              Đang tải bài tập...
+            </span>
+          </div>
+
+          <div id="lesson-assignments-list" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="text-align: center; padding: 32px; color: var(--text-muted);">
+              Đang nạp bài tập của bài học...
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
+
+  <!-- MODAL: LÀM BÀI TẬP NGHE HIỂU -->
+  <div id="modal-listening-assignment" class="modal-overlay">
+    <div class="modal-card" style="max-width: 650px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="listening-modal-title">🎧 Bài Tập Nghe Hiểu</h3>
+          <div id="listening-modal-desc" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-listening-assignment">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 68vh; overflow-y: auto;">
+        <div id="listening-modal-alert" class="alert"></div>
+
+        <!-- Trình phát Audio nghe hiểu -->
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px; text-align: center;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">
+            🔊 File âm thanh bài nghe:
+          </div>
+          <audio id="listening-audio-player" controls style="width: 100%; max-width: 450px; outline: none;"></audio>
+        </div>
+
+        <!-- Danh sách câu hỏi trắc nghiệm -->
+        <div id="listening-questions-list" style="display: flex; flex-direction: column; gap: 14px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-listening-assignment">Đóng</button>
+        <button type="button" id="btn-submit-listening" class="btn btn-primary">Nộp bài & Chấm điểm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LÀM BÀI TẬP NÓI & GHI ÂM -->
+  <div id="modal-speaking-assignment" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="speaking-modal-title">🎙️ Bài Tập Nói & Ghi Âm</h3>
+          <div id="speaking-modal-desc" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-speaking-assignment">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="speaking-modal-alert" class="alert"></div>
+
+        <!-- Thông tin hạn chót & phần thưởng XP -->
+        <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; font-size: 13px; color: var(--text-muted); background: var(--bg-subtle); padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <span>⏰ Hạn chót: <strong id="speaking-modal-due" style="color: var(--text-main);">Không giới hạn</strong></span>
+          <span>⚡ Thưởng: <strong id="speaking-modal-xp" style="color: #ca8a04;">+30 XP</strong></span>
+        </div>
+
+        <!-- Khung Đề bài câu/đoạn tiếng Trung cần đọc -->
+        <div style="background: var(--bg-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px; border: 1.5px solid var(--border-color); text-align: center;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">
+            Đề bài luyện đọc (Phát âm chuẩn theo thanh điệu):
+          </div>
+          <div id="speaking-prompt-hanzi" style="font-size: 22px; font-weight: 800; color: var(--text-main); font-family: 'PingFang SC', sans-serif; line-height: 1.5; margin-bottom: 6px;">
+            Đang tải đề bài...
+          </div>
+          <div id="speaking-prompt-pinyin" style="font-size: 15px; color: var(--primary); font-weight: 600; margin-bottom: 12px;"></div>
+
+          <div id="speaking-sample-audio-box" style="display: none; margin-top: 8px;">
+            <button type="button" id="btn-play-speaking-sample" class="btn btn-outline btn-sm">
+              🔊 Nghe audio đọc mẫu của cô giáo
+            </button>
+          </div>
+        </div>
+
+        <!-- Khung Ghi âm MediaRecorder -->
+        <div id="speaking-record-wrapper" style="background: var(--bg-card); border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 20px; text-align: center; margin-bottom: 14px;">
+          <div id="recorder-status-text" style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
+            Nhấn nút tròn đỏ bên dưới để bắt đầu ghi âm
+          </div>
+
+          <div id="recorder-timer" style="font-size: 28px; font-weight: 800; color: var(--text-main); font-family: monospace; margin-bottom: 16px;">
+            00:00 <span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">/ 01:00</span>
+          </div>
+
+          <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+            <button type="button" id="btn-start-record" class="btn btn-primary" style="border-radius: var(--radius-full); padding: 0 20px;">
+              🎙️ Bắt đầu ghi âm
+            </button>
+            <button type="button" id="btn-stop-record" class="btn btn-danger" style="display: none; border-radius: var(--radius-full); padding: 0 20px;">
+              ⏹️ Dừng ghi âm
+            </button>
+            <button type="button" id="btn-re-record" class="btn btn-outline" style="display: none;">
+              🔄 Ghi lại
+            </button>
+          </div>
+
+          <div id="preview-audio-container" style="display: none; margin-top: 14px;">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">🎧 Nghe lại bản ghi vừa thu:</div>
+            <audio id="preview-audio-player" controls style="width: 100%; max-width: 380px;"></audio>
+          </div>
+        </div>
+
+        <div id="mic-permission-guide" style="display: none; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; color: var(--warning); line-height: 1.5; margin-bottom: 14px;">
+          <strong>⚠️ Quyền truy cập Micro bị chặn:</strong>
+          Vui lòng bấm vào biểu tượng chiếc ổ khóa 🔒 (hoặc micro) ở góc trái thanh địa chỉ trình duyệt, chọn <em>"Cho phép (Allow) Microphone"</em>, sau đó thử lại nhé!
+        </div>
+
+        <div id="speaking-prev-submission-info" style="display: none; background: var(--bg-subtle); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; border: 1px solid var(--border-color);"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-speaking-assignment">Đóng</button>
+        <button type="button" id="btn-submit-speaking" class="btn btn-primary" disabled>
+          📤 Nộp bài ghi âm
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Scripts -->
   <script src="js/theme.js?v=3.0"></script>

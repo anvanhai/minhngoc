@@ -297,6 +297,62 @@ window.Student = (function () {
   }
 
   /**
+   * Lấy danh sách bài tập gắn với một bài học (cả bài tập cấp giáo trình và bài tập lớp)
+   */
+  async function getLessonAssignments(lessonId, classId = null) {
+    const db = getDb();
+    if (!db || !lessonId) return [];
+
+    const currentUser = await window.Auth.getCurrentUser();
+    const studentId = currentUser ? currentUser.user.id : null;
+
+    let query = db
+      .from('assignments')
+      .select(`
+        *,
+        lesson:lessons (
+          id, order_index, title_zh, title_vi
+        ),
+        submissions:assignment_submissions (
+          id, student_id, status, completed_at, score, audio_url, teacher_comment, graded_at
+        )
+      `)
+      .eq('lesson_id', lessonId);
+
+    if (classId) {
+      query = query.or(`class_id.eq.${classId},class_id.is.null`);
+    }
+
+    const { data: assignments, error } = await query
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.warn('Lỗi tải bài tập bài học:', error);
+      return [];
+    }
+
+    return (assignments || []).map(a => {
+      const mySub = (a.submissions || []).find(s => s.student_id === studentId);
+      const isPastDue = a.due_date ? (new Date() > new Date(a.due_date)) : false;
+
+      let status = 'pending';
+      if (mySub) {
+        status = mySub.status;
+      } else if (isPastDue) {
+        status = 'overdue';
+      }
+
+      return {
+        ...a,
+        submission: mySub || null,
+        userStatus: status,
+        isPastDue
+      };
+    });
+  }
+
+  /**
    * Hoàn thành bài tập từ vựng thường
    */
   async function completeAssignment(assignmentId) {
@@ -491,6 +547,7 @@ window.Student = (function () {
     recordLessonVocabProgress,
     submitQuizAttempt,
     getClassAssignments,
+    getLessonAssignments,
     completeAssignment,
     submitListeningAssignment,
     uploadRecordingAudio,
