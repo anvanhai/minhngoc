@@ -95,6 +95,35 @@ document.addEventListener('DOMContentLoaded', async function () {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /**
+   * Chuyển đổi lỗi database / PostgREST thành thông báo tiếng Việt dễ hiểu
+   */
+  function formatLessonVocabError(err, fallbackMsg = 'Không thể cập nhật từ vựng cho bài học.') {
+    const raw = (err && (err.message || err.details || err.hint || String(err))) || '';
+    const lower = raw.toLowerCase();
+    const code = err && err.code ? String(err.code) : '';
+
+    if (lower.includes('total_vocabularies') || lower.includes('does not exist') || code === '42703' || code === '42P01') {
+      return 'Cơ sở dữ liệu chưa được cập nhật đúng cấu trúc (thiếu cột hoặc hàm cũ đang tham chiếu cột không tồn tại). Vui lòng chạy file SQL Migration 24 trong Supabase SQL Editor rồi thử lại.';
+    }
+    if (lower.includes('could not find the function') || code === 'PGRST202') {
+      return 'Hàm xử lý từ vựng trên máy chủ chưa được khởi tạo hoặc chưa làm mới schema cache. Vui lòng chạy Migration 24 trên Supabase.';
+    }
+    if (lower.includes('permission denied') || code === '42501' || lower.includes('chỉ quản trị viên')) {
+      return 'Bạn không có quyền chỉnh sửa từ vựng của bài học này.';
+    }
+    if (lower.includes('failed to fetch') || lower.includes('network')) {
+      return 'Không thể kết nối tới máy chủ Supabase. Vui lòng kiểm tra kết nối mạng và thử lại.';
+    }
+    if (lower.includes('không tìm thấy bài học')) {
+      return 'Không tìm thấy bài học này trong hệ thống (có thể bài học vừa bị xóa).';
+    }
+    if (/^[a-z0-9_.\s"':-]+$/i.test(raw) && raw.length > 0) {
+      return `${fallbackMsg} Vui lòng kiểm tra lại cấu hình cơ sở dữ liệu và thử lại.`;
+    }
+    return raw || fallbackMsg;
+  }
+
   // ===========================================================================
   // 1. TẢI VÀ HIỂN THỊ DANH SÁCH GIÁO TRÌNH
   // ===========================================================================
@@ -251,9 +280,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         const isFirst = (index === 0);
         const isLast = (index === totalLessons - 1);
 
-        const vocabCount = l.vocab_count !== undefined ? l.vocab_count : (l.total_vocabularies || 0);
-        const slideCount = l.slide_count !== undefined ? l.slide_count : 0;
-        const assignCount = l.assignment_count !== undefined ? l.assignment_count : 0;
+        const vocabCount = l.vocab_count || 0;
+        const slideCount = l.slide_count || 0;
+        const assignCount = l.assignment_count || 0;
 
         return `
           <tr data-lesson-id="${l.id}">
@@ -654,9 +683,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('edit-lesson-xp').value = l.reward_xp || 50;
     document.getElementById('edit-lesson-pass-score').value = l.pass_score_percent || 80;
 
-    const vocabCount = l.vocab_count !== undefined ? l.vocab_count : (l.total_vocabularies || 0);
-    const slideCount = l.slide_count !== undefined ? l.slide_count : 0;
-    const assignCount = l.assignment_count !== undefined ? l.assignment_count : 0;
+    const vocabCount = l.vocab_count || 0;
+    const slideCount = l.slide_count || 0;
+    const assignCount = l.assignment_count || 0;
 
     const vocabCountEl = document.getElementById('edit-lesson-vocab-count');
     const slideCountEl = document.getElementById('edit-lesson-slide-count');
@@ -899,9 +928,28 @@ document.addEventListener('DOMContentLoaded', async function () {
             try {
               await window.Admin.removeWordFromLesson(linkId);
               await loadLessonVocabulariesList(lessonId);
-              await loadLessons(selectedCurriculum.id);
+              if (selectedCurriculum) {
+                await loadLessons(selectedCurriculum.id);
+                activeLessonForVocab = currentLessonsList.find(x => x.id === lessonId) || activeLessonForVocab;
+              }
+              const msg = `Đã gỡ từ "${hanzi}" khỏi bài học.`;
+              if (lessonVocabAlert) {
+                lessonVocabAlert.className = 'alert alert-success show';
+                lessonVocabAlert.textContent = msg;
+              }
+              if (pageAlert) {
+                pageAlert.className = 'alert alert-success show';
+                pageAlert.textContent = msg;
+              }
             } catch (err) {
-              alert('Lỗi gỡ từ: ' + err.message);
+              console.error('Lỗi gỡ từ:', err);
+              const errMsg = formatLessonVocabError(err, 'Lỗi khi gỡ từ khỏi bài học.');
+              if (lessonVocabAlert) {
+                lessonVocabAlert.className = 'alert alert-danger show';
+                lessonVocabAlert.textContent = errMsg;
+              } else {
+                alert(errMsg);
+              }
             }
           }
         });
@@ -930,7 +978,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   function updateSelectedLessonVocabCount() {
     const checked = document.querySelectorAll('.chk-lesson-vocab:checked');
     const total = document.querySelectorAll('.chk-lesson-vocab');
-    if (selectedVocabCount) selectedVocabCount.textContent = checked.length;
+    const countEl = document.getElementById('selected-vocab-count') || selectedVocabCount;
+    if (countEl) countEl.textContent = checked.length;
 
     if (checked.length > 0) {
       btnBatchRemoveVocab.style.display = 'inline-flex';
@@ -955,18 +1004,48 @@ document.addEventListener('DOMContentLoaded', async function () {
     const checked = Array.from(document.querySelectorAll('.chk-lesson-vocab:checked')).map(c => c.value);
     if (checked.length === 0) return;
 
+    const targetLessonId = activeLessonForVocab.id;
+
     if (confirm(`Bạn có chắc muốn gỡ ${checked.length} từ vựng đã chọn khỏi bài học này?`)) {
       try {
         btnBatchRemoveVocab.disabled = true;
         btnBatchRemoveVocab.textContent = 'Đang gỡ...';
 
-        await window.Admin.batchRemoveWordsFromLesson(activeLessonForVocab.id, checked);
-        await loadLessonVocabulariesList(activeLessonForVocab.id);
+        const res = await window.Admin.batchRemoveWordsFromLesson(targetLessonId, checked);
+        const removedCount = (res && typeof res.removed_count === 'number') ? res.removed_count : checked.length;
+
+        btnBatchRemoveVocab.innerHTML = '❌ Gỡ (<span id="selected-vocab-count">0</span>) từ đã chọn';
+        await loadLessonVocabulariesList(targetLessonId);
+        if (selectedCurriculum) {
+          await loadLessons(selectedCurriculum.id);
+          activeLessonForVocab = currentLessonsList.find(x => x.id === targetLessonId) || activeLessonForVocab;
+        }
+
+        const msg = `Đã gỡ ${removedCount} từ khỏi bài học.`;
+        if (lessonVocabAlert) {
+          lessonVocabAlert.className = 'alert alert-success show';
+          lessonVocabAlert.textContent = msg;
+        }
+        if (pageAlert) {
+          pageAlert.className = 'alert alert-success show';
+          pageAlert.textContent = msg;
+        }
       } catch (err) {
-        alert('Lỗi gỡ từ: ' + err.message);
+        console.error('Lỗi gỡ hàng loạt từ:', err);
+        btnBatchRemoveVocab.innerHTML = `❌ Gỡ (<span id="selected-vocab-count">${checked.length}</span>) từ đã chọn`;
+        const errMsg = formatLessonVocabError(err, 'Lỗi khi gỡ từ khỏi bài học.');
+        if (lessonVocabAlert) {
+          lessonVocabAlert.className = 'alert alert-danger show';
+          lessonVocabAlert.textContent = errMsg;
+        } else {
+          alert(errMsg);
+        }
       } finally {
         btnBatchRemoveVocab.disabled = false;
-        btnBatchRemoveVocab.textContent = `❌ Gỡ (${checked.length}) từ đã chọn`;
+        if (!btnBatchRemoveVocab.querySelector('#selected-vocab-count')) {
+          btnBatchRemoveVocab.innerHTML = '❌ Gỡ (<span id="selected-vocab-count">0</span>) từ đã chọn';
+        }
+        updateSelectedLessonVocabCount();
       }
     }
   });
@@ -1171,20 +1250,44 @@ document.addEventListener('DOMContentLoaded', async function () {
     const checked = Array.from(document.querySelectorAll('.chk-warehouse-vocab:checked')).map(c => c.value);
     if (checked.length === 0) return;
 
+    const targetLessonId = activeLessonForVocab.id;
+
     try {
+      addVocabAlert.className = 'alert';
+      addVocabAlert.textContent = '';
       btnConfirmAddWarehouseVocab.disabled = true;
       btnConfirmAddWarehouseVocab.textContent = 'Đang thêm...';
 
-      await window.Admin.batchAddWordsToLesson(activeLessonForVocab.id, checked);
+      const res = await window.Admin.batchAddWordsToLesson(targetLessonId, checked);
+      const addedCount = (res && typeof res.added_count === 'number') ? res.added_count : checked.length;
+      const skippedCount = (res && typeof res.skipped_count === 'number') ? res.skipped_count : 0;
+
+      // Đóng hộp thoại và cập nhật lại danh sách từ trong bài + bảng bài học ngay lập tức
       modalAddVocabToLesson.classList.remove('active');
-      await loadLessonVocabulariesList(activeLessonForVocab.id);
+      await loadLessonVocabulariesList(targetLessonId);
+      if (selectedCurriculum) {
+        await loadLessons(selectedCurriculum.id);
+        activeLessonForVocab = currentLessonsList.find(x => x.id === targetLessonId) || activeLessonForVocab;
+      }
+
+      const successMsg = skippedCount > 0
+        ? `Đã thêm ${addedCount} từ vào bài học (bỏ qua ${skippedCount} từ đã có sẵn).`
+        : `Đã thêm ${addedCount} từ vào bài học`;
+      if (lessonVocabAlert) {
+        lessonVocabAlert.className = 'alert alert-success show';
+        lessonVocabAlert.textContent = successMsg;
+      }
+      if (pageAlert) {
+        pageAlert.className = 'alert alert-success show';
+        pageAlert.textContent = successMsg;
+      }
 
     } catch (err) {
+      console.error('Lỗi thêm từ vào bài học:', err);
       addVocabAlert.className = 'alert alert-danger show';
-      addVocabAlert.textContent = err.message || 'Lỗi thêm từ vào bài học';
+      addVocabAlert.textContent = formatLessonVocabError(err, 'Không thể thêm từ vựng vào bài học.');
     } finally {
-      btnConfirmAddWarehouseVocab.disabled = false;
-      btnConfirmAddWarehouseVocab.textContent = `➕ Thêm (${checked.length}) từ vào bài học`;
+      updateSelectedWarehouseVocabCount();
     }
   });
 

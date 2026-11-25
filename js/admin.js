@@ -172,7 +172,7 @@ window.Admin = (function () {
       if (!error && data) {
         return data.map(l => ({
           ...l,
-          vocab_count: l.lesson_vocabularies && l.lesson_vocabularies[0] ? l.lesson_vocabularies[0].count : (l.total_vocabularies || 0),
+          vocab_count: l.lesson_vocabularies && l.lesson_vocabularies[0] ? l.lesson_vocabularies[0].count : 0,
           slide_count: l.lesson_slides && l.lesson_slides[0] ? l.lesson_slides[0].count : 0,
           assignment_count: l.assignments && l.assignments[0] ? l.assignments[0].count : 0
         }));
@@ -181,16 +181,32 @@ window.Admin = (function () {
       console.warn('Query lessons with counts error, falling back:', e);
     }
 
+    // Fallback: đếm trực tiếp từ bảng liên kết lesson_vocabularies nếu một bảng phụ chưa sẵn sàng
     const { data: fallbackData, error: fallbackError } = await db
+      .from('lessons')
+      .select('*, lesson_vocabularies(count)')
+      .eq('curriculum_id', curriculumId)
+      .order('order_index', { ascending: true });
+
+    if (!fallbackError && fallbackData) {
+      return fallbackData.map(l => ({
+        ...l,
+        vocab_count: l.lesson_vocabularies && l.lesson_vocabularies[0] ? l.lesson_vocabularies[0].count : 0,
+        slide_count: 0,
+        assignment_count: 0
+      }));
+    }
+
+    const { data: basicData, error: basicError } = await db
       .from('lessons')
       .select('*')
       .eq('curriculum_id', curriculumId)
       .order('order_index', { ascending: true });
 
-    if (fallbackError) throw fallbackError;
-    return (fallbackData || []).map(l => ({
+    if (basicError) throw basicError;
+    return (basicData || []).map(l => ({
       ...l,
-      vocab_count: l.total_vocabularies || 0,
+      vocab_count: 0,
       slide_count: 0,
       assignment_count: 0
     }));
