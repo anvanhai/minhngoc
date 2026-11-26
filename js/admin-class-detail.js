@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   window.Auth.renderNavbarUserInfo(authData.profile);
 
   const urlParams = new URLSearchParams(window.location.search);
-  const classId = urlParams.get('id');
+  let classId = urlParams.get('id');
+  const initialTabParam = urlParams.get('tab');
 
   if (!classId) {
     alert('Không tìm thấy mã lớp học!');
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   let currentClass = null;
   let curriculumLessons = [];
   let manualUnlocksMap = {};
+  let activeTabId = 'tab-overview';
 
   const pageAlert = document.getElementById('page-alert');
   const classDetailName = document.getElementById('class-detail-name');
@@ -107,15 +109,35 @@ document.addEventListener('DOMContentLoaded', async function () {
   const subnavBtns = document.querySelectorAll('.admin-subnav-btn[data-tab]');
   const tabPanes = document.querySelectorAll('.tab-pane');
 
+  function activateTab(targetTabId) {
+    if (!targetTabId) return;
+    const btn = document.querySelector(`.admin-subnav-btn[data-tab="${targetTabId}"]`);
+    const targetPane = document.getElementById(targetTabId);
+    if (!btn || !targetPane) return;
+
+    activeTabId = targetTabId;
+    subnavBtns.forEach(b => b.classList.remove('active'));
+    tabPanes.forEach(p => { p.style.display = 'none'; });
+
+    btn.classList.add('active');
+    targetPane.style.display = 'block';
+
+    try {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('id', classId);
+      nextUrl.searchParams.set('tab', targetTabId);
+      window.history.replaceState({}, '', nextUrl.toString());
+    } catch (e) {}
+
+    if (targetTabId === 'tab-leaderboard' && typeof loadClassLeaderboardAndAudit === 'function') {
+      loadClassLeaderboardAndAudit();
+    }
+  }
+
   subnavBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       const targetTabId = btn.getAttribute('data-tab');
-      subnavBtns.forEach(b => b.classList.remove('active'));
-      tabPanes.forEach(p => p.style.display = 'none');
-
-      btn.classList.add('active');
-      const targetPane = document.getElementById(targetTabId);
-      if (targetPane) targetPane.style.display = 'block';
+      activateTab(targetTabId);
     });
   });
 
@@ -128,10 +150,21 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
       }
 
+      // Kiểm tra phân quyền lớp học: Giáo viên chỉ được xem lớp mình phụ trách
+      if (authData.profile && authData.profile.role === 'teacher' && currentClass.teacher_id !== authData.user.id) {
+        classDetailName.textContent = 'Không có quyền truy cập';
+        classDetailCurriculum.textContent = 'Lớp học này do giáo viên khác phụ trách.';
+        tabPanes.forEach(p => { p.style.display = 'none'; });
+        const subnavEl = document.querySelector('.admin-subnav');
+        if (subnavEl) subnavEl.style.display = 'none';
+        showAlert('Bạn chỉ có quyền xem bảng xếp hạng và quản lý các lớp mình được phân công phụ trách.');
+        return false;
+      }
+
       // Render Header
-      classDetailName.textContent = currentClass.name;
+      classDetailName.textContent = currentClass.name || 'Lớp học';
       const currTitle = currentClass.curriculum ? currentClass.curriculum.title : 'Chưa gán';
-      classDetailCurriculum.textContent = `Giáo trình: ${currTitle} (${currentClass.level})`;
+      classDetailCurriculum.textContent = `Giáo trình: ${currTitle} (${currentClass.level || 'HSK1'})`;
 
       let badgeHtml = '<span class="badge-status badge-ongoing">Đang học</span>';
       if (currentClass.status === 'paused') badgeHtml = '<span class="badge-status badge-paused">Tạm dừng</span>';
@@ -153,6 +186,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (settingClassUnlockMode) settingClassUnlockMode.value = currentClass.unlock_mode || 'sequential';
       settingClassStatus.value = currentClass.status || 'ongoing';
 
+      // Đồng bộ dropdown lớp ở tab Bảng xếp hạng
+      const lbSel = document.getElementById('lb-class-selector');
+      if (lbSel && lbSel.querySelector(`option[value="${classId}"]`)) {
+        lbSel.value = classId;
+      }
+
       // 3. Tải danh sách mở khóa thủ công và bài học
       if (currentClass.curriculum_id) {
         manualUnlocksMap = await window.Admin.getClassLessonUnlocks(classId);
@@ -168,15 +207,27 @@ document.addEventListener('DOMContentLoaded', async function () {
           curriculumLessons.map(l => `<option value="${l.id}">Bài ${l.order_index}: ${l.title_zh} (${l.title_vi})</option>`).join('');
 
         renderClassLessonsTable();
+      } else {
+        curriculumLessons = [];
+        if (selectCurrentLesson) selectCurrentLesson.innerHTML = '';
+        if (assignLessonSelect) assignLessonSelect.innerHTML = '<option value="">-- Không gắn bài cụ thể --</option>';
+        renderClassLessonsTable();
       }
 
       // 4. Tải danh sách học sinh & bài tập
       await loadClassStudentsList();
       await loadClassAssignmentsList();
 
+      if (activeTabId === 'tab-leaderboard' && typeof loadClassLeaderboardAndAudit === 'function') {
+        await loadClassLeaderboardAndAudit();
+      }
+
+      return true;
+
     } catch (err) {
       console.error('Lỗi tải chi tiết lớp:', err);
       showAlert('Lỗi tải dữ liệu lớp học: ' + (err.message || err));
+      return false;
     }
   }
 
@@ -568,13 +619,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   // Chuyển nhanh sang tab Cài đặt từ Banner
   if (btnBannerEditClass) {
     btnBannerEditClass.addEventListener('click', () => {
-      subnavBtns.forEach(b => b.classList.remove('active'));
-      tabPanes.forEach(p => p.style.display = 'none');
-      const settingsBtn = document.querySelector('[data-tab="tab-settings"]');
-      if (settingsBtn) settingsBtn.classList.add('active');
+      activateTab('tab-settings');
       const settingsPane = document.getElementById('tab-settings');
       if (settingsPane) {
-        settingsPane.style.display = 'block';
         settingsPane.scrollIntoView({ behavior: 'smooth' });
       }
     });
@@ -1449,12 +1496,881 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
+  // ===========================================================================
+  // 10. TAB BẢNG XẾP HẠNG LỚP & ĐỐI SOÁT BÙ XP (GIÁO VIÊN / ADMIN)
+  // ===========================================================================
+  const lbClassSelector = document.getElementById('lb-class-selector');
+  const btnRunXpAudit = document.getElementById('btn-run-xp-audit');
+  const btnExportLbCsv = document.getElementById('btn-export-lb-csv');
+  const lbTabAlert = document.getElementById('lb-tab-alert');
+  const lbSumStudents = document.getElementById('lb-sum-students');
+  const lbSumAssignments = document.getElementById('lb-sum-assignments');
+  const lbSumBackfilledStudents = document.getElementById('lb-sum-backfilled-students');
+  const lbSumLegacyNote = document.getElementById('lb-sum-legacy-note');
+  const lbSumBackfilledXp = document.getElementById('lb-sum-backfilled-xp');
+  const lbSumBackfilledSub = document.getElementById('lb-sum-backfilled-sub');
+  const lbSumMismatched = document.getElementById('lb-sum-mismatched');
+  const lbLastChecked = document.getElementById('lb-last-checked');
+  const lbAuditSearch = document.getElementById('lb-audit-search');
+  const lbAuditFilter = document.getElementById('lb-audit-filter');
+  const lbAuditTableBody = document.getElementById('lb-audit-table-body');
+  const lbPaginationInfo = document.getElementById('lb-pagination-info');
+  const lbPaginationControls = document.getElementById('lb-pagination-controls');
+  const btnLbPrevPage = document.getElementById('btn-lb-prev-page');
+  const btnLbNextPage = document.getElementById('btn-lb-next-page');
+  const lbPageIndicator = document.getElementById('lb-page-indicator');
+
+  const modalXpAuditDetail = document.getElementById('modal-xp-audit-detail');
+  const auditModalStudentTitle = document.getElementById('audit-modal-student-title');
+  const auditModalStudentSub = document.getElementById('audit-modal-student-sub');
+  const auditModalBody = document.getElementById('audit-modal-body');
+
+  let lbCurrentPeriod = 'week';
+  let lbPage = 1;
+  const LB_PAGE_SIZE = 100;
+  let lbTotalCount = 0;
+  let lbMergedRows = [];
+  let lbLastSummary = null;
+  let lbClassesCache = [];
+  let lbSearchTimer = null;
+
+  function safeStr(val, fallback = '') {
+    if (val === null || val === undefined) return fallback;
+    const s = String(val).trim();
+    if (!s || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null') return fallback;
+    return s;
+  }
+
+  function escHtml(str) {
+    return safeStr(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatVnDateTime(isoStr, withSeconds = false) {
+    const raw = safeStr(isoStr);
+    if (!raw) return '';
+    try {
+      const opts = {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      };
+      if (withSeconds) opts.second = '2-digit';
+      return new Date(raw).toLocaleString('vi-VN', opts);
+    } catch (e) {
+      return raw;
+    }
+  }
+
+  function showLbError(msg, retryFn = null) {
+    if (!lbTabAlert) return;
+    lbTabAlert.className = 'alert alert-danger show';
+    lbTabAlert.innerHTML = '';
+
+    const span = document.createElement('span');
+    span.textContent = msg;
+    lbTabAlert.appendChild(span);
+
+    if (typeof retryFn === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-outline btn-sm';
+      btn.style.cssText = 'margin-left: 12px; height: 28px; padding: 0 10px; font-size: 12px;';
+      btn.textContent = '🔄 Thử lại';
+      btn.addEventListener('click', () => retryFn());
+      lbTabAlert.appendChild(btn);
+    }
+  }
+
+  function clearLbAlert() {
+    if (!lbTabAlert) return;
+    lbTabAlert.className = 'alert';
+    lbTabAlert.innerHTML = '';
+  }
+
+  async function initLeaderboardClassSelector() {
+    if (!lbClassSelector) return;
+    try {
+      let classes = [];
+      try {
+        classes = await window.Admin.getTeacherAccessibleClasses();
+      } catch (rpcErr) {
+        console.warn('Fallback getClasses cho selector lớp:', rpcErr);
+        const raw = await window.Admin.getClasses();
+        const isTeacherOnly = authData.profile && authData.profile.role === 'teacher';
+        classes = isTeacherOnly ? (raw || []).filter(c => c.teacher_id === authData.user.id) : (raw || []);
+      }
+
+      lbClassesCache = classes || [];
+      if (lbClassesCache.length === 0) {
+        lbClassSelector.innerHTML = '<option value="">-- Không có lớp nào thuộc quyền xem --</option>';
+        return;
+      }
+
+      lbClassSelector.innerHTML = lbClassesCache.map(c => {
+        const name = escHtml(safeStr(c.name, 'Lớp chưa đặt tên'));
+        const lvl = escHtml(safeStr(c.level, 'HSK1'));
+        const cnt = Number(c.active_student_count ?? c.activeStudentCount ?? 0);
+        const teacherLabel = safeStr(c.teacher_name);
+        const suffix = teacherLabel ? ` · GV: ${escHtml(teacherLabel)}` : '';
+        return `<option value="${escHtml(c.id)}">${name} (${lvl} · ${cnt} HV${suffix})</option>`;
+      }).join('');
+
+      if (lbClassSelector.querySelector(`option[value="${classId}"]`)) {
+        lbClassSelector.value = classId;
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách lớp cho selector BXH:', err);
+      lbClassSelector.innerHTML = '<option value="">-- Lỗi tải danh sách lớp --</option>';
+    }
+  }
+
+  function renderAuditSummaryCards(summary) {
+    const s = summary || {};
+    const totalStudents = Number(s.total_students || 0);
+    const totalAssigns = Number(s.total_class_assignments || 0);
+    const backfilledStudents = Number(s.backfilled_students_count || 0);
+    const totalBackfilledXp = Number(s.total_backfilled_xp || 0);
+    const legacyStudents = Number(s.legacy_suspect_students_count || 0);
+    const legacyXp = Number(s.legacy_suspect_xp || 0);
+    const matchedCount = Number(s.matched_count || 0);
+    const missingCount = Number(s.missing_count || 0);
+    const excessCount = Number(s.excess_count || 0);
+    const mismatchedCount = Number(s.mismatched_count || 0);
+    const checkedAt = formatVnDateTime(s.checked_at, true);
+
+    if (lbSumStudents) lbSumStudents.textContent = `${totalStudents} học viên`;
+    if (lbSumAssignments) lbSumAssignments.textContent = `${totalAssigns} bài tập của lớp`;
+    if (lbSumBackfilledStudents) lbSumBackfilledStudents.textContent = `${backfilledStudents} học viên`;
+    if (lbSumLegacyNote) {
+      lbSumLegacyNote.textContent = legacyStudents > 0
+        ? `+${legacyStudents} HV có mô tả bù cũ trước nhật ký`
+        : 'Theo nhật ký xp_backfill_log';
+    }
+    if (lbSumBackfilledXp) lbSumBackfilledXp.textContent = `+${totalBackfilledXp.toLocaleString()} XP`;
+    if (lbSumBackfilledSub) {
+      lbSumBackfilledSub.textContent = legacyXp > 0
+        ? `(+${legacyXp.toLocaleString()} XP nghi bù trước Migration 27)`
+        : 'Chỉ tính các khoản bù có nhật ký';
+    }
+    if (lbSumMismatched) {
+      lbSumMismatched.textContent = mismatchedCount > 0 ? `${mismatchedCount} học viên lệch` : '0 (Khớp hết)';
+      lbSumMismatched.style.color = mismatchedCount > 0 ? 'var(--danger)' : 'var(--success)';
+    }
+    if (lbLastChecked) {
+      lbLastChecked.textContent = `Khớp ${matchedCount} · Thiếu ${missingCount} · Thừa ${excessCount} · Lúc ${checkedAt || '--'}`;
+    }
+  }
+
+  function formatStatusBadge(row) {
+    const status = safeStr(row.status, 'matched');
+    const diff = Number(row.diff_xp || 0);
+    const dupExcess = Number(row.duplicate_excess_xp || 0);
+
+    if (status === 'missing') {
+      const missingAmt = diff < 0 ? Math.abs(diff) : Math.max(0, Number(row.expected_xp || 0) - Number(row.tx_xp || 0));
+      return {
+        label: `Còn thiếu ${missingAmt.toLocaleString()} XP`,
+        html: `<span class="badge-status badge-paused" style="background: rgba(251, 191, 36, 0.2); color: var(--warning);">⚠️ Còn thiếu ${missingAmt.toLocaleString()} XP</span>`
+      };
+    }
+    if (status === 'excess') {
+      const excessAmt = diff > 0 ? diff : (dupExcess > 0 ? dupExcess : Math.max(0, Number(row.tx_xp || 0) - Number(row.expected_xp || 0)));
+      return {
+        label: `Thừa ${excessAmt.toLocaleString()} XP (nghi cộng trùng)`,
+        html: `<span class="badge-status" style="background: rgba(248, 113, 113, 0.2); color: var(--danger);">🚨 Thừa ${excessAmt.toLocaleString()} XP (nghi cộng trùng)</span>`
+      };
+    }
+    return {
+      label: 'Khớp',
+      html: `<span class="badge-status badge-ongoing">✅ Khớp</span>`
+    };
+  }
+
+  function renderLeaderboardAuditTable() {
+    if (!lbAuditTableBody) return;
+    const query = safeStr(lbAuditSearch ? lbAuditSearch.value : '').toLowerCase();
+    const filterVal = lbAuditFilter ? lbAuditFilter.value : 'all';
+
+    const filtered = (lbMergedRows || []).filter(row => {
+      const name = (safeStr(row.display_name) || safeStr(row.username) || 'Học viên').toLowerCase();
+      const uname = safeStr(row.username).toLowerCase();
+      const matchQuery = !query || name.includes(query) || uname.includes(query);
+      if (!matchQuery) return false;
+
+      if (filterVal === 'all') return true;
+      if (filterVal === 'backfilled') {
+        return Number(row.backfill_total_xp || 0) > 0 || Number(row.legacy_suspect_backfill_xp || 0) > 0;
+      }
+      return row.status === filterVal;
+    });
+
+    if (filtered.length === 0) {
+      lbAuditTableBody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 36px; color: var(--text-muted);">
+            ${lbMergedRows.length === 0
+              ? 'Lớp học này chưa có học viên đang theo học (active).'
+              : 'Không tìm thấy học viên nào phù hợp bộ lọc hiện tại.'}
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    lbAuditTableBody.innerHTML = filtered.map(row => {
+      const rankNum = Number(row.rank || 0);
+      let rankBadge = `<span style="font-weight: 800; color: var(--text-muted);">#${rankNum || '-'}</span>`;
+      if (rankNum === 1) rankBadge = '<span style="font-size: 18px;">🥇</span>';
+      else if (rankNum === 2) rankBadge = '<span style="font-size: 18px;">🥈</span>';
+      else if (rankNum === 3) rankBadge = '<span style="font-size: 18px;">🥉</span>';
+
+      const displayName = safeStr(row.display_name) || safeStr(row.username) || 'Học viên';
+      const username = safeStr(row.username);
+      const initial = displayName.charAt(0).toUpperCase();
+
+      const periodXp = Number(row.period_xp || 0);
+      const lifetimeXp = Number(row.lifetime_xp ?? row.actual_xp ?? 0);
+      const wordsLearned = Number(row.words_learned || 0);
+      const streak = Number(row.current_streak || 0);
+      const completedAssigns = Number(row.completed_assignments || 0);
+      const totalAssigns = Number(row.total_assignments || 0);
+
+      const actualXp = Number(row.actual_xp ?? lifetimeXp);
+      const expectedXp = Number(row.expected_xp || 0);
+      const diffXp = Number(row.diff_xp || 0);
+      const statusInfo = formatStatusBadge(row);
+      const backfillTotal = Number(row.backfill_total_xp || 0);
+      const legacySuspect = Number(row.legacy_suspect_backfill_xp || 0);
+      const backfillTimeStr = formatVnDateTime(row.last_backfilled_at, false);
+
+      let backfillActionHtml = `
+        <button type="button" class="btn btn-outline btn-sm btn-open-audit-detail" data-student-id="${escHtml(row.student_id)}" style="height: 26px; padding: 0 8px; font-size: 11.5px;">
+          🔎 Xem đối soát chi tiết
+        </button>
+      `;
+
+      if (backfillTotal > 0) {
+        backfillActionHtml = `
+          <button type="button" class="btn btn-outline btn-sm btn-open-audit-detail" data-student-id="${escHtml(row.student_id)}" style="height: auto; min-height: 26px; padding: 3px 9px; font-size: 11.5px; white-space: normal; text-align: left; border-color: #38bdf8; color: #38bdf8;">
+            🩹 Đã bù +${backfillTotal.toLocaleString()} XP${backfillTimeStr ? ` vào ${escHtml(backfillTimeStr)}` : ''} (xem)
+          </button>
+        `;
+      } else if (legacySuspect > 0) {
+        backfillActionHtml = `
+          <button type="button" class="btn btn-outline btn-sm btn-open-audit-detail" data-student-id="${escHtml(row.student_id)}" style="height: auto; min-height: 26px; padding: 3px 9px; font-size: 11.5px; white-space: normal; text-align: left; border-color: var(--warning); color: var(--warning);">
+            📝 Nghi đã bù +${legacySuspect.toLocaleString()} XP (trước nhật ký — xem)
+          </button>
+        `;
+      }
+
+      const ledgerWarnHtml = row.is_ledger_out_of_sync
+        ? `<div style="font-size: 11px; color: var(--danger); margin-top: 2px;">⚠️ Sổ cái XP = ${Number(row.tx_xp || 0).toLocaleString()} XP (lệch hồ sơ)</div>`
+        : '';
+
+      return `
+        <tr>
+          <td style="text-align: center;">${rankBadge}</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 9px;">
+              <span style="width: 32px; height: 32px; border-radius: var(--radius-full); background: var(--primary-light); color: var(--primary); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0;">
+                ${escHtml(initial)}
+              </span>
+              <div>
+                <div style="font-weight: 700; color: var(--text-main);">${escHtml(displayName)}</div>
+                ${username ? `<div style="font-size: 11.5px; color: var(--text-muted);">@${escHtml(username)}</div>` : ''}
+              </div>
+            </div>
+          </td>
+          <td><strong style="color: #ca8a04;">${periodXp.toLocaleString()} XP</strong></td>
+          <td><strong>${lifetimeXp.toLocaleString()} XP</strong></td>
+          <td>${wordsLearned.toLocaleString()} từ</td>
+          <td>🔥 ${streak} ngày</td>
+          <td>${completedAssigns} / ${totalAssigns} bài</td>
+          <td>
+            <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
+              <div>${statusInfo.html}</div>
+              <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+                Đang có: <strong style="color: var(--text-main);">${actualXp.toLocaleString()}</strong> ·
+                Lẽ ra: <strong style="color: var(--text-main);">${expectedXp.toLocaleString()}</strong> ·
+                Lệch: <strong style="color: ${diffXp === 0 ? 'var(--success)' : 'var(--danger)'};">${diffXp > 0 ? `+${diffXp.toLocaleString()}` : diffXp.toLocaleString()}</strong>
+              </div>
+              ${Number(row.preserved_deleted_xp || 0) > 0 ? `<div style="font-size: 11px; color: var(--text-muted);">Gồm +${Number(row.preserved_deleted_xp).toLocaleString()} XP bảo lưu từ bài đã xóa</div>` : ''}
+              ${ledgerWarnHtml}
+              <div>${backfillActionHtml}</div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    lbAuditTableBody.querySelectorAll('.btn-open-audit-detail').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stId = btn.getAttribute('data-student-id');
+        if (stId) openXpAuditDetailModal(stId);
+      });
+    });
+  }
+
+  function updateLeaderboardPaginationUi() {
+    if (!lbPaginationInfo || !lbPaginationControls) return;
+    const isFiltering = !!(safeStr(lbAuditSearch ? lbAuditSearch.value : '') || (lbAuditFilter && lbAuditFilter.value !== 'all'));
+
+    if (isFiltering || lbTotalCount <= LB_PAGE_SIZE) {
+      lbPaginationControls.style.display = 'none';
+      lbPaginationInfo.textContent = `Hiển thị ${lbMergedRows.length} / ${lbTotalCount} học viên`;
+      return;
+    }
+
+    const totalPages = Math.max(1, Math.ceil(lbTotalCount / LB_PAGE_SIZE));
+    const startIdx = (lbPage - 1) * LB_PAGE_SIZE + 1;
+    const endIdx = Math.min(lbTotalCount, startIdx + lbMergedRows.length - 1);
+
+    lbPaginationInfo.textContent = `Hiển thị ${startIdx}–${endIdx} trong tổng số ${lbTotalCount} học viên (phân trang phía server)`;
+    lbPaginationControls.style.display = 'inline-flex';
+    if (lbPageIndicator) lbPageIndicator.textContent = `Trang ${lbPage} / ${totalPages}`;
+    if (btnLbPrevPage) btnLbPrevPage.disabled = lbPage <= 1;
+    if (btnLbNextPage) btnLbNextPage.disabled = lbPage >= totalPages;
+  }
+
+  async function loadClassLeaderboardAndAudit({ forceAuditBtn = false } = {}) {
+    if (!lbAuditTableBody || !classId) return;
+    clearLbAlert();
+
+    const isFiltering = !!(safeStr(lbAuditSearch ? lbAuditSearch.value : '') || (lbAuditFilter && lbAuditFilter.value !== 'all'));
+    const reqLimit = isFiltering ? 5000 : LB_PAGE_SIZE;
+    const reqOffset = isFiltering ? 0 : (lbPage - 1) * LB_PAGE_SIZE;
+
+    if (forceAuditBtn && btnRunXpAudit) {
+      btnRunXpAudit.disabled = true;
+      btnRunXpAudit.textContent = '⏳ Đang kiểm tra...';
+    }
+
+    lbAuditTableBody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align: center; padding: 36px; color: var(--text-muted);">
+          ⏳ Đang tải bảng xếp hạng &amp; đối soát dữ liệu XP từ máy chủ...
+        </td>
+      </tr>
+    `;
+
+    try {
+      // 1. Lấy bảng xếp hạng từ chính hàm get_class_leaderboard dùng chung với học viên
+      const lbRows = await window.Admin.getClassLeaderboardForTeacher(classId, lbCurrentPeriod, reqLimit, reqOffset);
+      const studentIds = (lbRows || []).map(r => r.student_id).filter(Boolean);
+      lbTotalCount = (lbRows && lbRows.length > 0 && lbRows[0].total_count !== undefined)
+        ? Number(lbRows[0].total_count)
+        : (lbRows ? lbRows.length : 0);
+
+      // 2. Lấy dữ liệu đối soát XP CHỈ ĐỌC cho đúng danh sách học viên trên trang + tổng kết toàn lớp
+      const reconcileRes = await window.Admin.getClassXpReconciliation(
+        classId,
+        studentIds.length > 0 ? studentIds : null,
+        reqLimit,
+        0
+      );
+
+      lbLastSummary = reconcileRes ? reconcileRes.summary : {};
+      renderAuditSummaryCards(lbLastSummary);
+
+      const auditByStudent = {};
+      ((reconcileRes && reconcileRes.students) || []).forEach(s => {
+        auditByStudent[s.student_id] = s;
+      });
+
+      lbMergedRows = (lbRows || []).map(lb => {
+        const audit = auditByStudent[lb.student_id] || {};
+        return {
+          ...lb,
+          ...audit,
+          display_name: safeStr(lb.display_name) || safeStr(audit.display_name) || safeStr(lb.username) || 'Học viên',
+          username: safeStr(lb.username) || safeStr(audit.username),
+          period_xp: Number(lb.period_xp || 0),
+          lifetime_xp: Number(lb.lifetime_xp ?? audit.actual_xp ?? 0),
+          words_learned: Number(lb.words_learned || 0),
+          current_streak: Number(lb.current_streak || 0)
+        };
+      });
+
+      renderLeaderboardAuditTable();
+      updateLeaderboardPaginationUi();
+    } catch (err) {
+      console.error('Lỗi tải BXH & đối soát XP:', err);
+      const rawMsg = safeStr(err && err.message ? err.message : String(err), 'Không thể tải dữ liệu bảng xếp hạng');
+      const friendlyMsg = rawMsg.includes('Could not find the function')
+        ? 'Cơ sở dữ liệu chưa chạy file Migration 27 (27_teacher_class_leaderboard_and_xp_audit.sql). Vui lòng chạy file SQL trong Supabase SQL Editor rồi bấm Thử lại.'
+        : rawMsg;
+
+      showLbError(friendlyMsg, () => loadClassLeaderboardAndAudit({ forceAuditBtn: true }));
+      lbAuditTableBody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 32px; color: var(--danger);">
+            <div style="font-weight: 700; margin-bottom: 6px;">Không thể tải bảng xếp hạng &amp; đối soát</div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">${escHtml(friendlyMsg)}</div>
+            <button type="button" id="btn-retry-lb-table" class="btn btn-outline btn-sm">🔄 Thử lại</button>
+          </td>
+        </tr>
+      `;
+      const retryBtn = document.getElementById('btn-retry-lb-table');
+      if (retryBtn) retryBtn.addEventListener('click', () => loadClassLeaderboardAndAudit({ forceAuditBtn: true }));
+    } finally {
+      if (forceAuditBtn && btnRunXpAudit) {
+        btnRunXpAudit.disabled = false;
+        btnRunXpAudit.textContent = '🔍 Chạy kiểm tra đối soát';
+      }
+    }
+  }
+
+  async function openXpAuditDetailModal(studentId) {
+    if (!modalXpAuditDetail || !auditModalBody) return;
+    const rowSnapshot = lbMergedRows.find(r => r.student_id === studentId);
+    const snapName = rowSnapshot ? (safeStr(rowSnapshot.display_name) || safeStr(rowSnapshot.username) || 'Học viên') : 'Học viên';
+    const snapUser = rowSnapshot && safeStr(rowSnapshot.username) ? `@${safeStr(rowSnapshot.username)}` : '';
+
+    if (auditModalStudentTitle) auditModalStudentTitle.textContent = `Đối soát XP · ${snapName}`;
+    if (auditModalStudentSub) auditModalStudentSub.textContent = snapUser || 'Đang tải thông tin chi tiết...';
+    auditModalBody.innerHTML = '<div style="text-align: center; padding: 36px; color: var(--text-muted);">⏳ Đang tải chi tiết đối soát và nhật ký bù XP...</div>';
+    modalXpAuditDetail.classList.add('active');
+
+    try {
+      const detail = await window.Admin.getStudentXpAuditDetail(classId, studentId);
+      const sum = (detail && detail.summary) || {};
+      const counts = (detail && detail.counts) || {};
+      const logs = (detail && detail.backfill_logs) || [];
+      const legacyRows = (detail && detail.legacy_suspect_rows) || [];
+      const recentTx = (detail && detail.recent_transactions) || [];
+      const statusInfo = formatStatusBadge(sum);
+
+      const sName = safeStr(sum.display_name, snapName);
+      const sUser = safeStr(sum.username);
+      if (auditModalStudentTitle) auditModalStudentTitle.textContent = `Đối soát XP · ${sName}`;
+      if (auditModalStudentSub) auditModalStudentSub.textContent = sUser ? `@${sUser}` : '';
+
+      const diffVal = Number(sum.diff_xp || 0);
+      const ruleNames = {
+        vocabulary_milestone_2xp: '+2 XP / từ thuộc hoặc tạm nhớ',
+        lesson_vocab_10xp: '+10 XP / bài hoàn thành từ vựng',
+        lesson_quiz_reward_xp: 'Thưởng Quiz hoàn thành bài học',
+        assignment_completion_xp: 'Hoàn thành bài tập',
+        recording_grade_xp: 'Giáo viên chấm bài ghi âm'
+      };
+
+      const logsHtml = logs.length > 0
+        ? `
+          <div class="table-responsive" style="margin-top: 8px;">
+            <table class="data-table" style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th>Thời điểm bù (VN)</th>
+                  <th>Quy tắc áp dụng</th>
+                  <th>Lý do</th>
+                  <th style="text-align: right;">Số XP</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${logs.map(l => `
+                  <tr>
+                    <td>
+                      <div>${escHtml(formatVnDateTime(l.backfilled_at, true))}</div>
+                      <div style="font-size: 11px; color: var(--text-muted);">Đợt: <code>${escHtml(safeStr(l.batch_id).slice(0, 8))}</code></div>
+                    </td>
+                    <td>${escHtml(ruleNames[l.rule_applied] || safeStr(l.rule_applied, 'Bù XP'))}</td>
+                    <td>${escHtml(safeStr(l.reason, 'Bù XP tự động'))}</td>
+                    <td style="text-align: right;"><strong style="color: #ca8a04;">+${Number(l.amount || 0).toLocaleString()} XP</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+        : legacyRows.length > 0
+          ? `
+            <div class="alert alert-warning show" style="margin-top: 8px; font-size: 13px; color: var(--warning);">
+              <strong>⚠️ Dữ liệu bù cũ trước khi có bảng nhật ký <code>xp_backfill_log</code>:</strong><br>
+              Phát hiện ${legacyRows.length} giao dịch mang mô tả bắt đầu bằng <code>"Bù XP..."</code> (có thể đã chạy Migration 26 trước khi cài đặt Migration 27).
+              Vì chưa có nhật ký <code>xp_backfill_log</code> nên <strong>không xác định được mã đợt và thời điểm chạy bù thực tế</strong> (cột ngày bên dưới là thời điểm học gốc).
+            </div>
+            <div class="table-responsive" style="margin-top: 8px;">
+              <table class="data-table" style="font-size: 13px;">
+                <thead>
+                  <tr>
+                    <th>Ngày học gốc (VN)</th>
+                    <th>Loại nguồn</th>
+                    <th>Mô tả</th>
+                    <th style="text-align: right;">Số XP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${legacyRows.map(r => `
+                    <tr>
+                      <td>${escHtml(formatVnDateTime(r.original_activity_at, false) || '--')}</td>
+                      <td><code>${escHtml(safeStr(r.source_type))}</code></td>
+                      <td>${escHtml(safeStr(r.description))}</td>
+                      <td style="text-align: right;"><strong style="color: #ca8a04;">+${Number(r.amount || 0).toLocaleString()} XP</strong></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `
+          : `
+            <div style="padding: 12px 14px; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 13px; color: var(--text-muted); margin-top: 8px;">
+              ${detail && detail.has_unlogged_legacy_note
+                ? 'Không có bản ghi trong bảng <code>xp_backfill_log</code>. Nếu từng có thao tác cộng/bù XP thủ công trước Migration 27 thì hệ thống không tự phân biệt được với XP thường mà chỉ đối soát qua tổng điểm.'
+                : 'Chưa phát sinh khoản bù XP nào cho học viên này.'}
+            </div>
+          `;
+
+      auditModalBody.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px;">
+          <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+            <div style="font-size: 12px; color: var(--text-muted);">XP đang có (Hồ sơ)</div>
+            <div style="font-size: 20px; font-weight: 800; color: var(--text-main);">${Number(sum.actual_xp || 0).toLocaleString()} XP</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Sổ cái TX: ${Number(sum.tx_xp || 0).toLocaleString()} XP</div>
+          </div>
+          <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+            <div style="font-size: 12px; color: var(--text-muted);">XP lẽ ra phải có</div>
+            <div style="font-size: 20px; font-weight: 800; color: #38bdf8;">${Number(sum.expected_xp || 0).toLocaleString()} XP</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Tính từ dữ liệu thật</div>
+          </div>
+          <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+            <div style="font-size: 12px; color: var(--text-muted);">Chênh lệch &amp; Trạng thái</div>
+            <div style="font-size: 18px; font-weight: 800; color: ${diffVal === 0 ? 'var(--success)' : 'var(--danger)'}; margin-bottom: 4px;">
+              ${diffVal > 0 ? `+${diffVal.toLocaleString()} XP` : `${diffVal.toLocaleString()} XP`}
+            </div>
+            <div>${statusInfo.html}</div>
+          </div>
+        </div>
+
+        <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text-main);">1. Chi tiết tính "XP lẽ ra phải có"</h4>
+        <div class="table-responsive" style="margin-bottom: 16px;">
+          <table class="data-table" style="font-size: 13px;">
+            <thead>
+              <tr>
+                <th>Hạng mục nguồn</th>
+                <th>Số lượng ghi nhận</th>
+                <th>Quy tắc tính</th>
+                <th style="text-align: right;">XP chuẩn</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Từ vựng đã nhớ / thuộc (SRS ≥ 2)</td>
+                <td>${Number(counts.vocab_words || 0)} từ</td>
+                <td>+2 XP / từ (1 lần)</td>
+                <td style="text-align: right;"><strong>+${Number(sum.vocab_xp || 0).toLocaleString()} XP</strong></td>
+              </tr>
+              <tr>
+                <td>Hoàn thành từ vựng bài học</td>
+                <td>${Number(counts.lesson_vocab_done || 0)} bài</td>
+                <td>+10 XP / bài (1 lần)</td>
+                <td style="text-align: right;"><strong>+${Number(sum.lesson_vocab_xp || 0).toLocaleString()} XP</strong></td>
+              </tr>
+              <tr>
+                <td>Vượt qua Quiz cuối bài</td>
+                <td>${Number(counts.quiz_passed_count || 0)} bài</td>
+                <td>Theo <code>lessons.reward_xp</code> (mặc định +50 XP)</td>
+                <td style="text-align: right;"><strong>+${Number(sum.quiz_xp || 0).toLocaleString()} XP</strong></td>
+              </tr>
+              <tr>
+                <td>Hoàn thành bài tập đã nộp</td>
+                <td>${Number(counts.assign_done_count || 0)} bài</td>
+                <td>Theo <code>assignments.reward_xp</code> (nghe ≥ 60đ)</td>
+                <td style="text-align: right;"><strong>+${Number(sum.assign_xp || 0).toLocaleString()} XP</strong></td>
+              </tr>
+              <tr>
+                <td>Giáo viên chấm bài ghi âm</td>
+                <td>${Number(counts.rec_graded_count || 0)} bài</td>
+                <td><code>round((score/100) × reward_xp)</code></td>
+                <td style="text-align: right;"><strong>+${Number(sum.recording_xp || 0).toLocaleString()} XP</strong></td>
+              </tr>
+              <tr>
+                <td>Thưởng hợp lệ khác (Admin / Streak / Sự kiện)</td>
+                <td>--</td>
+                <td>Từ giao dịch <code>admin_reward / streak_bonus / ...</code></td>
+                <td style="text-align: right;"><strong>+${Number(sum.manual_bonus_xp || 0).toLocaleString()} XP</strong></td>
+              </tr>
+              ${Number(sum.preserved_deleted_xp || 0) > 0 ? `
+                <tr>
+                  <td>XP bảo lưu từ bài học / bài tập cũ đã xóa</td>
+                  <td>--</td>
+                  <td>Giữ nguyên khi xóa bài tập/lớp cũ (không cộng trùng)</td>
+                  <td style="text-align: right;"><strong>+${Number(sum.preserved_deleted_xp || 0).toLocaleString()} XP</strong></td>
+                </tr>
+              ` : ''}
+            </tbody>
+          </table>
+        </div>
+
+        <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">2. Các khoản đã bù XP</h4>
+        ${logsHtml}
+
+        <h4 style="font-size: 14px; font-weight: 700; margin: 16px 0 8px; color: var(--text-main);">3. Giao dịch XP gần nhất (tối đa 30 dòng)</h4>
+        ${recentTx.length > 0 ? `
+          <div class="table-responsive">
+            <table class="data-table" style="font-size: 12.5px;">
+              <thead>
+                <tr>
+                  <th>Thời gian (VN)</th>
+                  <th>Loại</th>
+                  <th>Mô tả</th>
+                  <th>Phân loại</th>
+                  <th style="text-align: right;">XP</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${recentTx.map(t => `
+                  <tr>
+                    <td>${escHtml(formatVnDateTime(t.created_at, false) || '--')}</td>
+                    <td><code>${escHtml(safeStr(t.source_type))}</code></td>
+                    <td>${escHtml(safeStr(t.description, '--'))}</td>
+                    <td>
+                      ${t.is_backfilled
+                        ? `<span style="color: #38bdf8; font-weight: 600;">Đã bù (${escHtml(formatVnDateTime(t.backfilled_at, false))})</span>`
+                        : (safeStr(t.description).startsWith('Bù XP')
+                          ? '<span style="color: var(--warning);">Nghi bù cũ</span>'
+                          : '<span style="color: var(--text-muted);">XP thường</span>')}
+                    </td>
+                    <td style="text-align: right;"><strong>+${Number(t.amount || 0).toLocaleString()}</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : '<div style="font-size: 13px; color: var(--text-muted);">Chưa có giao dịch XP nào trong bảng xp_transactions.</div>'}
+      `;
+    } catch (err) {
+      console.error('Lỗi tải chi tiết đối soát XP học viên:', err);
+      const errMsg = safeStr(err && err.message ? err.message : String(err), 'Không thể tải chi tiết đối soát');
+      auditModalBody.innerHTML = `
+        <div style="text-align: center; padding: 32px; color: var(--danger);">
+          <div style="font-weight: 700; margin-bottom: 6px;">Không thể tải chi tiết đối soát</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">${escHtml(errMsg)}</div>
+          <button type="button" id="btn-retry-audit-detail" class="btn btn-outline btn-sm">🔄 Thử lại</button>
+        </div>
+      `;
+      const retryBtn = document.getElementById('btn-retry-audit-detail');
+      if (retryBtn) retryBtn.addEventListener('click', () => openXpAuditDetailModal(studentId));
+    }
+  }
+
+  async function exportLeaderboardCsv() {
+    if (!btnExportLbCsv || !classId) return;
+    clearLbAlert();
+    try {
+      btnExportLbCsv.disabled = true;
+      btnExportLbCsv.textContent = '⏳ Đang xuất CSV...';
+
+      let exportRows = lbMergedRows;
+      if (lbTotalCount > lbMergedRows.length || exportRows.length === 0) {
+        const allLb = await window.Admin.getClassLeaderboardForTeacher(classId, lbCurrentPeriod, 5000, 0);
+        const allIds = (allLb || []).map(r => r.student_id).filter(Boolean);
+        const allRec = await window.Admin.getClassXpReconciliation(classId, allIds.length > 0 ? allIds : null, 5000, 0);
+        const mapAudit = {};
+        ((allRec && allRec.students) || []).forEach(s => { mapAudit[s.student_id] = s; });
+        exportRows = (allLb || []).map(lb => ({ ...lb, ...(mapAudit[lb.student_id] || {}) }));
+      }
+
+      if (!exportRows || exportRows.length === 0) {
+        showLbError('Lớp hiện chưa có học viên nào để xuất file CSV.');
+        return;
+      }
+
+      const periodNames = {
+        today: 'hom-nay',
+        week: 'tuan-nay',
+        month: 'thang-nay',
+        all: 'tong-diem-lop'
+      };
+
+      const headers = [
+        'Hạng',
+        'Họ tên',
+        'Username',
+        'XP trong kỳ',
+        'XP tổng (Hồ sơ)',
+        'Tổng sổ cái (xp_transactions)',
+        'XP lẽ ra phải có',
+        'Chênh lệch XP',
+        'Trạng thái đối soát',
+        'Đã bù XP (Nhật ký)',
+        'Thời điểm bù gần nhất (Giờ VN)',
+        'Từ đã học',
+        'Chuỗi ngày',
+        'Bài tập đã hoàn thành',
+        'Tổng bài tập lớp'
+      ];
+
+      const csvEscape = (v) => `"${String(v === null || v === undefined ? '' : v).replace(/"/g, '""')}"`;
+
+      const csvLines = [
+        headers.map(csvEscape).join(','),
+        ...exportRows.map(r => {
+          const displayName = safeStr(r.display_name) || safeStr(r.username) || 'Học viên';
+          const username = safeStr(r.username) ? `@${safeStr(r.username)}` : '';
+          const statusInfo = formatStatusBadge(r);
+          const bfTime = formatVnDateTime(r.last_backfilled_at, true);
+          return [
+            Number(r.rank || 0),
+            displayName,
+            username,
+            Number(r.period_xp || 0),
+            Number(r.lifetime_xp ?? r.actual_xp ?? 0),
+            Number(r.tx_xp || 0),
+            Number(r.expected_xp || 0),
+            Number(r.diff_xp || 0),
+            statusInfo.label,
+            Number(r.backfill_total_xp || 0),
+            bfTime,
+            Number(r.words_learned || 0),
+            Number(r.current_streak || 0),
+            Number(r.completed_assignments || 0),
+            Number(r.total_assignments || 0)
+          ].map(csvEscape).join(',');
+        })
+      ];
+
+      // Thêm UTF-8 BOM (\uFEFF) để Microsoft Excel mở đúng tiếng Việt có dấu
+      const blob = new Blob(['\uFEFF' + csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const clsSlug = safeStr(currentClass && currentClass.name, 'lop-hoc')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'lop-hoc';
+      const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+      link.href = url;
+      link.download = `bang-xep-hang_${clsSlug}_${periodNames[lbCurrentPeriod] || 'tuan'}_${dateStr}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Lỗi xuất CSV:', err);
+      showLbError('Không thể xuất file CSV: ' + safeStr(err && err.message ? err.message : String(err), 'Lỗi không xác định'));
+    } finally {
+      btnExportLbCsv.disabled = false;
+      btnExportLbCsv.textContent = '📥 Xuất CSV';
+    }
+  }
+
+  // Gắn sự kiện Tab Bảng xếp hạng & Đối soát
+  document.querySelectorAll('.lb-period-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.querySelectorAll('.lb-period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      lbCurrentPeriod = btn.getAttribute('data-period') || 'week';
+      lbPage = 1;
+      await loadClassLeaderboardAndAudit();
+    });
+  });
+
+  if (lbClassSelector) {
+    lbClassSelector.addEventListener('change', async () => {
+      const nextId = lbClassSelector.value;
+      if (!nextId || nextId === classId) return;
+      classId = nextId;
+      lbPage = 1;
+      try {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set('id', classId);
+        nextUrl.searchParams.set('tab', activeTabId);
+        window.history.replaceState({}, '', nextUrl.toString());
+      } catch (e) {}
+      await loadClassAllData();
+    });
+  }
+
+  if (btnRunXpAudit) {
+    btnRunXpAudit.addEventListener('click', () => loadClassLeaderboardAndAudit({ forceAuditBtn: true }));
+  }
+
+  if (btnExportLbCsv) {
+    btnExportLbCsv.addEventListener('click', exportLeaderboardCsv);
+  }
+
+  if (lbAuditSearch) {
+    lbAuditSearch.addEventListener('input', () => {
+      if (lbSearchTimer) clearTimeout(lbSearchTimer);
+      lbSearchTimer = setTimeout(() => {
+        if (lbTotalCount > LB_PAGE_SIZE) {
+          loadClassLeaderboardAndAudit();
+        } else {
+          renderLeaderboardAuditTable();
+          updateLeaderboardPaginationUi();
+        }
+      }, 220);
+    });
+  }
+
+  if (lbAuditFilter) {
+    lbAuditFilter.addEventListener('change', () => {
+      if (lbTotalCount > LB_PAGE_SIZE) {
+        loadClassLeaderboardAndAudit();
+      } else {
+        renderLeaderboardAuditTable();
+        updateLeaderboardPaginationUi();
+      }
+    });
+  }
+
+  if (btnLbPrevPage) {
+    btnLbPrevPage.addEventListener('click', async () => {
+      if (lbPage > 1) {
+        lbPage--;
+        await loadClassLeaderboardAndAudit();
+      }
+    });
+  }
+
+  if (btnLbNextPage) {
+    btnLbNextPage.addEventListener('click', async () => {
+      const totalPages = Math.max(1, Math.ceil(lbTotalCount / LB_PAGE_SIZE));
+      if (lbPage < totalPages) {
+        lbPage++;
+        await loadClassLeaderboardAndAudit();
+      }
+    });
+  }
+
+  document.querySelectorAll('[data-close="modal-xp-audit-detail"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (modalXpAuditDetail) modalXpAuditDetail.classList.remove('active');
+    });
+  });
+
+  if (modalXpAuditDetail) {
+    modalXpAuditDetail.addEventListener('click', (e) => {
+      if (e.target === modalXpAuditDetail) modalXpAuditDetail.classList.remove('active');
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalXpAuditDetail && modalXpAuditDetail.classList.contains('active')) {
+      modalXpAuditDetail.classList.remove('active');
+    }
+  });
+
   // Khởi tạo modal đặt lại mật khẩu nếu có
   if (window.Admin && typeof window.Admin.initResetPasswordModal === 'function') {
     window.Admin.initResetPasswordModal();
   }
 
   // Tải dữ liệu ban đầu
-  await loadCurriculumsAndTeachersDropdowns();
-  await loadClassAllData();
+  await Promise.all([
+    loadCurriculumsAndTeachersDropdowns(),
+    initLeaderboardClassSelector()
+  ]);
+  const loadedOk = await loadClassAllData();
+
+  if (loadedOk && initialTabParam && document.getElementById(initialTabParam)) {
+    activateTab(initialTabParam);
+  }
 });

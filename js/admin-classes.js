@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   // 3. Tải danh sách lớp học và render ra grid cards
   async function loadClassesList() {
+    const quickLbBtn = document.getElementById('btn-quick-leaderboard-classes');
     try {
       classesContainer.innerHTML = `
         <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
@@ -114,19 +115,48 @@ document.addEventListener('DOMContentLoaded', async function () {
         </div>
       `;
 
-      classesList = await window.Admin.getClasses();
+      const isTeacherOnly = authData.profile && authData.profile.role === 'teacher';
+
+      // Ưu tiên RPC getTeacherAccessibleClasses (lọc theo quyền: Admin thấy hết, Giáo viên chỉ thấy lớp phụ trách)
+      try {
+        const rpcClasses = await window.Admin.getTeacherAccessibleClasses();
+        classesList = (rpcClasses || []).map(c => ({
+          ...c,
+          curriculum: {
+            id: c.curriculum_id,
+            title: c.curriculum_title || 'Chưa gán giáo trình',
+            total_lessons: c.total_lessons || 0
+          },
+          activeStudentCount: Number(c.active_student_count || 0)
+        }));
+      } catch (rpcErr) {
+        // Fallback nếu DB chưa chạy Migration 27
+        console.warn('Fallback getClasses (chưa chạy Migration 27):', rpcErr);
+        const rawClasses = await window.Admin.getClasses();
+        classesList = isTeacherOnly
+          ? (rawClasses || []).filter(c => c.teacher_id === authData.user.id)
+          : (rawClasses || []);
+      }
 
       if (!classesList || classesList.length === 0) {
+        if (quickLbBtn) quickLbBtn.style.display = 'none';
         classesContainer.innerHTML = `
           <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
             <div style="font-size: 40px; margin-bottom: 12px;">📚</div>
-            <h3 style="margin-bottom: 8px;">Chưa có lớp học nào</h3>
+            <h3 style="margin-bottom: 8px;">${isTeacherOnly ? 'Bạn chưa được phân công lớp học nào' : 'Chưa có lớp học nào'}</h3>
             <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
-              Hãy nhấn nút "Tạo Lớp Học Mới" ở trên để khởi tạo lớp đầu tiên cho học viên.
+              ${isTeacherOnly
+                ? 'Vui lòng liên hệ Quản trị viên để được phân công phụ trách lớp học.'
+                : 'Hãy nhấn nút "Tạo Lớp Học Mới" ở trên để khởi tạo lớp đầu tiên cho học viên.'}
             </p>
           </div>
         `;
         return;
+      }
+
+      if (quickLbBtn) {
+        quickLbBtn.href = `class-detail.html?id=${classesList[0].id}&tab=tab-leaderboard`;
+        quickLbBtn.style.display = 'inline-flex';
       }
 
       classesContainer.innerHTML = classesList.map(cls => {
@@ -137,18 +167,21 @@ document.addEventListener('DOMContentLoaded', async function () {
           statusBadge = '<span class="badge-status badge-completed">Đã kết thúc</span>';
         }
 
-        const currTitle = cls.curriculum ? cls.curriculum.title : 'Chưa gán giáo trình';
-        const totalLessons = cls.curriculum ? (cls.curriculum.total_lessons || 0) : 0;
+        const safeName = cls.name || 'Lớp chưa đặt tên';
+        const safeNameAttr = String(safeName).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeLevel = cls.level || 'HSK1';
+        const currTitle = (cls.curriculum && cls.curriculum.title) ? cls.curriculum.title : 'Chưa gán giáo trình';
+        const totalLessons = (cls.curriculum && cls.curriculum.total_lessons) ? cls.curriculum.total_lessons : 0;
 
         return `
           <div class="class-card">
             <div class="class-card-header">
-              <span class="class-card-title">${cls.name}</span>
+              <span class="class-card-title">${safeNameAttr}</span>
               ${statusBadge}
             </div>
 
             <div class="class-card-curriculum">
-              📖 ${currTitle} (${cls.level})
+              📖 ${currTitle} (${safeLevel})
             </div>
 
             <div class="class-card-meta">
@@ -159,14 +192,19 @@ document.addEventListener('DOMContentLoaded', async function () {
             </div>
 
             <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
-              <a href="class-detail.html?id=${cls.id}" class="btn btn-primary btn-block btn-sm" style="height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700;">
-                ⚙️ Quản lý chi tiết lớp
-              </a>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <a href="class-detail.html?id=${cls.id}" class="btn btn-primary btn-sm" style="flex: 1; height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700;">
+                  ⚙️ Chi tiết lớp
+                </a>
+                <a href="class-detail.html?id=${cls.id}&tab=tab-leaderboard" class="btn btn-outline btn-sm" style="flex: 1; height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700;">
+                  🏆 Bảng xếp hạng
+                </a>
+              </div>
               <div style="display: flex; gap: 8px;">
                 <button type="button" class="btn btn-outline btn-sm btn-edit-class" data-id="${cls.id}" style="flex: 1; height: 32px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 4px;" title="Chỉnh sửa thông tin lớp">
                   ✏️ Sửa lớp
                 </button>
-                <button type="button" class="btn btn-sm btn-delete-class" data-id="${cls.id}" data-name="${cls.name}" style="flex: 1; height: 32px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 1.5px solid #fca5a5; background: rgba(239, 68, 68, 0.08); color: #dc2626;" title="Xóa lớp học">
+                <button type="button" class="btn btn-sm btn-delete-class" data-id="${cls.id}" data-name="${safeNameAttr}" style="flex: 1; height: 32px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border: 1.5px solid #fca5a5; background: rgba(239, 68, 68, 0.08); color: #dc2626;" title="Xóa lớp học">
                   🗑️ Xóa lớp
                 </button>
               </div>
@@ -196,7 +234,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     } catch (err) {
       console.error('Lỗi tải danh sách lớp:', err);
-      showAlert('Không thể tải danh sách lớp học: ' + (err.message || err));
+      classesContainer.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 32px; background: var(--bg-card); border: 1px solid var(--danger-border); border-radius: var(--radius-md); color: var(--danger);">
+          <div style="font-weight: 700; margin-bottom: 6px;">Không thể tải danh sách lớp học</div>
+          <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">${err.message || err}</div>
+          <button type="button" id="btn-retry-load-classes" class="btn btn-outline btn-sm">🔄 Thử lại</button>
+        </div>
+      `;
+      const retryBtn = document.getElementById('btn-retry-load-classes');
+      if (retryBtn) retryBtn.addEventListener('click', loadClassesList);
     }
   }
 

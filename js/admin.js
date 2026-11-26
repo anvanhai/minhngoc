@@ -2065,6 +2065,58 @@ window.Admin = (function () {
     }
   }
 
+  // ===========================================================================
+  // 10. BẢNG XẾP HẠNG LỚP & ĐỐI SOÁT BÙ XP (CHO GIÁO VIÊN / ADMIN)
+  // ===========================================================================
+
+  async function getTeacherAccessibleClasses() {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_teacher_accessible_classes');
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getClassLeaderboardForTeacher(classId, period = 'week', limit = 100, offset = 0) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_class_leaderboard', {
+      p_class_id: classId,
+      p_period: period,
+      p_limit: limit,
+      p_offset: offset
+    });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getClassXpReconciliation(classId, studentIds = null, limit = 100, offset = 0) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const payload = {
+      p_class_id: classId,
+      p_limit: limit,
+      p_offset: offset
+    };
+    if (Array.isArray(studentIds)) {
+      payload.p_student_ids = studentIds;
+    }
+    const { data, error } = await db.rpc('get_class_xp_reconciliation', payload);
+    if (error) throw error;
+    return data || { class_id: classId, checked_at: new Date().toISOString(), summary: {}, students: [] };
+  }
+
+  async function getStudentXpAuditDetail(classId, studentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_student_xp_audit_detail', {
+      p_class_id: classId,
+      p_student_id: studentId
+    });
+    if (error) throw error;
+    return data || null;
+  }
+
   return {
     // Giáo trình
     getCurriculums,
@@ -2103,6 +2155,10 @@ window.Admin = (function () {
     deleteClass,
     getClassUsageStats,
     getTeachers,
+    getTeacherAccessibleClasses,
+    getClassLeaderboardForTeacher,
+    getClassXpReconciliation,
+    getStudentXpAuditDetail,
     // Học sinh
     getClassStudents,
     getAvailableStudentsForClass,
