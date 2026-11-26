@@ -37,57 +37,6 @@ Dự án được xây dựng hoàn toàn bằng **HTML5, CSS3, JavaScript thu�
 
 ---
 
-## 📁 Cấu Trúc Thư Mục
-
-```text
-my-web/
-├── index.html                   # Trang Đăng nhập & Đăng ký bằng Username
-├── dashboard.html               # Bàn học cá nhân hóa của Học sinh
-├── curriculum.html              # Bản đồ lộ trình bài học (Roadmap)
-├── lesson.html                  # Phòng học bài (Từ mới, Flashcard SRS, Quiz)
-├── leaderboard.html             # Bảng xếp hạng riêng của lớp (Podium Top 3)
-│
-├── admin/                       # Khu vực Quản trị dành cho Giáo viên / Admin
-│   ├── classes.html             # Quản lý danh sách các Lớp học & Tạo lớp
-│   ├── class-detail.html        # Chi tiết lớp: Học sinh, Tiến độ, Mở bài, Bài tập
-│   ├── curriculums.html         # Quản lý Giáo trình & Danh sách bài học
-│   └── vocabularies.html        # Kho từ vựng & Nhập Excel/CSV kéo thả
-│
-├── css/
-│   └── style.css                # CSS dùng chung toàn hệ thống, tối ưu mobile
-│
-├── js/
-│   ├── config.js                # Cấu hình Supabase (URL & Anon Key)
-│   ├── config.example.js        # Mẫu file cấu hình tham khảo
-│   ├── db.js                    # Khởi tạo kết nối Supabase client
-│   ├── auth.js                  # Module đăng nhập, đăng ký username, phân quyền RLS
-│   ├── xp.js                    # Module XP, Streak & Phát âm tiếng Trung (zh-CN)
-│   ├── student.js               # Module API dành riêng cho Học sinh
-│   ├── admin.js                 # Module API dành riêng cho Quản trị viên
-│   ├── index.js                 # Logic trang index.html
-│   ├── dashboard.js             # Logic trang dashboard.html
-│   ├── curriculum.js            # Logic trang curriculum.html
-│   ├── lesson.js                # Logic trang lesson.html
-│   ├── leaderboard.js           # Logic trang leaderboard.html
-│   ├── admin-classes.js         # Logic trang admin/classes.html
-│   ├── admin-class-detail.js    # Logic trang admin/class-detail.html
-│   ├── admin-curriculums.js     # Logic trang admin/curriculums.html
-│   └── admin-vocabularies.js    # Logic trang admin/vocabularies.html
-│
-├── supabase/                    # Các file SQL Migration chạy trên Supabase
-│   ├── 01_profiles_and_roles.sql         # Hồ sơ người dùng, phân quyền RLS
-│   ├── 02_curriculum_and_classes.sql     # Giáo trình, bài học, kho từ, lớp học
-│   ├── 03_student_progress.sql           # Tiến độ bài học, Spaced Repetition SRS
-│   ├── 04_quiz_assignments_and_xp.sql    # Quiz cuối bài, bài tập, mở bài thủ công
-│   └── 05_leaderboard_and_promotion.sql  # Bảng xếp hạng lớp, streak, chuyển cấp HSK2
-│
-├── docs/
-│   └── minhngoc_hsk_system_design_and_ui_mockups.md  # Tài liệu thiết kế kiến trúc gốc
-├── .gitignore                   # Cấu hình bỏ qua file nhạy cảm khi dùng Git
-└── README.md                    # Hướng dẫn cài đặt & Triển khai
-```
-
----
 
 ## 🚀 Hướng Dẫn Cài Đặt Từ Đầu
 
