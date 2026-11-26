@@ -619,11 +619,12 @@ window.Admin = (function () {
   }
 
   /**
-   * Import mảng từ vựng từ file Excel/CSV vào database
-   * Hỗ trợ cập nhật sort_order theo đúng thứ tự dòng trong file Excel gốc,
-   * giữ nguyên ID và không làm mất liên kết với các bài học hay tiến độ học viên.
-   * @param {Array<Object>} wordsList - Danh sách các từ đã chuẩn hóa
+   * Import mảng từ vựng từ file Excel/CSV và gán vào bài học (nếu chọn) trong MỘT giao dịch RPC.
+   * Khớp từ đã có theo (hanzi, hsk_level) để giữ nguyên UUID (id), cập nhật sort_order
+   * theo đúng thứ tự dòng trong file, không tạo bản sao và không mất tiến độ SRS.
+   * @param {Array<Object>} wordsList - Danh sách các từ hợp lệ đã chuẩn hóa theo thứ tự file
    * @param {string|null} assignLessonId - ID bài học muốn gán ngay (nếu có)
+   * @returns {Promise<Object>} Thống kê số lượng thêm mới, cập nhật, bỏ qua và gán bài
    */
   async function batchImportVocabularies(wordsList, assignLessonId = null) {
     const db = getDb();
@@ -632,88 +633,78 @@ window.Admin = (function () {
       throw new Error('Danh sách từ vựng trống');
     }
 
-    // 1. Khử trùng lặp nội bộ trong file (giữ lại dòng đầu tiên xuất hiện để bảo toàn STT)
+    // Chuẩn hóa payload theo đúng thứ tự dòng file và chống trùng ngay ở client
     const seenMap = new Set();
     const dedupedWords = [];
-    for (const w of wordsList) {
-      const key = `${w.hanzi}_${w.hsk_level}`;
-      if (!seenMap.has(key)) {
-        seenMap.add(key);
-        dedupedWords.push(w);
+    let clientDuplicateSkipped = 0;
+
+    for (let idx = 0; idx < wordsList.length; idx++) {
+      const w = wordsList[idx];
+      if (!w) continue;
+      const hanzi = String(w.hanzi || '').trim();
+      const pinyin = String(w.pinyin || '').trim();
+      const meaningVi = String(w.meaning_vi || '').trim();
+      const hskLevel = parseInt(w.hsk_level, 10);
+
+      if (!hanzi || !pinyin || !meaningVi || isNaN(hskLevel) || hskLevel < 1 || hskLevel > 9) {
+        clientDuplicateSkipped++;
+        continue;
       }
+
+      const key = `${hanzi}_${hskLevel}`;
+      if (seenMap.has(key)) {
+        clientDuplicateSkipped++;
+        continue;
+      }
+      seenMap.add(key);
+
+      dedupedWords.push({
+        hanzi,
+        pinyin,
+        meaning_vi: meaningVi,
+        hsk_level: hskLevel,
+        part_of_speech: w.part_of_speech ? String(w.part_of_speech).trim() : null,
+        example_hanzi: w.example_hanzi ? String(w.example_hanzi).trim() : null,
+        example_pinyin: w.example_pinyin ? String(w.example_pinyin).trim() : null,
+        example_vi: w.example_vi ? String(w.example_vi).trim() : null,
+        sort_order: (w.sort_order && Number(w.sort_order) > 0) ? Number(w.sort_order) : (dedupedWords.length + 1)
+      });
     }
 
-    // 2. Thêm hoặc cập nhật vào bảng vocabularies theo lô (tránh payload quá lớn)
-    const BATCH_SIZE = 150;
-    let totalImported = 0;
-
-    for (let i = 0; i < dedupedWords.length; i += BATCH_SIZE) {
-      const batch = dedupedWords.slice(i, i + BATCH_SIZE);
-
-      // Thử dùng RPC batch_upsert_vocabularies (Migration 23) để cập nhật thông minh theo (hanzi, hsk_level)
-      let rpcSucceeded = false;
-      try {
-        const { error: rpcErr } = await db.rpc('batch_upsert_vocabularies', { p_words: batch });
-        if (!rpcErr) {
-          rpcSucceeded = true;
-        }
-      } catch (e) {
-        rpcSucceeded = false;
-      }
-
-      if (!rpcSucceeded) {
-        // Fallback: PostgREST upsert hoặc insert thông thường nếu RPC chưa được chạy
-        const { error: insertError } = await db
-          .from('vocabularies')
-          .upsert(batch, { onConflict: 'hanzi,pinyin' });
-
-        if (insertError) {
-          const { error: fallbackError } = await db
-            .from('vocabularies')
-            .insert(batch);
-
-          if (fallbackError) throw fallbackError;
-        }
-      }
-
-      totalImported += batch.length;
+    if (dedupedWords.length === 0) {
+      throw new Error('Không có dòng từ vựng hợp lệ nào để import.');
     }
 
-    // 3. Nếu có chọn gán vào bài học, bảo toàn đúng thứ tự các từ trong file
-    if (assignLessonId) {
-      const allHanzis = dedupedWords.map(w => w.hanzi);
-      const vocabMap = new Map();
+    const { data, error } = await db.rpc('import_vocabularies_and_assign_lesson', {
+      p_words: dedupedWords,
+      p_lesson_id: assignLessonId || null
+    });
 
-      for (let i = 0; i < allHanzis.length; i += BATCH_SIZE) {
-        const batchHanzis = allHanzis.slice(i, i + BATCH_SIZE);
-        const { data: foundVocabs } = await db
-          .from('vocabularies')
-          .select('id, hanzi, hsk_level')
-          .in('hanzi', batchHanzis);
-
-        if (foundVocabs) {
-          foundVocabs.forEach(v => {
-            vocabMap.set(`${v.hanzi}_${v.hsk_level}`, v.id);
-            if (!vocabMap.has(v.hanzi)) vocabMap.set(v.hanzi, v.id);
-          });
-        }
+    if (error) {
+      const msg = String(error.message || '');
+      const code = String(error.code || '');
+      if (code === 'PGRST202' || code === '42883' || msg.includes('import_vocabularies_and_assign_lesson')) {
+        throw new Error('Chưa cài đặt hàm SQL import_vocabularies_and_assign_lesson (Migration 31). Vui lòng chạy file supabase/31_atomic_import_vocabularies_and_assign_lesson.sql trên Supabase SQL Editor rồi thử lại.');
       }
-
-      // Giữ chính xác thứ tự ban đầu của mảng file
-      const orderedVocabIds = [];
-      for (const w of dedupedWords) {
-        const id = vocabMap.get(`${w.hanzi}_${w.hsk_level}`) || vocabMap.get(w.hanzi);
-        if (id && !orderedVocabIds.includes(id)) {
-          orderedVocabIds.push(id);
-        }
+      if (msg.includes('total_vocabularies') || code === '42703') {
+        throw new Error('Lỗi schema bài học (thiếu migration sửa total_vocabularies). Vui lòng chạy Migration 24 và Migration 31 trên Supabase SQL Editor rồi thử lại.');
       }
-
-      if (orderedVocabIds.length > 0) {
-        await batchAddWordsToLesson(assignLessonId, orderedVocabIds);
-      }
+      throw error;
     }
 
-    return { total: totalImported };
+    const res = data || {};
+    return {
+      inserted_count: Number(res.inserted_count || 0),
+      updated_count: Number(res.updated_count || 0),
+      skipped_count: clientDuplicateSkipped + Number(res.skipped_count || 0),
+      total: Number(res.total_processed || dedupedWords.length),
+      lesson_id: res.lesson_id || assignLessonId || null,
+      lesson_added_count: Number(res.lesson_added_count || 0),
+      lesson_already_in_count: Number(res.lesson_already_in_count || 0),
+      lesson_vocab_count: (res.lesson_vocab_count !== undefined && res.lesson_vocab_count !== null)
+        ? Number(res.lesson_vocab_count)
+        : null
+    };
   }
 
   // ===========================================================================
