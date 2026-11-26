@@ -192,32 +192,49 @@ window.Student = (function () {
   }
 
   /**
-   * Cập nhật đánh giá Flashcard SRS cho 1 từ vựng
+   * Cập nhật đánh giá Flashcard SRS cho 1 từ vựng (+2 XP nếu lần đầu đạt thuộc/nhớ)
    */
-  async function recordWordReview(vocabId, level) {
+  async function recordWordReview(vocabId, level, classId = null) {
     const db = getDb();
-    if (!db) return;
+    if (!db) throw new Error('Database chưa kết nối');
 
-    const { error } = await db.rpc('record_word_review', {
+    const payload = {
       p_vocab_id: vocabId,
       p_level: level
-    });
+    };
+    if (classId) {
+      payload.p_class_id = classId;
+    }
+
+    let { data, error } = await db.rpc('record_word_review', payload);
+
+    // Fallback nếu DB chưa chạy Migration 25 (chữ ký 2 tham số cũ)
+    if (error && (error.code === 'PGRST202' || (error.message && error.message.includes('Could not find the function')))) {
+      const retry = await db.rpc('record_word_review', {
+        p_vocab_id: vocabId,
+        p_level: level
+      });
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('Lỗi ghi nhận đánh giá từ vựng SRS:', error);
       throw error;
     }
+
+    return data || { success: true, xp_awarded: 0 };
   }
 
   /**
-   * Cập nhật tiến độ học từ của bài học
+   * Cập nhật tiến độ học từ của bài học (+10 XP khi hoàn thành đủ từ mới của bài lần đầu)
    */
   async function recordLessonVocabProgress(classId, lessonId, learnedCount, totalWords) {
     const db = getDb();
-    if (!db) return;
+    if (!db) throw new Error('Database chưa kết nối');
 
-    const { error } = await db.rpc('record_lesson_vocab_progress', {
-      p_class_id: classId,
+    const { data, error } = await db.rpc('record_lesson_vocab_progress', {
+      p_class_id: classId || null,
       p_lesson_id: lessonId,
       p_learned_count: learnedCount,
       p_total_words: totalWords
@@ -225,7 +242,10 @@ window.Student = (function () {
 
     if (error) {
       console.error('Lỗi ghi nhận tiến độ học bài:', error);
+      throw error;
     }
+
+    return data || { success: true, xp_awarded: 0 };
   }
 
   /**

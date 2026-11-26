@@ -30,19 +30,52 @@ document.addEventListener('DOMContentLoaded', async function () {
   const dashNextTitle = document.getElementById('dash-next-title');
   const dashNextDesc = document.getElementById('dash-next-desc');
   const dashNextWordCount = document.getElementById('dash-next-word-count');
+  const dashNextXpReward = document.getElementById('dash-next-xp-reward');
   const btnStartVocab = document.getElementById('btn-start-vocab');
   const btnStartFlashcard = document.getElementById('btn-start-flashcard');
 
-  // Render thông tin cá nhân
+  let currentActiveClassId = null;
+
+  /**
+   * Nạp lại số XP, chuỗi ngày học (streak) và hạng trong lớp mà không cần tải lại trang
+   */
+  async function refreshDashboardStats(classIdToRefresh = currentActiveClassId) {
+    try {
+      if (typeof window.Auth.getProfile === 'function') {
+        const latestProfile = await window.Auth.getProfile(authData.user.id);
+        if (latestProfile) {
+          window.Auth.renderNavbarUserInfo(latestProfile);
+          if (dashStreak) dashStreak.textContent = `🔥 ${latestProfile.current_streak || 0} ngày`;
+          if (dashXp) dashXp.textContent = `⚡ ${(latestProfile.lifetime_xp || 0).toLocaleString()} XP`;
+        }
+      }
+      if (classIdToRefresh && dashRank) {
+        const leaderboard = await window.Student.getClassLeaderboard(classIdToRefresh, 'week');
+        if (leaderboard && leaderboard.length > 0) {
+          const myRank = leaderboard.find(s => s.student_id === authData.user.id);
+          if (myRank) {
+            dashRank.textContent = `Hạng ${myRank.rank} / ${leaderboard.length}`;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Không thể làm mới thống kê dashboard:', e);
+    }
+  }
+
+  // Render thông tin cá nhân ban đầu
   if (profile) {
     if (myUsername) myUsername.textContent = profile.username;
     if (dashStreak) dashStreak.textContent = `🔥 ${profile.current_streak || 0} ngày`;
     if (dashXp) dashXp.textContent = `⚡ ${(profile.lifetime_xp || 0).toLocaleString()} XP`;
 
-    // Tự động kiểm tra và cập nhật streak hôm nay
+    // Tự động kiểm tra và cập nhật streak hôm nay theo giờ VN (không nuốt lỗi ngầm)
     window.Student.updateDailyStreak().then(st => {
-      if (st && st.current_streak && dashStreak) {
+      if (st && st.current_streak !== undefined && dashStreak) {
         dashStreak.textContent = `🔥 ${st.current_streak} ngày`;
+      }
+      if (currentActiveClassId) {
+        refreshDashboardStats(currentActiveClassId);
       }
     });
   }
@@ -57,6 +90,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       assignedBox.style.display = 'none';
       return;
     }
+
+    currentActiveClassId = activeClass.id;
 
     // Học sinh đã vào lớp thành công
     unassignedBox.style.display = 'none';
@@ -94,6 +129,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (targetLesson) {
         dashNextTitle.textContent = `Bài ${targetLesson.order_index}: ${targetLesson.title_zh}`;
         dashNextDesc.textContent = targetLesson.title_vi || 'Bài học tiếng Trung';
+        if (dashNextXpReward) {
+          const rxp = targetLesson.reward_xp || 50;
+          dashNextXpReward.textContent = targetLesson.isCompleted
+            ? `+${rxp} XP (Đã nhận)`
+            : `+${rxp} XP (+10 XP từ vựng)`;
+        }
 
         // Lấy số lượng từ vựng của bài học này
         try {
@@ -387,6 +428,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
           if (listeningAudioPlayer) listeningAudioPlayer.pause();
           await loadDashboardAssignments();
+          await refreshDashboardStats(activeClass.id);
+          if (res.xp_awarded > 0 && window.XP && typeof window.XP.showXpToast === 'function') {
+            window.XP.showXpToast(res.xp_awarded, 'Bài tập Nghe hiểu');
+          }
 
           if (window.FeedbackPopup) {
             window.FeedbackPopup.show('listening', {
@@ -398,8 +443,11 @@ document.addEventListener('DOMContentLoaded', async function () {
           }
 
         } catch (err) {
+          console.error('Lỗi khi nộp bài nghe:', err);
           listeningModalAlert.className = 'alert alert-danger show';
-          listeningModalAlert.textContent = err.message || 'Lỗi khi nộp bài nghe';
+          listeningModalAlert.textContent = (window.XP && window.XP.formatDbError)
+            ? window.XP.formatDbError(err, 'Lỗi khi nộp bài nghe')
+            : (err.message || 'Lỗi khi nộp bài nghe');
           btnSubmitListening.disabled = false;
           btnSubmitListening.textContent = 'Thử lại';
         }
@@ -523,16 +571,26 @@ document.addEventListener('DOMContentLoaded', async function () {
             try {
               btn.disabled = true;
               btn.textContent = 'Đang lưu...';
-              await window.Student.completeAssignment(assign.id);
+              const res = await window.Student.completeAssignment(assign.id);
+              const xpEarned = (res && res.xp_awarded) ? res.xp_awarded : 0;
               detailAssignAlert.className = 'alert alert-success show';
-              detailAssignAlert.textContent = '🎉 Chúc mừng bạn đã hoàn thành bài tập!';
+              detailAssignAlert.textContent = xpEarned > 0
+                ? `🎉 Chúc mừng bạn đã hoàn thành bài tập! (+${xpEarned} XP)`
+                : '🎉 Đã ghi nhận hoàn thành bài tập!';
               await loadDashboardAssignments();
+              await refreshDashboardStats(activeClass.id);
+              if (xpEarned > 0 && window.XP && typeof window.XP.showXpToast === 'function') {
+                window.XP.showXpToast(xpEarned, 'Hoàn thành bài tập');
+              }
               setTimeout(() => {
                 modalAssignmentDetail.classList.remove('active');
               }, 1200);
             } catch (err) {
+              console.error('Lỗi hoàn thành bài tập:', err);
               detailAssignAlert.className = 'alert alert-danger show';
-              detailAssignAlert.textContent = err.message || 'Lỗi khi hoàn thành bài tập';
+              detailAssignAlert.textContent = (window.XP && window.XP.formatDbError)
+                ? window.XP.formatDbError(err, 'Lỗi khi hoàn thành bài tập')
+                : (err.message || 'Lỗi khi hoàn thành bài tập');
               btn.disabled = false;
               btn.textContent = 'Thử lại';
             }
@@ -1188,16 +1246,10 @@ document.addEventListener('DOMContentLoaded', async function () {
           // Cập nhật lại danh sách bài tập trên dashboard
           await loadDashboardAssignments();
 
-          // Cập nhật lại XP hiển thị trên trang nếu được cộng điểm
-          if (res.xp_awarded > 0 && typeof window.Auth.getProfile === 'function') {
-            try {
-              const updatedProfile = await window.Auth.getProfile(authData.user.id);
-              if (updatedProfile) {
-                window.Auth.renderNavbarUserInfo(updatedProfile);
-                const statXp = document.getElementById('stat-lifetime-xp');
-                if (statXp) statXp.textContent = (updatedProfile.lifetime_xp || 0).toLocaleString();
-              }
-            } catch (e) {}
+          // Cập nhật lại XP, streak, hạng lớp hiển thị trực tiếp trên dashboard
+          await refreshDashboardStats(activeClass.id);
+          if (res && res.xp_awarded > 0 && window.XP && typeof window.XP.showXpToast === 'function') {
+            window.XP.showXpToast(res.xp_awarded, 'Nộp bài ghi âm');
           }
 
           if (window.FeedbackPopup) {
@@ -1214,7 +1266,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         } catch (err) {
           speakingModalAlert.className = 'alert alert-danger show';
-          speakingModalAlert.textContent = err.message || 'Lỗi khi nộp bài ghi âm';
+          speakingModalAlert.textContent = (window.XP && typeof window.XP.formatDbError === 'function')
+            ? window.XP.formatDbError(err, 'Lỗi khi nộp bài ghi âm')
+            : (err.message || 'Lỗi khi nộp bài ghi âm');
           btnSubmitSpeaking.disabled = false;
           btnSubmitSpeaking.textContent = `Thử nộp lại (${recordedTakes.length} bản ghi)`;
         }
@@ -1224,18 +1278,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Tải danh sách bài tập lần đầu
     await loadDashboardAssignments();
 
-    // 5. Lấy thứ hạng thật của học sinh trong lớp (Tuần này)
-    try {
-      const leaderboard = await window.Student.getClassLeaderboard(activeClass.id, 'week');
-      if (leaderboard && leaderboard.length > 0) {
-        const myRank = leaderboard.find(s => s.student_id === authData.user.id);
-        if (myRank && dashRank) {
-          dashRank.textContent = `Hạng ${myRank.rank} / ${leaderboard.length}`;
-        }
+    // 5. Lấy thứ hạng thật, XP và chuỗi ngày mới nhất của học sinh trong lớp
+    await refreshDashboardStats(activeClass.id);
+
+    // Tự động đồng bộ lại khi học viên quay lại từ trang lesson.html (bfcache)
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted && currentActiveClassId) {
+        refreshDashboardStats(currentActiveClassId);
       }
-    } catch (e) {
-      console.warn('Lỗi lấy thứ hạng lớp:', e);
-    }
+    });
 
   } catch (err) {
     console.error('Lỗi tải dữ liệu Dashboard:', err);

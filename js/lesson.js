@@ -21,12 +21,73 @@ document.addEventListener('DOMContentLoaded', async function () {
   let currentVocabIndex = 0;
   let currentFcIndex = 0;
   let hanziWriterInstance = null;
+  let resolvedClassId = typeof classId !== 'undefined' ? classId : null;
+  let currentLessonData = null;
+  let sessionVocabXpEarned = 0;
 
   // Header Elements
   const lessonHeaderTitle = document.getElementById('lesson-header-title');
   const lessonWordCounter = document.getElementById('lesson-word-counter');
   const btnBackLink = document.getElementById('btn-back-link');
   const lessonAlert = document.getElementById('lesson-alert');
+
+  function formatLessonDbError(err, fallback) {
+    if (window.XP && typeof window.XP.formatDbError === 'function') {
+      return window.XP.formatDbError(err, fallback);
+    }
+    return (err && err.message) ? err.message : fallback;
+  }
+
+  function showXpEarnedToast(xpAmount, label) {
+    if (xpAmount > 0 && window.XP && typeof window.XP.showXpToast === 'function') {
+      window.XP.showXpToast(xpAmount, label);
+    }
+  }
+
+  function showLessonErrorWithRetry(message, retryFn) {
+    if (!lessonAlert) return;
+    lessonAlert.className = 'alert alert-danger show';
+    lessonAlert.innerHTML = '';
+
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = message;
+    lessonAlert.appendChild(msgSpan);
+
+    if (typeof retryFn === 'function') {
+      const retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'btn btn-secondary';
+      retryBtn.style.cssText = 'margin-left: 12px; padding: 4px 12px; font-size: 13px;';
+      retryBtn.textContent = '🔄 Thử lại';
+      retryBtn.addEventListener('click', async () => {
+        lessonAlert.className = 'alert';
+        lessonAlert.textContent = '';
+        await retryFn();
+      });
+      lessonAlert.appendChild(retryBtn);
+    }
+    lessonAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function resolveStudentClassId() {
+    if (resolvedClassId) return resolvedClassId;
+    if (typeof classId !== 'undefined' && classId) {
+      resolvedClassId = classId;
+      return resolvedClassId;
+    }
+    if (window.Student && typeof window.Student.getActiveClass === 'function') {
+      try {
+        const activeCls = await window.Student.getActiveClass();
+        if (activeCls && activeCls.id) {
+          resolvedClassId = activeCls.id;
+          return resolvedClassId;
+        }
+      } catch (e) {
+        console.warn('Không xác định được lớp học đang theo học:', e);
+      }
+    }
+    return null;
+  }
 
   // Mode Tabs
   const tabBtnVocab = document.getElementById('tab-btn-vocab');
@@ -121,6 +182,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   // 1. Tải thông tin bài học và danh sách từ vựng
   try {
+    await resolveStudentClassId();
     const db = window.getDb();
     const { data: lessonData } = await db
       .from('lessons')
@@ -129,8 +191,16 @@ document.addEventListener('DOMContentLoaded', async function () {
       .single();
 
     if (lessonData) {
+      currentLessonData = lessonData;
       lessonHeaderTitle.textContent = `Bài ${lessonData.order_index}: ${lessonData.title_zh}`;
       document.title = `Bài ${lessonData.order_index}: ${lessonData.title_zh} — Minh Ngọc HSK`;
+
+      const lessonRewardXp = typeof lessonData.reward_xp === 'number' ? lessonData.reward_xp : 50;
+      const lessonHeaderXp = document.getElementById('lesson-header-xp');
+      if (lessonHeaderXp) {
+        lessonHeaderXp.textContent = `Hoàn thành bài để nhận +${lessonRewardXp} XP`;
+        lessonHeaderXp.title = `Học xong từ vựng để nhận +10 XP và đạt Quiz ≥ 80% để hoàn thành bài nhận +${lessonRewardXp} XP`;
+      }
     }
 
     words = await window.Student.getLessonWords(lessonId);
@@ -317,22 +387,48 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   });
 
-  btnNextVocab.addEventListener('click', async () => {
-    if (currentVocabIndex < words.length - 1) {
-      currentVocabIndex++;
-      renderVocabWord();
-    } else {
-      if (classId) {
-        await window.Student.recordLessonVocabProgress(classId, lessonId, words.length, words.length);
+  async function saveAndCompleteVocabStep() {
+    btnNextVocab.disabled = true;
+    try {
+      const targetClassId = await resolveStudentClassId();
+      if (!targetClassId) {
+        throw new Error('Không xác định được lớp học hiện tại để lưu tiến độ và cộng XP.');
       }
+
+      const res = await window.Student.recordLessonVocabProgress(targetClassId, lessonId, words.length, words.length);
+      const lessonRewardXp = (currentLessonData && typeof currentLessonData.reward_xp === 'number') ? currentLessonData.reward_xp : 50;
+
+      if (res && res.xp_awarded > 0) {
+        showXpEarnedToast(res.xp_awarded, 'Hoàn thành từ vựng bài học');
+        showAlert(`🎉 Đã ghi nhận hoàn thành từ vựng (+${res.xp_awarded} XP)! Tiếp tục ôn Flashcard hoặc làm Quiz đạt ≥ 80% để hoàn thành bài nhận +${lessonRewardXp} XP.`, 'success');
+      } else {
+        showAlert(`🎉 Bạn đã xem hết toàn bộ từ vựng của bài học! Hãy chuyển sang Flashcard hoặc làm Quiz đạt ≥ 80% để hoàn thành bài nhận +${lessonRewardXp} XP.`, 'success');
+      }
+
       if (window.FeedbackPopup) {
         window.FeedbackPopup.show('vocabulary', {
           onContinue: () => switchMode('flashcard')
         });
       } else {
-        showAlert('🎉 Bạn đã xem hết toàn bộ từ vựng của bài học! Hãy chuyển sang Flashcard hoặc làm Quiz để nhận XP.', 'success');
         setTimeout(() => switchMode('flashcard'), 1200);
       }
+    } catch (err) {
+      console.error('Lỗi lưu tiến độ từ vựng:', err);
+      showLessonErrorWithRetry(
+        formatLessonDbError(err, 'Không thể lưu tiến độ từ vựng lên máy chủ. Vui lòng thử lại.'),
+        saveAndCompleteVocabStep
+      );
+    } finally {
+      btnNextVocab.disabled = false;
+    }
+  }
+
+  btnNextVocab.addEventListener('click', async () => {
+    if (currentVocabIndex < words.length - 1) {
+      currentVocabIndex++;
+      renderVocabWord();
+    } else {
+      await saveAndCompleteVocabStep();
     }
   });
 
@@ -390,17 +486,21 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (w) window.XP.speakChinese(w.hanzi);
   });
 
-  document.querySelectorAll('.btn-srs').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const srsLevel = parseInt(btn.getAttribute('data-srs'), 10);
-      const w = words[currentFcIndex];
+  let isSavingFlashcard = false;
+
+  async function handleFlashcardSrsAction(srsLevel) {
+    if (isSavingFlashcard) return;
+    isSavingFlashcard = true;
+
+    const w = words[currentFcIndex];
+    try {
+      const targetClassId = await resolveStudentClassId();
 
       if (w) {
-        try {
-          await window.Student.recordWordReview(w.id, srsLevel);
-        } catch (err) {
-          console.warn('Lỗi lưu SRS:', err);
+        const reviewRes = await window.Student.recordWordReview(w.id, srsLevel, targetClassId);
+        if (reviewRes && reviewRes.xp_awarded > 0) {
+          sessionVocabXpEarned += reviewRes.xp_awarded;
+          showXpEarnedToast(reviewRes.xp_awarded, `Thuộc từ: ${w.hanzi || 'từ mới'}`);
         }
       }
 
@@ -408,9 +508,20 @@ document.addEventListener('DOMContentLoaded', async function () {
         currentFcIndex++;
         renderFlashcard();
       } else {
-        if (classId) {
-          await window.Student.recordLessonVocabProgress(classId, lessonId, words.length, words.length);
+        if (!targetClassId) {
+          throw new Error('Không xác định được lớp học hiện tại để ghi nhận hoàn thành từ vựng.');
         }
+
+        const vocabRes = await window.Student.recordLessonVocabProgress(targetClassId, lessonId, words.length, words.length);
+        if (vocabRes && vocabRes.xp_awarded > 0) {
+          sessionVocabXpEarned += vocabRes.xp_awarded;
+          showXpEarnedToast(vocabRes.xp_awarded, 'Hoàn thành từ vựng bài học');
+        }
+
+        const lessonRewardXp = (currentLessonData && typeof currentLessonData.reward_xp === 'number') ? currentLessonData.reward_xp : 50;
+        const earnedSummaryHtml = sessionVocabXpEarned > 0
+          ? `<br>Bạn đã nhận tổng cộng <strong style="color: #ca8a04;">+${sessionVocabXpEarned} XP</strong> từ phần từ vựng trong phiên học này!`
+          : '';
 
         if (window.FeedbackPopup) {
           window.FeedbackPopup.show('practice', {
@@ -430,7 +541,8 @@ document.addEventListener('DOMContentLoaded', async function () {
               Đã ôn tập xong vòng thẻ Flashcard!
             </h2>
             <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 20px;">
-              Bạn đã ôn luyện toàn bộ <strong>${words.length} từ vựng</strong>. Hãy vào làm Quiz để kiểm tra trí nhớ và nhận XP nhé!
+              Bạn đã ôn luyện toàn bộ <strong>${words.length} từ vựng</strong>.${earnedSummaryHtml}
+              <br>Hãy làm Quiz đạt ≥ 80% để hoàn thành bài và nhận thưởng <strong style="color: #ca8a04;">+${lessonRewardXp} XP</strong> nhé!
             </p>
             <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
               <button type="button" id="btn-goto-quiz" class="btn btn-primary">
@@ -449,6 +561,22 @@ document.addEventListener('DOMContentLoaded', async function () {
           location.reload();
         });
       }
+    } catch (err) {
+      console.error('Lỗi lưu SRS / tiến độ Flashcard:', err);
+      showLessonErrorWithRetry(
+        formatLessonDbError(err, 'Không thể lưu tiến độ ôn từ vựng lên máy chủ. Vui lòng thử lại.'),
+        () => handleFlashcardSrsAction(srsLevel)
+      );
+    } finally {
+      isSavingFlashcard = false;
+    }
+  }
+
+  document.querySelectorAll('.btn-srs').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const srsLevel = parseInt(btn.getAttribute('data-srs'), 10);
+      await handleFlashcardSrsAction(srsLevel);
     });
   });
 
@@ -626,25 +754,39 @@ document.addEventListener('DOMContentLoaded', async function () {
     const total = quizQuestions.length;
     const percent = Math.round((quizCorrectCount / total) * 100);
     quizResultScore.textContent = `${percent}%`;
+    quizResultIcon.textContent = '⏳';
+    quizResultTitle.textContent = 'Đang lưu kết quả kiểm tra...';
+    quizResultDesc.textContent = `Bạn đã trả lời đúng ${quizCorrectCount}/${total} câu (${percent}%). Đang đồng bộ XP với máy chủ...`;
 
     try {
+      const targetClassId = await resolveStudentClassId();
+      if (!targetClassId) {
+        throw new Error('Không xác định được lớp học hiện tại để ghi nhận kết quả và cộng XP.');
+      }
+
       // Gọi RPC an toàn phía server
       const result = await window.Student.submitQuizAttempt(
-        classId,
+        targetClassId,
         lessonId,
         quizCorrectCount,
         total
       );
 
-      const isPassed = result ? result.passed : (percent >= 80);
-      const xpAwarded = result ? result.xp_awarded : 0;
+      const passScore = (result && typeof result.pass_score === 'number') ? result.pass_score : 80;
+      const isPassed = result ? !!result.passed : (percent >= passScore);
+      const xpAwarded = (result && typeof result.xp_awarded === 'number') ? result.xp_awarded : 0;
+      const lessonRewardXp = (currentLessonData && typeof currentLessonData.reward_xp === 'number') ? currentLessonData.reward_xp : 50;
+
+      if (xpAwarded > 0) {
+        showXpEarnedToast(xpAwarded, 'Hoàn thành bài kiểm tra');
+      }
 
       if (isPassed) {
         quizResultIcon.textContent = '🎉';
         quizResultTitle.textContent = 'Chúc mừng bạn đã hoàn thành bài học!';
         quizResultDesc.innerHTML = `
           Bạn đã trả lời đúng <strong>${quizCorrectCount}/${total} câu (${percent}%)</strong>.<br>
-          ${xpAwarded > 0 ? `Đã cộng thưởng <strong style="color: #ca8a04;">+${xpAwarded} XP</strong> vào tài khoản của bạn!` : 'Bạn đã từng nhận thưởng XP của bài học này.'}
+          ${xpAwarded > 0 ? `Đã cộng thưởng <strong style="color: #ca8a04;">+${xpAwarded} XP</strong> vào tài khoản của bạn!` : 'Bạn đã hoàn thành và nhận thưởng XP của bài học này trước đó.'}
           <br>Bài học tiếp theo đã được mở khóa trên lộ trình!
         `;
       } else {
@@ -652,7 +794,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         quizResultTitle.textContent = 'Chưa đạt điểm yêu cầu';
         quizResultDesc.innerHTML = `
           Bạn trả lời đúng <strong>${quizCorrectCount}/${total} câu (${percent}%)</strong>.<br>
-          Cần đạt <strong>từ 80% trở lên</strong> để vượt qua bài học. Hãy ôn lại từ vựng hoặc Flashcard và thử lại nhé!
+          Cần đạt <strong>từ ${passScore}% trở lên</strong> để vượt qua bài học và nhận thưởng <strong>+${lessonRewardXp} XP</strong>. Hãy ôn lại từ vựng hoặc Flashcard và thử lại nhé!
         `;
       }
 
@@ -674,7 +816,24 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     } catch (err) {
       console.error('Lỗi lưu kết quả quiz:', err);
-      quizResultDesc.textContent = `Đạt ${quizCorrectCount}/${total} câu (${percent}%).`;
+      const friendlyMsg = formatLessonDbError(err, 'Không thể lưu kết quả bài kiểm tra lên máy chủ.');
+      quizResultIcon.textContent = '❌';
+      quizResultTitle.textContent = 'Chưa lưu được kết quả kiểm tra';
+      quizResultDesc.innerHTML = '';
+
+      const pMsg = document.createElement('p');
+      pMsg.style.cssText = 'color: #f87171; margin-bottom: 10px;';
+      pMsg.textContent = `Bạn trả lời đúng ${quizCorrectCount}/${total} câu (${percent}%), nhưng lưu điểm bị lỗi: ${friendlyMsg}`;
+      quizResultDesc.appendChild(pMsg);
+
+      const retryBtn = document.createElement('button');
+      retryBtn.type = 'button';
+      retryBtn.className = 'btn btn-primary';
+      retryBtn.textContent = '🔄 Thử lưu kết quả lại';
+      retryBtn.addEventListener('click', () => finishQuiz());
+      quizResultDesc.appendChild(retryBtn);
+
+      showLessonErrorWithRetry(friendlyMsg, () => finishQuiz());
     }
   }
 
@@ -1568,6 +1727,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         );
 
         const xpBonusText = (res && res.xp_awarded > 0) ? ` (+${res.xp_awarded} XP)` : '';
+        if (res && res.xp_awarded > 0) {
+          showXpEarnedToast(res.xp_awarded, 'Nộp bài ghi âm');
+        }
         speakingModalAlert.className = 'alert alert-success show';
         speakingModalAlert.textContent = '🎉 Nộp bài ghi âm thành công!' + xpBonusText + ' Cô giáo sẽ nghe và chấm điểm cho bạn sớm nhất.';
 
@@ -1586,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       } catch (err) {
         console.error('Lỗi nộp bài ghi âm:', err);
         speakingModalAlert.className = 'alert alert-danger show';
-        speakingModalAlert.textContent = err.message || 'Lỗi khi nộp bài ghi âm';
+        speakingModalAlert.textContent = formatLessonDbError(err, 'Lỗi khi nộp bài ghi âm');
         btnSubmitSpeaking.disabled = false;
         btnSubmitSpeaking.textContent = `Thử nộp lại (${recordedTakes.length} bản ghi)`;
       }
@@ -1676,9 +1838,17 @@ document.addEventListener('DOMContentLoaded', async function () {
         btnSubmitListening.textContent = 'Đang chấm điểm...';
 
         const result = await window.Student.submitListeningAssignment(currentListeningAssign.id, answers);
+        const correctCount = result ? (result.correct_count ?? result.correctCount ?? 0) : 0;
+        const totalQuestions = result ? (result.total_questions ?? result.totalQuestions ?? 0) : 0;
+        const earnedXp = result ? (result.xp_awarded ?? result.earnedXp ?? 0) : 0;
+        const xpSuffix = earnedXp > 0 ? ` (+${earnedXp} XP)` : '';
+
+        if (earnedXp > 0) {
+          showXpEarnedToast(earnedXp, 'Hoàn thành bài tập nghe');
+        }
 
         listeningModalAlert.className = 'alert alert-success show';
-        listeningModalAlert.textContent = `🎉 Hoàn thành! Bạn trả lời đúng ${result.correctCount}/${result.totalQuestions} câu. (+${result.earnedXp || 30} XP)`;
+        listeningModalAlert.textContent = `🎉 Hoàn thành! Bạn trả lời đúng ${correctCount}/${totalQuestions} câu.${xpSuffix}`;
 
         setTimeout(() => {
           if (listeningAudioPlayer) listeningAudioPlayer.pause();
@@ -1689,7 +1859,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       } catch (err) {
         console.error('Lỗi nộp bài nghe:', err);
         listeningModalAlert.className = 'alert alert-danger show';
-        listeningModalAlert.textContent = err.message || 'Lỗi nộp bài';
+        listeningModalAlert.textContent = formatLessonDbError(err, 'Lỗi nộp bài');
         btnSubmitListening.disabled = false;
         btnSubmitListening.textContent = 'Thử lại';
       }

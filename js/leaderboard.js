@@ -106,17 +106,17 @@ document.addEventListener('DOMContentLoaded', async function () {
       renderMyPosition(leaderboardData);
 
       // Render bảng danh sách lớp
-      leaderboardTableBody.innerHTML = leaderboardData.map(st => {
+      leaderboardTableBody.innerHTML = leaderboardData.map((st, idx) => {
         const isMe = (st.student_id === authData.user.id);
         const rowStyle = isMe ? 'background: var(--primary-light); font-weight: 700;' : '';
 
         let rankBadge = `<span style="font-weight: 800; color: var(--text-muted);">#${st.rank}</span>`;
-        if (st.rank === 1) rankBadge = '<span style="font-size: 18px;">🥇</span>';
-        else if (st.rank === 2) rankBadge = '<span style="font-size: 18px;">🥈</span>';
-        else if (st.rank === 3) rankBadge = '<span style="font-size: 18px;">🥉</span>';
+        if (Number(st.rank) === 1) rankBadge = '<span style="font-size: 18px;">🥇</span>';
+        else if (Number(st.rank) === 2) rankBadge = '<span style="font-size: 18px;">🥈</span>';
+        else if (Number(st.rank) === 3) rankBadge = '<span style="font-size: 18px;">🥉</span>';
 
         return `
-          <tr style="${rowStyle} cursor: pointer;" class="lb-row" data-idx="${st.rank - 1}">
+          <tr style="${rowStyle} cursor: pointer;" class="lb-row" data-idx="${idx}">
             <td style="text-align: center;">${rankBadge}</td>
             <td>
               <div style="display: flex; align-items: center; gap: 8px;">
