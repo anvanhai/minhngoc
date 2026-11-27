@@ -999,13 +999,146 @@ window.Admin = (function () {
     if (error) throw error;
 
     return (data || []).map(a => {
-      const completedCount = (a.submissions || []).filter(s => s.status === 'completed' || s.status === 'late').length;
+      const completedCount = (a.submissions || []).filter(s => {
+        if (a.assignment_type === 'custom') {
+          return s.status === 'submitted' || s.status === 'completed' || s.status === 'late' || s.status === 'graded';
+        }
+        return s.status === 'completed' || s.status === 'late' || s.status === 'graded';
+      }).length;
       return {
         ...a,
         completedCount,
         totalSubmissions: (a.submissions || []).length
       };
     });
+  }
+
+  /**
+   * Lấy nhanh một khoảng từ vựng (ví dụ từ dòng #1 đến #25) theo đúng bộ lọc và thứ tự đang xem
+   */
+  async function getVocabulariesByPositionRange({ hskLevel = null, search = '', partOfSpeech = null, sortBy = 'sort_order', fromPos = 1, toPos = 20 } = {}) {
+    const db = getDb();
+    if (!db) return [];
+
+    const startIdx = Math.max(0, (parseInt(fromPos, 10) || 1) - 1);
+    const endIdx = Math.max(startIdx, (parseInt(toPos, 10) || 1) - 1);
+    const clampedEnd = Math.min(startIdx + 99, endIdx); // Tối đa 100 từ mỗi lần chọn khoảng
+
+    let query = db.from('vocabularies').select('*');
+    if (hskLevel && hskLevel !== 'all') {
+      query = query.eq('hsk_level', parseInt(hskLevel, 10));
+    }
+    if (partOfSpeech && partOfSpeech !== 'all') {
+      query = query.eq('part_of_speech', partOfSpeech.trim());
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      query = query.or(`hanzi.ilike.%${q}%,pinyin.ilike.%${q}%,meaning_vi.ilike.%${q}%`);
+    }
+
+    if (sortBy === 'pinyin') {
+      query = query.order('hsk_level', { ascending: true }).order('pinyin', { ascending: true }).order('id', { ascending: true });
+    } else if (sortBy === 'hanzi') {
+      query = query.order('hsk_level', { ascending: true }).order('hanzi', { ascending: true }).order('id', { ascending: true });
+    } else if (sortBy === 'created_at') {
+      query = query.order('hsk_level', { ascending: true }).order('created_at', { ascending: false }).order('id', { ascending: true });
+    } else {
+      query = query.order('hsk_level', { ascending: true }).order('sort_order', { ascending: true, nullsFirst: false }).order('id', { ascending: true });
+    }
+
+    const { data, error } = await query.range(startIdx, clampedEnd);
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function upsertCustomAssignment({
+    assignmentId = null,
+    classId = null,
+    lessonId = null,
+    title = '',
+    description = null,
+    dueDate = null,
+    rewardXp = 30,
+    isPublished = false,
+    customSettings = {},
+    questions = [],
+    metadataOnly = false
+  }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('upsert_custom_assignment', {
+      p_assignment_id: assignmentId || null,
+      p_class_id: classId || null,
+      p_lesson_id: lessonId || null,
+      p_title: title,
+      p_description: description || null,
+      p_due_date: dueDate,
+      p_reward_xp: parseInt(rewardXp || 30, 10),
+      p_is_published: Boolean(isPublished),
+      p_custom_settings: customSettings || {},
+      p_questions: questions || [],
+      p_metadata_only: Boolean(metadataOnly)
+    });
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function getCustomAssignmentEditor(assignmentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('get_custom_assignment_editor', {
+      p_assignment_id: assignmentId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getVocabDistractorPool(vocabIds = []) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('get_vocab_distractor_pool', {
+      p_vocabulary_ids: vocabIds
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getCustomAssignmentResultsAndStats(assignmentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('get_custom_assignment_results_and_stats', {
+      p_assignment_id: assignmentId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getTeacherAttemptDetail(attemptId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('get_teacher_attempt_detail', {
+      p_attempt_id: attemptId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function gradeCustomAttemptAnswers(attemptId, grades) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('grade_custom_attempt_answers', {
+      p_attempt_id: attemptId,
+      p_grades: grades || []
+    });
+    if (error) throw error;
+    return data;
   }
 
   async function createAssignment({
@@ -2226,6 +2359,31 @@ window.Admin = (function () {
     return data;
   }
 
+  // ===========================================================================
+  // THỐNG KÊ THỜI GIAN HỌC CỦA LỚP & LỊCH SỬ 8 TUẦN (PHẦN B)
+  // ===========================================================================
+
+  async function getClassStudyTime(classId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_class_study_time', {
+      p_class_id: classId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getStudentStudyTimeHistory(classId, studentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_student_study_time_history', {
+      p_class_id: classId,
+      p_student_id: studentId
+    });
+    if (error) throw error;
+    return data;
+  }
+
   return {
     // Giáo trình
     getCurriculums,
@@ -2281,6 +2439,13 @@ window.Admin = (function () {
     deleteAssignment,
     reorderLessonAssignments,
     getAssignmentSubmissions,
+    getVocabulariesByPositionRange,
+    upsertCustomAssignment,
+    getCustomAssignmentEditor,
+    getVocabDistractorPool,
+    getCustomAssignmentResultsAndStats,
+    getTeacherAttemptDetail,
+    gradeCustomAttemptAnswers,
     getRecordingsForGrading,
     gradeRecording,
     getAudioPlayUrl,
@@ -2320,6 +2485,9 @@ window.Admin = (function () {
     deleteSelfStudyCard,
     reorderSelfStudyCards,
     getClassSrsOverview,
+    // Thống kê thời gian học (Phần B)
+    getClassStudyTime,
+    getStudentStudyTimeHistory,
     // Đặt lại mật khẩu & Quản lý Tài khoản
     resetUserPassword,
     getAllProfiles,

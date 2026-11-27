@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   async function loadDecks() {
+    if (window.StudyTimer) await window.StudyTimer.stop({ flush: true });
     if (activeSession) {
       activeSession.destroy();
       activeSession = null;
@@ -160,6 +161,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         deck_title: safeStr(deck.title, 'Tự học')
       }));
 
+      if (window.StudyTimer) window.StudyTimer.start('self_study');
+
       activeSession = window.FlashcardSession.mount({
         mode: 'self_study',
         deckTitle: safeStr(deck.title, 'Tự học'),
@@ -178,9 +181,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         },
         onReplayDeck: () => {
           openDeckStudy(deckId);
+        },
+        onFinish: () => {
+          if (window.StudyTimer) void window.StudyTimer.stop({ flush: true });
         }
       });
     } catch (err) {
+      if (window.StudyTimer) void window.StudyTimer.stop({ flush: false });
       console.error('Lỗi tải thẻ Tự học:', err);
       studyCardsLoading.style.display = 'none';
       studyCardsError.style.display = 'block';

@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Bàn học của tôi — Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="css/style.css?v=6.0">
+  <link rel="stylesheet" href="css/style.css?v=6.3">
   <script>
     (function(){
       try {
@@ -116,6 +116,7 @@
         <li class="nav-item"><a href="curriculum.html">📖 Giáo trình</a></li>
         <li class="nav-item"><a href="review.html">🧠 Ôn tập <span class="nav-due-badge">0</span></a></li>
         <li class="nav-item"><a href="self-study.html">🃏 Tự học</a></li>
+        <li class="nav-item"><a href="vocab-practice.html">📚 Kho từ vựng</a></li>
         <li class="nav-item"><a href="leaderboard.html">🏆 Bảng xếp hạng</a></li>
       </ul>
 
@@ -139,6 +140,9 @@
   <!-- Nội dung chính Dashboard -->
   <main class="main-wrapper">
     <div id="page-alert" class="alert"></div>
+
+    <!-- THẺ TỔNG KẾT ĐẦU TUẦN (hiện từ thứ Hai khi tuần trước có thời gian học và chưa đóng) -->
+    <div id="study-weekly-recap-card" class="card st-recap-card" style="display: none;"></div>
 
     <!-- KHỐI CHƯA ĐƯỢC XẾP LỚP -->
     <div id="unassigned-class-box" class="card" style="display: none; border-left: 4px solid #ca8a04;">
@@ -224,6 +228,25 @@
           <div>
             <div class="stat-widget-label">Tổng điểm kinh nghiệm</div>
             <div id="dash-xp" class="stat-widget-value">0 XP</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card THỜI GIAN HỌC THỰC TẾ (Phần B) -->
+      <div id="study-time-dashboard-card" class="card st-dashboard-card" style="box-shadow: var(--shadow-md); margin-bottom: 16px;">
+        <div class="st-card-header">
+          <div>
+            <h3 class="card-title" style="margin-bottom: 2px;">⏱️ Thời gian học thực tế</h3>
+            <p class="st-card-sub">
+              Tính theo giờ Việt Nam · Tuần cố định từ Thứ Hai đến Chủ nhật
+            </p>
+          </div>
+          <span id="dash-study-week-range" class="st-week-range-pill">--</span>
+        </div>
+
+        <div id="dash-study-time-body">
+          <div style="text-align: center; padding: 18px 10px; color: var(--text-muted); font-size: 13.5px;">
+            ⏳ Đang tải thống kê thời gian học...
           </div>
         </div>
       </div>
@@ -505,6 +528,25 @@
     </div>
   </div>
 
+  <!-- MODAL: LÀM BÀI TẬP TỰ SOẠN (QUIZLET / QUIZIZZ) -->
+  <div id="modal-custom-assignment-player" class="modal-overlay">
+    <div class="modal-card ca-player-modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="ca-player-modal-title">🧩 Bài Tập Tự Soạn</h3>
+          <div id="ca-player-modal-sub" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;"></div>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-custom-assignment-player">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 78vh; overflow-y: auto;">
+        <div id="ca-player-stage-root"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-custom-assignment-player">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     Minh Ngọc HSK &copy; 2026 · Hệ thống học tiếng Trung thông minh
   </footer>
@@ -516,8 +558,11 @@
   <script src="js/db.js?v=5.0"></script>
   <script src="js/auth.js?v=5.0"></script>
   <script src="js/xp.js?v=5.0"></script>
-  <script src="js/student.js?v=6.0"></script>
+  <script src="js/student.js?v=8.2"></script>
+  <script src="js/study-timer.js?v=1.0"></script>
   <script src="js/feedback-popup.js?v=5.0"></script>
-  <script src="js/dashboard.js?v=6.0"></script>
+  <script src="js/custom-assignment-shared.js?v=1.0"></script>
+  <script src="js/student-custom-assignment.js?v=1.1"></script>
+  <script src="js/dashboard.js?v=7.1"></script>
 </body>
 </html>

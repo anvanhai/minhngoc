@@ -36,6 +36,19 @@ document.addEventListener('DOMContentLoaded', async function () {
   const excelDropzone = document.getElementById('excel-dropzone');
   const excelSelectedFileEl = document.getElementById('excel-selected-file');
   const excelFileInput = document.getElementById('excel-file-input');
+  const importSheetSelectorWrap = document.getElementById('import-sheet-selector-wrap');
+  const importSheetSelect = document.getElementById('import-sheet-select');
+  const importDetectSummary = document.getElementById('import-detect-summary');
+  const importDetectSummaryText = document.getElementById('import-detect-summary-text');
+  const importDetectBadges = document.getElementById('import-detect-badges');
+  const btnToggleColumnMapper = document.getElementById('btn-toggle-column-mapper');
+  const importDefaultHskWrap = document.getElementById('import-default-hsk-wrap');
+  const importDefaultHskSelect = document.getElementById('import-default-hsk-select');
+  const importDefaultHskHint = document.getElementById('import-default-hsk-hint');
+  const importColumnMapperWrap = document.getElementById('import-column-mapper-wrap');
+  const btnApplyColumnMapping = document.getElementById('btn-apply-column-mapping');
+  const importMapperHead = document.getElementById('import-mapper-head');
+  const importMapperBody = document.getElementById('import-mapper-body');
   const selectAssignCurriculum = document.getElementById('import-assign-curriculum');
   const selectAssignLesson = document.getElementById('import-assign-lesson');
   const importLessonLoadError = document.getElementById('import-lesson-load-error');
@@ -47,6 +60,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   const previewSkippedBox = document.getElementById('preview-skipped-box');
   const previewSkippedTitle = document.getElementById('preview-skipped-title');
   const previewSkippedList = document.getElementById('preview-skipped-list');
+  const btnDownloadSkippedCsv = document.getElementById('btn-download-skipped-csv');
   const btnConfirmImport = document.getElementById('btn-confirm-import');
   const importModalAlert = document.getElementById('import-modal-alert');
 
@@ -727,156 +741,16 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 
   // ===========================================================================
-  // 9. NHẬP EXCEL / CSV BẰNG SHEETJS
+  // 9. NHẬP EXCEL / CSV / TSV THÔNG MINH (SHEETJS + VOCABIMPORTPARSER)
   // ===========================================================================
 
   const DEFAULT_DROPZONE_SUBTITLE = 'hoặc bấm vào để chọn file từ máy tính';
 
-  const EXCEL_COLUMN_ALIASES = {
-    hanzi: [
-      'hanzi', 'chu han', 'chuhan', 'han tu', 'hantu', 'tu vung', 'tuvung', 'word', 'chinese'
-    ],
-    pinyin: [
-      'pinyin', 'phien am', 'phienam', 'binh am', 'binham', 'am doc'
-    ],
-    meaning_vi: [
-      'meaning_vi', 'meaning vi', 'meaning', 'nghia', 'nghia tieng viet', 'dich nghia', 'tieng viet'
-    ],
-    hsk_level: [
-      'hsk_level', 'hsk level', 'hsk', 'cap do', 'cap do hsk', 'level', 'cap'
-    ],
-    part_of_speech: [
-      'part_of_speech', 'part of speech', 'tu loai', 'tuloai', 'loai tu', 'pos', 'type'
-    ],
-    example_hanzi: [
-      'example_hanzi', 'example hanzi', 'vi du', 'vidu', 'cau vi du', 'vi du han tu', 'example'
-    ],
-    example_pinyin: [
-      'example_pinyin', 'example pinyin', 'phien am vi du', 'pinyin vi du'
-    ],
-    example_vi: [
-      'example_vi', 'example vi', 'nghia vi du', 'dich vi du', 'nghia cau', 'nghia cau vi du'
-    ],
-    sort_order: [
-      'sort_order', 'sort order', 'stt', 'tt', 'no.', 'no', 'thu tu', 'so thu tu', 'order'
-    ]
-  };
-
-  function stripVietnameseAccents(str) {
-    return String(str ?? '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
-      .normalize('NFC');
-  }
-
-  function normalizeHeaderToken(str) {
-    return stripVietnameseAccents(
-      String(str ?? '')
-        .replace(/^\uFEFF+/, '')
-        .normalize('NFC')
-    )
-      .toLowerCase()
-      .replace(/[:*]+$/g, '')
-      .replace(/[_-]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
-
-  function matchHeaderToField(rawHeader) {
-    const rawStr = String(rawHeader ?? '').replace(/^\uFEFF+/, '').trim();
-    if (!rawStr || rawStr.startsWith('__EMPTY')) return null;
-
-    // Xây dựng danh sách ứng viên ưu tiên: toàn chuỗi -> bỏ ngoặc đơn -> trong ngoặc đơn -> tách theo '/'
-    const candidateGroups = [];
-    const fullNorm = normalizeHeaderToken(rawStr);
-    if (fullNorm) candidateGroups.push([fullNorm, fullNorm.replace(/\s+/g, '_')]);
-
-    const parenMatch = rawStr.match(/^(.+?)\(([^)]+)\)\s*[:*]*\s*$/);
-    if (parenMatch) {
-      const outside = normalizeHeaderToken(parenMatch[1]);
-      const inside = normalizeHeaderToken(parenMatch[2]);
-      if (outside) candidateGroups.push([outside, outside.replace(/\s+/g, '_')]);
-      if (inside) candidateGroups.push([inside, inside.replace(/\s+/g, '_')]);
-    }
-
-    if (rawStr.includes('/') || rawStr.includes('|')) {
-      rawStr.split(/[\/|]+/).forEach(part => {
-        const p = normalizeHeaderToken(part);
-        if (p) candidateGroups.push([p, p.replace(/\s+/g, '_')]);
-      });
-    }
-
-    for (const candidates of candidateGroups) {
-      for (const [field, aliases] of Object.entries(EXCEL_COLUMN_ALIASES)) {
-        if (candidates.some(c => aliases.includes(c))) {
-          return field;
-        }
-      }
-    }
-    return null;
-  }
-
-  function resolveExcelColumnMap(rawRows, headerRowCells = []) {
-    const seenHeaderKeys = new Set();
-    const headerKeys = [];
-
-    (headerRowCells || []).forEach(cell => {
-      const key = String(cell ?? '').replace(/^\uFEFF+/, '').trim();
-      if (key && !seenHeaderKeys.has(key)) {
-        seenHeaderKeys.add(key);
-        headerKeys.push(key);
-      }
-    });
-
-    (rawRows || []).forEach(row => {
-      if (!row || typeof row !== 'object') return;
-      Object.keys(row).forEach(k => {
-        if (k && !k.startsWith('__EMPTY') && !seenHeaderKeys.has(k)) {
-          seenHeaderKeys.add(k);
-          headerKeys.push(k);
-        }
-      });
-    });
-
-    const columnMap = {};
-    for (const rawKey of headerKeys) {
-      const field = matchHeaderToField(rawKey);
-      if (field && !columnMap[field]) {
-        columnMap[field] = rawKey;
-      }
-    }
-    return { columnMap, headerKeys };
-  }
-
-  function getMappedCellVal(row, mappedKey, fieldAliases) {
-    if (mappedKey && Object.prototype.hasOwnProperty.call(row, mappedKey)) {
-      return String(row[mappedKey] ?? '').replace(/^\uFEFF/, '').trim();
-    }
-    // Dự phòng nếu một dòng sau có khóa header biến thể khác
-    for (const rowKey in row) {
-      if (!Object.prototype.hasOwnProperty.call(row, rowKey)) continue;
-      if (matchHeaderToField(rowKey) === fieldAliases) {
-        return String(row[rowKey] ?? '').replace(/^\uFEFF/, '').trim();
-      }
-    }
-    return '';
-  }
-
-  function parseStrictHskLevel(rawVal) {
-    const trimmed = String(rawVal ?? '').trim();
-    if (!trimmed) return { valid: true, value: 1 };
-    const m = stripVietnameseAccents(trimmed)
-      .toLowerCase()
-      .match(/^(?:(?:hsk|cap do|cap|level)\s*[_:-]?\s*)?(-?\d+)$/i);
-    if (!m) return { valid: false, raw: trimmed };
-    const lvl = parseInt(m[1], 10);
-    if (!Number.isInteger(lvl) || lvl < 1 || lvl > 9) {
-      return { valid: false, raw: trimmed };
-    }
-    return { valid: true, value: lvl };
-  }
+  let currentImportWorkbook = null;
+  let currentImportFileName = '';
+  let currentAnalysis = null;
+  let currentColumnMapping = {};
+  let isMapperExpanded = false;
 
   function resetImportPreviewState() {
     parsedExcelWords = [];
@@ -887,8 +761,307 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (previewSkippedBox) previewSkippedBox.style.display = 'none';
     if (previewSkippedTitle) previewSkippedTitle.textContent = '';
     if (previewSkippedList) previewSkippedList.innerHTML = '';
+    if (btnDownloadSkippedCsv) btnDownloadSkippedCsv.style.display = 'none';
     btnConfirmImport.disabled = true;
     btnConfirmImport.textContent = '🚀 Bắt đầu Nhập Dữ Liệu';
+  }
+
+  function resetAllImportAnalysisUi() {
+    currentImportWorkbook = null;
+    currentImportFileName = '';
+    currentAnalysis = null;
+    currentColumnMapping = {};
+    isMapperExpanded = false;
+    if (importSheetSelectorWrap) importSheetSelectorWrap.style.display = 'none';
+    if (importSheetSelect) importSheetSelect.innerHTML = '';
+    if (importDetectSummary) importDetectSummary.style.display = 'none';
+    if (importDetectSummaryText) importDetectSummaryText.textContent = '';
+    if (importDetectBadges) importDetectBadges.innerHTML = '';
+    if (importDefaultHskWrap) importDefaultHskWrap.style.display = 'none';
+    if (importColumnMapperWrap) importColumnMapperWrap.style.display = 'none';
+    if (importMapperHead) importMapperHead.innerHTML = '';
+    if (importMapperBody) importMapperBody.innerHTML = '';
+    resetImportPreviewState();
+  }
+
+  function updateMapperVisibility() {
+    if (!importColumnMapperWrap) return;
+    importColumnMapperWrap.style.display = isMapperExpanded ? 'block' : 'none';
+    if (btnToggleColumnMapper) {
+      btnToggleColumnMapper.textContent = isMapperExpanded ? '🔼 Ẩn ghép cột' : '🔧 Chỉnh ghép cột';
+    }
+  }
+
+  function syncDefaultHskControls(shouldApplySuggested = false) {
+    if (!importDefaultHskWrap || !importDefaultHskSelect || !currentAnalysis) return;
+    const hasHskCol = currentColumnMapping.hsk_level !== null && currentColumnMapping.hsk_level !== undefined;
+    if (hasHskCol) {
+      importDefaultHskWrap.style.display = 'none';
+      return;
+    }
+
+    importDefaultHskWrap.style.display = 'block';
+    if (shouldApplySuggested) {
+      importDefaultHskSelect.value = String(currentAnalysis.suggestedFileHskLevel || 1);
+    }
+
+    if (importDefaultHskHint) {
+      if (currentAnalysis.hskSuggestedFromFilename) {
+        importDefaultHskHint.textContent = `File không có cột Cấp HSK — đã gợi ý HSK ${currentAnalysis.hskSuggestedFromFilename} theo tên file "${currentImportFileName}". Bạn có thể đổi nếu cần.`;
+      } else {
+        importDefaultHskHint.textContent = 'File không có cột Cấp HSK — cấp độ chọn ở đây sẽ áp dụng cho toàn bộ từ trong file.';
+      }
+    }
+  }
+
+  function renderDetectSummary(analysis) {
+    if (!importDetectSummary || !importDetectSummaryText || !importDetectBadges) return;
+
+    importDetectSummary.style.display = 'block';
+    importDetectSummaryText.textContent = analysis.summaryNotice || 'Đã phân tích xong dữ liệu.';
+
+    const badges = [];
+    if (analysis.metadata && analysis.metadata.sheetName && analysis.metadata.totalSheets > 1) {
+      badges.push({ label: `Sheet: ${analysis.metadata.sheetName}`, cls: 'is-highlight' });
+    }
+    (analysis.summaryBadges || []).forEach(txt => {
+      const isWarn = /không có dòng tiêu đề|tiêu đề lạ|1 cột/i.test(txt);
+      badges.push({ label: txt, cls: isWarn ? 'is-warn' : 'is-highlight' });
+    });
+
+    if (analysis.missingRequired && analysis.missingRequired.length > 0) {
+      badges.push({ label: 'Thiếu cột bắt buộc — cần chọn lại', cls: 'is-warn' });
+    } else if (analysis.overallConfidence >= 0.85) {
+      badges.push({ label: `Độ tin cậy cao (${Math.round(analysis.overallConfidence * 100)}%)`, cls: 'is-highlight' });
+    } else {
+      badges.push({ label: `Cần kiểm tra ghép cột (${Math.round(analysis.overallConfidence * 100)}%)`, cls: 'is-warn' });
+    }
+
+    importDetectBadges.innerHTML = badges
+      .map(b => `<span class="import-badge-pill ${b.cls}">${escapeHtml(b.label)}</span>`)
+      .join('');
+  }
+
+  function renderColumnMapper(analysis) {
+    if (!importMapperHead || !importMapperBody || !window.VocabImportParser) return;
+    const { FIELD_DEFS } = window.VocabImportParser;
+    const colCount = analysis.colCount || 0;
+
+    let headHtml = '<tr>';
+    for (let c = 0; c < colCount; c++) {
+      const rawHdr = (analysis.hasHeader && analysis.headerCells && analysis.headerCells[c])
+        ? analysis.headerCells[c]
+        : '';
+      const mappedField = FIELD_DEFS.find(f => currentColumnMapping[f.key] === c);
+      const selectedKey = mappedField ? mappedField.key : '';
+
+      const optionsHtml = [
+        '<option value="">-- Bỏ qua cột này --</option>',
+        ...FIELD_DEFS.map(f => {
+          const reqMark = f.required ? ' *' : '';
+          const isSel = selectedKey === f.key ? ' selected' : '';
+          return `<option value="${escapeHtml(f.key)}"${isSel}>${escapeHtml(f.shortLabel + reqMark)}</option>`;
+        })
+      ].join('');
+
+      headHtml += `
+        <th>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Cột ${c + 1}${rawHdr ? `: ${escapeHtml(rawHdr)}` : ' (Không tiêu đề)'}</div>
+          <select class="form-control import-mapper-select" data-col-idx="${c}">${optionsHtml}</select>
+        </th>
+      `;
+    }
+    headHtml += '</tr>';
+    importMapperHead.innerHTML = headHtml;
+
+    // Ràng buộc mỗi vai trò chỉ chọn tối đa 1 cột
+    importMapperHead.querySelectorAll('.import-mapper-select').forEach(sel => {
+      sel.addEventListener('change', function () {
+        const chosenField = this.value;
+        if (!chosenField) return;
+        importMapperHead.querySelectorAll('.import-mapper-select').forEach(other => {
+          if (other !== this && other.value === chosenField) {
+            other.value = '';
+          }
+        });
+      });
+    });
+
+    const sampleRows = (analysis.previewRows || []).slice(0, 5);
+    if (sampleRows.length === 0) {
+      importMapperBody.innerHTML = `<tr><td colspan="${Math.max(1, colCount)}" style="text-align: center; color: var(--text-muted);">Không có dòng dữ liệu mẫu.</td></tr>`;
+    } else {
+      importMapperBody.innerHTML = sampleRows.map(row => {
+        let cellsHtml = '';
+        for (let c = 0; c < colCount; c++) {
+          const rawVal = (Array.isArray(row) && row[c] !== undefined) ? String(row[c]) : '';
+          const shortDisplay = rawVal.length > 80 ? rawVal.slice(0, 80) + '…' : rawVal;
+          cellsHtml += `<td title="${escapeHtml(rawVal)}">${shortDisplay ? escapeHtml(shortDisplay) : '<span style="color: var(--text-light);">—</span>'}</td>`;
+        }
+        return `<tr>${cellsHtml}</tr>`;
+      }).join('');
+    }
+
+    updateMapperVisibility();
+  }
+
+  function readMappingFromMapperDom() {
+    const nextMapping = {};
+    if (window.VocabImportParser && Array.isArray(window.VocabImportParser.FIELD_DEFS)) {
+      window.VocabImportParser.FIELD_DEFS.forEach(f => {
+        nextMapping[f.key] = null;
+      });
+    }
+    if (!importMapperHead) return nextMapping;
+
+    importMapperHead.querySelectorAll('.import-mapper-select').forEach(sel => {
+      const colIdx = parseInt(sel.dataset.colIdx, 10);
+      const fieldKey = sel.value;
+      if (fieldKey && !isNaN(colIdx) && nextMapping[fieldKey] === null) {
+        nextMapping[fieldKey] = colIdx;
+      }
+    });
+    return nextMapping;
+  }
+
+  function runExtractionAndPreview() {
+    if (!currentAnalysis || !window.VocabImportParser) return;
+    const { extractWordsWithMapping } = window.VocabImportParser;
+
+    const missingLabels = [];
+    if (currentColumnMapping.hanzi === null || currentColumnMapping.hanzi === undefined) {
+      missingLabels.push('Chữ Hán (hanzi)');
+    }
+    if (currentColumnMapping.pinyin === null || currentColumnMapping.pinyin === undefined) {
+      missingLabels.push('Pinyin (phiên âm)');
+    }
+    if (currentColumnMapping.meaning_vi === null || currentColumnMapping.meaning_vi === undefined) {
+      missingLabels.push('Nghĩa tiếng Việt (meaning_vi)');
+    }
+
+    if (missingLabels.length > 0) {
+      resetImportPreviewState();
+      isMapperExpanded = true;
+      updateMapperVisibility();
+      showImportAlert(
+        `Thiếu cột bắt buộc: ${missingLabels.join(', ')}. Hãy chọn cột tương ứng trong bảng "Kiểm tra & ghép cột" phía trên rồi bấm "Áp dụng ghép cột", hoặc bổ sung cột còn thiếu vào file.`
+      );
+      return;
+    }
+
+    const defaultHskLevel = importDefaultHskSelect ? (parseInt(importDefaultHskSelect.value, 10) || 1) : 1;
+    const { validWords, skippedRows } = extractWordsWithMapping({
+      matrix: currentAnalysis.matrix,
+      rowNumbers: currentAnalysis.rowNumbers,
+      dataStartIndex: currentAnalysis.dataStartIndex,
+      columnMapping: currentColumnMapping,
+      defaultHskLevel
+    });
+
+    if (validWords.length === 0) {
+      resetImportPreviewState();
+      if (currentAnalysis.dataRowCount === 0) {
+        showImportAlert('File Excel/CSV mới chỉ có dòng tiêu đề, chưa có dòng dữ liệu từ vựng nào!');
+      } else {
+        const detailPreview = skippedRows.slice(0, 5)
+          .map(s => `Dòng ${s.rowNum}: ${s.reason}`)
+          .join('; ');
+        const extraCount = skippedRows.length > 5 ? ` (và ${skippedRows.length - 5} dòng khác)` : '';
+        isMapperExpanded = true;
+        updateMapperVisibility();
+        showImportAlert(
+          skippedRows.length > 0
+            ? `Không có từ vựng hợp lệ nào sau khi đọc! Chi tiết: ${detailPreview}${extraCount}. Hãy kiểm tra lại ghép cột phía trên hoặc dữ liệu file.`
+            : 'Không tìm thấy từ vựng hợp lệ nào trong file! Hãy kiểm tra lại các cột Chữ Hán, Pinyin và Nghĩa.'
+        );
+      }
+      return;
+    }
+
+    parsedExcelWords = validWords;
+    skippedExcelRows = skippedRows;
+    clearImportAlert();
+    renderExcelPreview(parsedExcelWords, skippedExcelRows);
+  }
+
+  function applyAnalysisToUi(analysis) {
+    currentAnalysis = analysis;
+
+    if (!analysis || analysis.isEmpty) {
+      if (importDetectSummary) importDetectSummary.style.display = 'none';
+      if (importDefaultHskWrap) importDefaultHskWrap.style.display = 'none';
+      if (importColumnMapperWrap) importColumnMapperWrap.style.display = 'none';
+      resetImportPreviewState();
+      showImportAlert(
+        (analysis && analysis.metadata && analysis.metadata.totalSheets > 1)
+          ? `Trang tính "${analysis.metadata.sheetName}" đang trống. Hãy chọn trang tính khác ở mục phía trên.`
+          : 'File Excel/CSV trống hoặc không chứa dữ liệu nào!'
+      );
+      return;
+    }
+
+    currentColumnMapping = { ...analysis.columnMapping };
+    isMapperExpanded = Boolean(analysis.needsConfirmation);
+
+    renderDetectSummary(analysis);
+    syncDefaultHskControls(true);
+    renderColumnMapper(analysis);
+    runExtractionAndPreview();
+  }
+
+  function processExcelSheet(requestedSheetName = null) {
+    if (!currentImportWorkbook || !window.XLSX || !window.VocabImportParser) return;
+    const {
+      MAX_IMPORT_ROWS,
+      extractSheetRowsFromWorkbook,
+      detectAndSplitSingleColumnMatrix,
+      analyzeTabularSource
+    } = window.VocabImportParser;
+
+    const sheetRes = extractSheetRowsFromWorkbook(window.XLSX, currentImportWorkbook, requestedSheetName);
+
+    if (importSheetSelectorWrap && importSheetSelect) {
+      if (sheetRes.sheets.length > 1) {
+        importSheetSelect.innerHTML = '';
+        sheetRes.sheets.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.name;
+          opt.textContent = `${s.name} (${s.dataRowCount.toLocaleString('vi-VN')} dòng có dữ liệu)`;
+          if (s.name === sheetRes.selectedSheet) opt.selected = true;
+          importSheetSelect.appendChild(opt);
+        });
+        importSheetSelectorWrap.style.display = 'block';
+      } else {
+        importSheetSelectorWrap.style.display = 'none';
+        importSheetSelect.innerHTML = '';
+      }
+    }
+
+    const splitRes = detectAndSplitSingleColumnMatrix(sheetRes.matrix, sheetRes.rowNumbers);
+
+    if (splitRes.matrix.length > MAX_IMPORT_ROWS) {
+      if (importDetectSummary) importDetectSummary.style.display = 'none';
+      if (importDefaultHskWrap) importDefaultHskWrap.style.display = 'none';
+      if (importColumnMapperWrap) importColumnMapperWrap.style.display = 'none';
+      resetImportPreviewState();
+      showImportAlert(`Trang tính "${sheetRes.selectedSheet}" có ${splitRes.matrix.length.toLocaleString('vi-VN')} dòng, vượt quá giới hạn ${MAX_IMPORT_ROWS.toLocaleString('vi-VN')} dòng/lần để đảm bảo trình duyệt ổn định. Vui lòng chia nhỏ file.`);
+      return;
+    }
+
+    const analysis = analyzeTabularSource({
+      matrix: splitRes.matrix,
+      rowNumbers: splitRes.rowNumbers,
+      fileName: currentImportFileName,
+      metadata: {
+        sheetName: sheetRes.selectedSheet,
+        totalSheets: sheetRes.sheets.length,
+        delimiter: splitRes.detectedDelimiter,
+        splitFromSingleColumn: splitRes.splitFromSingleColumn,
+        mergedCellAppliedCount: sheetRes.mergedCellAppliedCount
+      }
+    });
+
+    applyAnalysisToUi(analysis);
   }
 
   function clearLessonLoadError() {
@@ -959,7 +1132,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   btnOpenImportExcel.addEventListener('click', async () => {
     clearImportAlert();
-    resetImportPreviewState();
+    resetAllImportAnalysisUi();
     clearLessonLoadError();
     if (excelFileInput) excelFileInput.value = '';
     if (excelSelectedFileEl) excelSelectedFileEl.textContent = DEFAULT_DROPZONE_SUBTITLE;
@@ -1007,7 +1180,56 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // Kéo thả và Chọn file Excel/CSV
+  if (importSheetSelect) {
+    importSheetSelect.addEventListener('change', function () {
+      if (currentImportWorkbook) {
+        clearImportAlert();
+        processExcelSheet(importSheetSelect.value);
+      }
+    });
+  }
+
+  if (btnToggleColumnMapper) {
+    btnToggleColumnMapper.addEventListener('click', function () {
+      isMapperExpanded = !isMapperExpanded;
+      updateMapperVisibility();
+    });
+  }
+
+  if (btnApplyColumnMapping) {
+    btnApplyColumnMapping.addEventListener('click', function () {
+      if (!currentAnalysis) return;
+      currentColumnMapping = readMappingFromMapperDom();
+      syncDefaultHskControls(false);
+      runExtractionAndPreview();
+    });
+  }
+
+  if (importDefaultHskSelect) {
+    importDefaultHskSelect.addEventListener('change', function () {
+      if (currentAnalysis) {
+        runExtractionAndPreview();
+      }
+    });
+  }
+
+  if (btnDownloadSkippedCsv) {
+    btnDownloadSkippedCsv.addEventListener('click', function () {
+      if (!skippedExcelRows || skippedExcelRows.length === 0 || !window.VocabImportParser) return;
+      const csvContent = window.VocabImportParser.buildSkippedRowsCsv(skippedExcelRows);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dong_loi_nhap_tu_vung.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  }
+
+  // Kéo thả và Chọn file Excel/CSV/TSV
   excelDropzone.addEventListener('click', (e) => {
     if (e.target === excelFileInput) return;
     excelFileInput.click();
@@ -1039,209 +1261,111 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   });
 
-  function decodeCsvBufferToUtf8String(arrayBuffer) {
-    const bytes = new Uint8Array(arrayBuffer);
-    let text;
-    if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) {
-      text = new TextDecoder('utf-16le').decode(bytes);
-    } else if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) {
-      text = new TextDecoder('utf-16be').decode(bytes);
-    } else {
-      text = new TextDecoder('utf-8').decode(bytes);
-    }
-    return text.replace(/^\uFEFF+/, '');
-  }
-
   function handleSelectedExcelFile(file) {
-    // Luôn xóa trạng thái lỗi và xem trước cũ trước khi đọc file mới
+    // Luôn xóa trạng thái lỗi, nhận diện và xem trước cũ trước khi đọc file mới
     clearImportAlert();
-    resetImportPreviewState();
+    resetAllImportAnalysisUi();
 
-    if (!window.XLSX) {
-      showImportAlert('Thư viện SheetJS chưa được nạp, vui lòng tải lại trang!');
+    if (!window.XLSX || !window.VocabImportParser) {
+      showImportAlert('Bộ đọc Excel/CSV chưa được nạp đầy đủ, vui lòng tải lại trang!');
       return;
     }
+
+    const {
+      MAX_FILE_SIZE_BYTES,
+      MAX_IMPORT_ROWS,
+      decodeTextBuffer,
+      detectDelimiter,
+      parseDelimitedText,
+      detectAndSplitSingleColumnMatrix,
+      analyzeTabularSource
+    } = window.VocabImportParser;
 
     const fileName = String(file.name || '').trim();
-    const ext = fileName.split('.').pop().toLowerCase();
-    if (!['xlsx', 'xls', 'csv'].includes(ext)) {
+    const ext = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
+    if (!['xlsx', 'xls', 'csv', 'tsv'].includes(ext)) {
       if (excelSelectedFileEl) excelSelectedFileEl.textContent = DEFAULT_DROPZONE_SUBTITLE;
-      showImportAlert('Định dạng file không hỗ trợ! Vui lòng chọn file .xlsx, .xls hoặc .csv.');
+      showImportAlert('Định dạng file không hỗ trợ! Vui lòng chọn file .xlsx, .xls, .csv hoặc .tsv.');
       return;
     }
 
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+      if (excelSelectedFileEl) excelSelectedFileEl.textContent = DEFAULT_DROPZONE_SUBTITLE;
+      showImportAlert(`File "${fileName}" có dung lượng ${sizeMb} MB, vượt quá giới hạn tối đa 5 MB để bảo vệ trình duyệt. Vui lòng tách thành nhiều file nhỏ.`);
+      return;
+    }
+
+    currentImportFileName = fileName;
     if (excelSelectedFileEl) {
-      excelSelectedFileEl.textContent = `Đã chọn: ${fileName}`;
+      excelSelectedFileEl.textContent = `⏳ Đang phân tích: ${fileName}`;
     }
 
     const reader = new FileReader();
     reader.onload = function (e) {
       try {
-        let workbook;
-        if (ext === 'csv') {
-          const csvText = decodeCsvBufferToUtf8String(e.target.result);
-          workbook = window.XLSX.read(csvText, { type: 'string' });
+        if (excelSelectedFileEl) {
+          excelSelectedFileEl.textContent = `Đã chọn: ${fileName}`;
+        }
+
+        if (ext === 'csv' || ext === 'tsv') {
+          const decoded = decodeTextBuffer(e.target.result);
+          const delimRes = detectDelimiter(decoded.text, ext === 'tsv' ? '\t' : null);
+
+          let matrix = delimRes.matrix;
+          let rowNumbers = delimRes.rowNumbers;
+          let delimiterUsed = delimRes.delimiter;
+          let splitSingle = false;
+
+          if ((!matrix || matrix.length === 0) && decoded.text.trim() !== '') {
+            // Dự phòng nếu toàn bộ CSV chỉ có 1 cột (vd thiếu dấu phân cách hoặc gói ngoặc kép cả dòng)
+            const fallbackParsed = parseDelimitedText(decoded.text, ext === 'tsv' ? '\t' : ',');
+            const singleCheck = detectAndSplitSingleColumnMatrix(fallbackParsed.rows, fallbackParsed.rowStartLines);
+            matrix = singleCheck.matrix;
+            rowNumbers = singleCheck.rowNumbers;
+            splitSingle = singleCheck.splitFromSingleColumn;
+            delimiterUsed = singleCheck.detectedDelimiter;
+          }
+
+          if (matrix && matrix.length > MAX_IMPORT_ROWS) {
+            showImportAlert(`File "${fileName}" có ${matrix.length.toLocaleString('vi-VN')} dòng, vượt quá giới hạn ${MAX_IMPORT_ROWS.toLocaleString('vi-VN')} dòng/lần để đảm bảo trình duyệt ổn định.`);
+            return;
+          }
+
+          const analysis = analyzeTabularSource({
+            matrix: matrix || [],
+            rowNumbers: rowNumbers || [],
+            fileName,
+            metadata: {
+              encoding: decoded.encoding,
+              delimiter: delimiterUsed,
+              splitFromSingleColumn: splitSingle,
+              mergedCellAppliedCount: 0
+            }
+          });
+          applyAnalysisToUi(analysis);
         } else {
           const data = new Uint8Array(e.target.result);
-          workbook = window.XLSX.read(data, { type: 'array', codepage: 65001 });
-        }
-
-        if (!workbook || !Array.isArray(workbook.SheetNames) || workbook.SheetNames.length === 0) {
-          showImportAlert('File Excel trống hoặc không chứa sheet dữ liệu nào!');
-          return;
-        }
-
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const matrixRows = window.XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-        let headerIdx = Array.isArray(matrixRows)
-          ? matrixRows.findIndex(r => Array.isArray(r) && r.some(c => String(c ?? '').trim() !== ''))
-          : -1;
-
-        if (headerIdx >= 0) {
-          const firstCandidate = resolveExcelColumnMap([], matrixRows[headerIdx]).columnMap;
-          if (!firstCandidate.hanzi || !firstCandidate.pinyin || !firstCandidate.meaning_vi) {
-            for (let i = headerIdx + 1; i < Math.min(matrixRows.length, headerIdx + 5); i++) {
-              if (!Array.isArray(matrixRows[i])) continue;
-              const candidate = resolveExcelColumnMap([], matrixRows[i]).columnMap;
-              if (candidate.hanzi && candidate.pinyin && candidate.meaning_vi) {
-                headerIdx = i;
-                break;
-              }
-            }
+          const workbook = window.XLSX.read(data, { type: 'array', codepage: 65001 });
+          if (!workbook || !Array.isArray(workbook.SheetNames) || workbook.SheetNames.length === 0) {
+            showImportAlert('File Excel trống hoặc không chứa sheet dữ liệu nào!');
+            return;
           }
+          currentImportWorkbook = workbook;
+          processExcelSheet(null);
         }
-
-        const headerRowCells = headerIdx >= 0 ? matrixRows[headerIdx] : [];
-        let sheetJsonOpts = { defval: '' };
-        if (headerIdx > 0 && worksheet['!ref']) {
-          const decodedRef = window.XLSX.utils.decode_range(worksheet['!ref']);
-          sheetJsonOpts = { defval: '', range: decodedRef.s.r + headerIdx };
-        }
-        const rawRows = window.XLSX.utils.sheet_to_json(worksheet, sheetJsonOpts);
-
-        const { columnMap } = resolveExcelColumnMap(rawRows, headerRowCells);
-
-        // Kiểm tra cột bắt buộc trước
-        const missingCols = [];
-        if (!columnMap.hanzi) missingCols.push('Chữ Hán (hanzi / chữ hán / hán tự)');
-        if (!columnMap.pinyin) missingCols.push('Pinyin (pinyin / phiên âm)');
-        if (!columnMap.meaning_vi) missingCols.push('Nghĩa (meaning_vi / nghĩa / nghĩa tiếng việt)');
-
-        if (missingCols.length > 0) {
-          showImportAlert(`Thiếu cột bắt buộc trong file: ${missingCols.join(', ')}.`);
-          return;
-        }
-
-        if (!rawRows || rawRows.length === 0) {
-          showImportAlert('File Excel/CSV mới chỉ có dòng tiêu đề, chưa có dòng dữ liệu từ vựng nào!');
-          return;
-        }
-
-        const { validWords, skippedRows } = normalizeExcelRows(rawRows, columnMap);
-
-        if (validWords.length === 0) {
-          const detailPreview = skippedRows.slice(0, 5)
-            .map(s => `Dòng ${s.rowNum}: ${s.reason}`)
-            .join('; ');
-          const extraCount = skippedRows.length > 5 ? ` (và ${skippedRows.length - 5} dòng khác)` : '';
-          showImportAlert(
-            skippedRows.length > 0
-              ? `Không tìm thấy từ vựng hợp lệ nào trong file! Chi tiết dòng lỗi: ${detailPreview}${extraCount}.`
-              : 'Không tìm thấy từ vựng hợp lệ nào trong file! Hãy kiểm tra lại dữ liệu các cột Chữ Hán, Pinyin và Nghĩa.'
-          );
-          return;
-        }
-
-        parsedExcelWords = validWords;
-        skippedExcelRows = skippedRows;
-        clearImportAlert();
-        renderExcelPreview(parsedExcelWords, skippedExcelRows);
-
       } catch (err) {
-        console.error('Lỗi đọc file Excel:', err);
-        resetImportPreviewState();
-        showImportAlert('Không thể đọc file Excel/CSV này. Vui lòng kiểm tra lại định dạng file!');
+        console.error('Lỗi đọc file Excel/CSV:', err);
+        resetAllImportAnalysisUi();
+        showImportAlert('Không thể đọc file Excel/CSV này. Vui lòng kiểm tra lại file không bị hỏng hoặc mật khẩu bảo vệ!');
       }
     };
     reader.onerror = function () {
-      resetImportPreviewState();
+      if (excelSelectedFileEl) excelSelectedFileEl.textContent = DEFAULT_DROPZONE_SUBTITLE;
+      resetAllImportAnalysisUi();
       showImportAlert('Không thể đọc file từ máy tính. Vui lòng thử lại!');
     };
     reader.readAsArrayBuffer(file);
-  }
-
-  function normalizeExcelRows(rows, columnMap) {
-    const validWords = [];
-    const skippedRows = [];
-    const seenKeys = new Set();
-    let validCounter = 0;
-
-    rows.forEach((r, idx) => {
-      if (!r || typeof r !== 'object') return;
-      const rowNum = typeof r.__rowNum__ === 'number' ? (r.__rowNum__ + 1) : (idx + 2);
-
-      // Bỏ qua các dòng hoàn toàn trống ở cuối sheet
-      const hasAnyValue = Object.keys(r).some(k => !k.startsWith('__EMPTY') && String(r[k] ?? '').trim() !== '');
-      if (!hasAnyValue) return;
-
-      const hanzi = getMappedCellVal(r, columnMap.hanzi, 'hanzi').normalize('NFC');
-      const pinyin = getMappedCellVal(r, columnMap.pinyin, 'pinyin').normalize('NFC');
-      const meaningVi = getMappedCellVal(r, columnMap.meaning_vi, 'meaning_vi').normalize('NFC');
-      const hskRaw = getMappedCellVal(r, columnMap.hsk_level, 'hsk_level');
-      const parsedHsk = parseStrictHskLevel(hskRaw);
-
-      const reasons = [];
-      if (!hanzi) reasons.push('chữ Hán rỗng');
-      if (!pinyin) reasons.push('pinyin rỗng');
-      if (!meaningVi) reasons.push('nghĩa rỗng');
-      if (!parsedHsk.valid) reasons.push(`cấp HSK "${parsedHsk.raw}" ngoài 1–9`);
-
-      if (reasons.length > 0) {
-        skippedRows.push({
-          rowNum,
-          hanzi,
-          reason: reasons.join(', ')
-        });
-        return;
-      }
-
-      const hskLevel = parsedHsk.value;
-      const dupKey = `${hanzi}_${hskLevel}`;
-      if (seenKeys.has(dupKey)) {
-        skippedRows.push({
-          rowNum,
-          hanzi,
-          reason: `trùng từ "${hanzi}" (HSK ${hskLevel}) trong file`
-        });
-        return;
-      }
-      seenKeys.add(dupKey);
-
-      const partOfSpeech = getMappedCellVal(r, columnMap.part_of_speech, 'part_of_speech');
-      const exampleHanzi = getMappedCellVal(r, columnMap.example_hanzi, 'example_hanzi');
-      const examplePinyin = getMappedCellVal(r, columnMap.example_pinyin, 'example_pinyin');
-      const exampleVi = getMappedCellVal(r, columnMap.example_vi, 'example_vi');
-      const explicitOrderRaw = getMappedCellVal(r, columnMap.sort_order, 'sort_order');
-      const explicitOrder = /^\d+$/.test(explicitOrderRaw) ? parseInt(explicitOrderRaw, 10) : NaN;
-
-      validCounter++;
-      const sortOrder = (!isNaN(explicitOrder) && explicitOrder > 0) ? explicitOrder : validCounter;
-
-      validWords.push({
-        hanzi,
-        pinyin,
-        meaning_vi: meaningVi,
-        hsk_level: hskLevel,
-        part_of_speech: partOfSpeech || null,
-        example_hanzi: exampleHanzi || null,
-        example_pinyin: examplePinyin || null,
-        example_vi: exampleVi || null,
-        sort_order: sortOrder
-      });
-    });
-
-    return { validWords, skippedRows };
   }
 
   function renderExcelPreview(words, skippedRows = []) {
@@ -1278,11 +1402,13 @@ document.addEventListener('DOMContentLoaded', async function () {
           ? `<li>... và ${skippedRows.length - maxDisplay} dòng khác.</li>`
           : '';
         previewSkippedList.innerHTML = itemsHtml + extraHtml;
+        if (btnDownloadSkippedCsv) btnDownloadSkippedCsv.style.display = 'inline-flex';
         previewSkippedBox.style.display = 'block';
       } else {
         previewSkippedBox.style.display = 'none';
         previewSkippedTitle.textContent = '';
         previewSkippedList.innerHTML = '';
+        if (btnDownloadSkippedCsv) btnDownloadSkippedCsv.style.display = 'none';
       }
     }
 

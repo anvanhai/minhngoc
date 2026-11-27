@@ -351,7 +351,7 @@
 
   <!-- MODAL: NHẬP EXCEL / CSV -->
   <div id="modal-import-excel" class="modal-overlay">
-    <div class="modal-card" style="max-width: 640px;">
+    <div class="modal-card" style="max-width: 780px;">
       <div class="modal-header">
         <h3 class="modal-title">📥 Nhập Từ Vựng Bằng File Excel / CSV</h3>
         <button type="button" class="modal-close" data-close="modal-import-excel">&times;</button>
@@ -360,8 +360,8 @@
         <div id="import-modal-alert" class="alert"></div>
 
         <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;">
-          Hệ thống hỗ trợ file <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code>. File chỉ cần chứa các cột:
-          <strong>Chữ Hán</strong> (hanzi), <strong>Pinyin</strong>, <strong>Nghĩa</strong> (meaning_vi), và tùy chọn cấp độ HSK (1–9).
+          Hệ thống hỗ trợ file <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code>, <code>.tsv</code> (tối đa 5 MB / 5.000 dòng).
+          Tự động nhận diện bảng mã (UTF-8, Windows-1258, GB18030), tách dữ liệu CSV bị dính 1 cột, file không tiêu đề hoặc tiêu đề tiếng Việt/Trung, chỉ cần đủ <strong>Chữ Hán</strong>, <strong>Pinyin</strong>, <strong>Nghĩa tiếng Việt</strong>.
         </p>
 
         <div style="margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; background: var(--bg-subtle); border: 1px dashed var(--border-color); border-radius: var(--radius-sm); padding: 10px 14px;">
@@ -374,10 +374,64 @@
         <!-- Dropzone kéo thả file -->
         <div id="excel-dropzone" class="dropzone" style="margin-bottom: 16px;">
           <div class="dropzone-icon">📄</div>
-          <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">Kéo & thả file Excel/CSV vào đây</div>
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">Kéo & thả file Excel/CSV/TSV vào đây</div>
           <div id="excel-selected-file" style="font-size: 13px; color: var(--text-muted);">hoặc bấm vào để chọn file từ máy tính</div>
         </div>
-        <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display: none;">
+        <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv,.tsv" style="display: none;">
+
+        <!-- Chọn trang tính Excel (hiện khi có từ 2 sheet trở lên) -->
+        <div id="import-sheet-selector-wrap" class="import-subbox" style="display: none;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+            <label for="import-sheet-select" style="font-weight: 700; font-size: 13px; color: var(--text-main); margin: 0;">📑 Trang tính (Sheet) đang đọc:</label>
+            <select id="import-sheet-select" class="form-control" style="max-width: 360px; flex: 1;"></select>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Hệ thống tự chọn trang có nhiều dữ liệu nhất; bạn có thể chuyển trang tính khác nếu cần.</div>
+        </div>
+
+        <!-- Tóm tắt tự nhận diện -->
+        <div id="import-detect-summary" class="import-detect-box" style="display: none;">
+          <div class="import-detect-header">
+            <div style="font-weight: 700; color: var(--text-main);" id="import-detect-summary-text"></div>
+            <button type="button" id="btn-toggle-column-mapper" class="btn btn-outline btn-sm" style="font-size: 12px; white-space: nowrap;">🔧 Chỉnh ghép cột</button>
+          </div>
+          <div id="import-detect-badges" class="import-detect-badges"></div>
+        </div>
+
+        <!-- Chọn cấp HSK mặc định cho toàn bộ file (hiện khi file thiếu cột HSK) -->
+        <div id="import-default-hsk-wrap" class="import-subbox" style="display: none;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+            <label for="import-default-hsk-select" style="font-weight: 700; font-size: 13px; color: var(--text-main); margin: 0;">🎯 Cấp HSK mặc định cho toàn bộ file:</label>
+            <select id="import-default-hsk-select" class="form-control" style="max-width: 220px;">
+              <option value="1">HSK 1</option>
+              <option value="2">HSK 2</option>
+              <option value="3">HSK 3</option>
+              <option value="4">HSK 4</option>
+              <option value="5">HSK 5</option>
+              <option value="6">HSK 6</option>
+              <option value="7">HSK 7</option>
+              <option value="8">HSK 8</option>
+              <option value="9">HSK 9</option>
+            </select>
+          </div>
+          <div id="import-default-hsk-hint" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;"></div>
+        </div>
+
+        <!-- Bảng Ghép cột 5 dòng đầu -->
+        <div id="import-column-mapper-wrap" class="import-mapper-box" style="display: none;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">🧩 Kiểm tra & ghép cột (5 dòng dữ liệu đầu tiên)</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Chọn đúng vai trò cho từng cột nếu file không có tiêu đề hoặc nhận diện chưa đúng, sau đó bấm <strong>Áp dụng ghép cột</strong>.</div>
+            </div>
+            <button type="button" id="btn-apply-column-mapping" class="btn btn-primary btn-sm" style="white-space: nowrap;">✅ Áp dụng ghép cột</button>
+          </div>
+          <div class="table-responsive" style="max-height: 240px;">
+            <table class="import-mapper-table">
+              <thead id="import-mapper-head"></thead>
+              <tbody id="import-mapper-body"></tbody>
+            </table>
+          </div>
+        </div>
 
         <!-- Tùy chọn gán trực tiếp vào Bài học -->
         <div class="form-group">
@@ -417,8 +471,11 @@
             </table>
           </div>
           <div id="preview-skipped-box" style="display: none; margin-top: 10px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--warning-bg); border: 1px solid var(--warning-border); color: var(--warning); font-size: 13px; line-height: 1.5;">
-            <div id="preview-skipped-title" style="font-weight: 700; margin-bottom: 4px;"></div>
-            <ul id="preview-skipped-list" style="margin: 0 0 0 18px; padding: 0; max-height: 100px; overflow-y: auto; font-size: 12px;"></ul>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 6px;">
+              <div id="preview-skipped-title" style="font-weight: 700;"></div>
+              <button type="button" id="btn-download-skipped-csv" class="btn btn-outline btn-sm" style="font-size: 12px; white-space: nowrap;">📥 Tải danh sách dòng lỗi (.csv)</button>
+            </div>
+            <ul id="preview-skipped-list" style="margin: 0 0 0 18px; padding: 0; max-height: 110px; overflow-y: auto; font-size: 12px;"></ul>
           </div>
         </div>
       </div>
@@ -552,7 +609,8 @@
   <script src="../js/db.js?v=5.2"></script>
   <script src="../js/auth.js?v=5.2"></script>
   <script src="../js/xp.js?v=5.2"></script>
-  <script src="../js/admin.js?v=5.3"></script>
-  <script src="../js/admin-vocabularies.js?v=5.3"></script>
+  <script src="../js/admin.js?v=5.4"></script>
+  <script src="../js/vocab-import-parser.js?v=5.4"></script>
+  <script src="../js/admin-vocabularies.js?v=5.4"></script>
 </body>
 </html>

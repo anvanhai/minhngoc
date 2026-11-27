@@ -268,22 +268,27 @@ document.addEventListener('DOMContentLoaded', async function () {
       tabBtnVocab.classList.add('active');
       modeVocabContainer.style.display = 'block';
       renderVocabWord();
+      if (window.StudyTimer) window.StudyTimer.setActivity(words && words.length > 0 ? 'lesson_vocab' : null);
     } else if (mode === 'flashcard') {
       tabBtnFlashcard.classList.add('active');
       modeFlashcardContainer.style.display = 'block';
       renderFlashcard();
+      if (window.StudyTimer) window.StudyTimer.setActivity(words && words.length > 0 ? 'lesson_flashcard' : null);
     } else if (mode === 'quiz') {
       tabBtnQuiz.classList.add('active');
       modeQuizContainer.style.display = 'block';
       resetQuizToStart();
+      if (window.StudyTimer) window.StudyTimer.setActivity(words && words.length > 0 ? 'lesson_quiz' : null);
     } else if (mode === 'slides') {
       if (tabBtnSlides) tabBtnSlides.classList.add('active');
       if (modeSlidesContainer) modeSlidesContainer.style.display = 'block';
       loadAndRenderLessonSlides();
+      if (window.StudyTimer) window.StudyTimer.setActivity('lesson_slides');
     } else if (mode === 'assignments') {
       if (tabBtnAssignments) tabBtnAssignments.classList.add('active');
       if (modeAssignmentsContainer) modeAssignmentsContainer.style.display = 'block';
       loadAndRenderLessonAssignments();
+      if (window.StudyTimer) window.StudyTimer.setActivity(null);
     }
   }
 
@@ -1034,6 +1039,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
 
       if (lessonAssignCounter) lessonAssignCounter.textContent = `${lessonAssignmentsData.length} bài tập`;
+      if (window.StudentCustomAssignment && typeof window.StudentCustomAssignment.bindGlobalClose === 'function') {
+        window.StudentCustomAssignment.bindGlobalClose();
+      }
+      const esc = (window.CustomAssignmentShared && window.CustomAssignmentShared.escapeHtml)
+        ? window.CustomAssignmentShared.escapeHtml
+        : (s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
 
       lessonAssignmentsList.innerHTML = lessonAssignmentsData.map(a => {
         let typeBadge = '';
@@ -1052,6 +1063,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         } else if (a.assignment_type === 'quiz') {
           typeBadge = '<span class="badge" style="background: #fef3c7; color: #92400e; font-weight: 700;">📝 Trắc nghiệm Quiz</span>';
           actionBtnText = '📝 Vào kiểm tra Quiz';
+        } else if (a.assignment_type === 'custom') {
+          typeBadge = '<span class="badge" style="background: rgba(99, 102, 241, 0.18); color: #6366f1; font-weight: 700;">🧩 Bài tập Tự soạn</span>';
+          actionBtnText = (a.userStatus === 'completed' || a.userStatus === 'submitted' || a.userStatus === 'graded')
+            ? '🧩 Xem kết quả / Làm lại'
+            : '🧩 Làm bài ngay';
         } else {
           typeBadge = '<span class="badge" style="background: #f3e8ff; color: #6b21a8; font-weight: 700;">📖 Ôn tập Từ vựng</span>';
           actionBtnText = '📖 Vào học từ vựng';
@@ -1061,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (a.userStatus === 'completed') {
           statusBadge = '<span class="badge" style="background: #dcfce7; color: #15803d; font-weight: 700;">✅ Đã hoàn thành</span>';
         } else if (a.userStatus === 'submitted') {
-          statusBadge = '<span class="badge" style="background: #fef3c7; color: #b45309; font-weight: 700;">⏳ Chờ cô giáo chấm</span>';
+          statusBadge = '<span class="badge" style="background: #fef3c7; color: #b45309; font-weight: 700;">⏳ Đã nộp / Chờ chấm</span>';
         } else if (a.userStatus === 'graded') {
           const score = a.submission ? a.submission.score : '';
           statusBadge = `<span class="badge" style="background: #e0e7ff; color: #4338ca; font-weight: 700;">⭐ Điểm: ${score}/100</span>`;
@@ -1070,18 +1086,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         return `
           <div class="card" style="padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 240px;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
                 ${typeBadge}
                 ${statusBadge}
                 <span style="font-size: 13px; font-weight: 700; color: #ca8a04;">+${a.reward_xp || 30} XP</span>
               </div>
               <h3 style="font-size: 16px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">
-                ${a.title}
+                ${esc(a.title)}
               </h3>
-              ${a.description ? `<p style="font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.4;">${a.description}</p>` : ''}
+              ${a.description ? `<p style="font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.4;">${esc(a.description)}</p>` : ''}
               ${a.submission && a.submission.teacher_comment ? `
                 <div style="margin-top: 8px; background: rgba(59,130,246,0.06); border-left: 3px solid var(--primary); padding: 6px 10px; font-size: 12px; color: var(--text-main); border-radius: 4px;">
-                  💬 <strong>Cô giáo nhận xét:</strong> "${a.submission.teacher_comment}"
+                  💬 <strong>Cô giáo nhận xét:</strong> "${esc(a.submission.teacher_comment)}"
                 </div>
               ` : ''}
             </div>
@@ -1101,7 +1117,13 @@ document.addEventListener('DOMContentLoaded', async function () {
           const assign = lessonAssignmentsData.find(x => x.id === aId);
           if (!assign) return;
 
-          if (type === 'speaking') {
+          if (type === 'custom' && window.StudentCustomAssignment) {
+            window.StudentCustomAssignment.openAssignmentModal(assign.id, {
+              onSubmitted: async () => {
+                await loadLessonAssignments();
+              }
+            });
+          } else if (type === 'speaking') {
             openSpeakingModal(assign);
           } else if (type === 'listening') {
             openListeningModal(assign);
@@ -1321,6 +1343,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         stopRecordingCleanup();
         resetRecordingUi();
         modalSpeaking.classList.remove('active');
+        if (window.StudyTimer) void window.StudyTimer.popActivity({ expectedActivity: 'assignment_speaking', flush: true });
       });
     });
   }
@@ -1548,10 +1571,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     modalSpeaking.classList.add('active');
+    if (window.StudyTimer) window.StudyTimer.pushActivity('assignment_speaking');
   }
 
   if (btnStartRecord) {
     btnStartRecord.addEventListener('click', async () => {
+      if (window.StudyTimer) window.StudyTimer.markActive();
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         activeStream = stream;
@@ -1751,6 +1776,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         setTimeout(() => {
           stopRecordingCleanup();
           modalSpeaking.classList.remove('active');
+          if (window.StudyTimer) void window.StudyTimer.popActivity({ expectedActivity: 'assignment_speaking', flush: true });
           loadAndRenderLessonAssignments();
         }, 1500);
 
@@ -1770,8 +1796,14 @@ document.addEventListener('DOMContentLoaded', async function () {
       btn.addEventListener('click', () => {
         if (listeningAudioPlayer) listeningAudioPlayer.pause();
         modalListening.classList.remove('active');
+        if (window.StudyTimer) void window.StudyTimer.popActivity({ expectedActivity: 'assignment_listening', flush: true });
       });
     });
+    if (listeningAudioPlayer) {
+      listeningAudioPlayer.addEventListener('play', () => {
+        if (window.StudyTimer) window.StudyTimer.markActive();
+      });
+    }
   }
 
   function openListeningModal(assign) {
@@ -1818,6 +1850,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     modalListening.classList.add('active');
+    if (window.StudyTimer) window.StudyTimer.pushActivity('assignment_listening');
   }
 
   if (btnSubmitListening) {
@@ -1862,6 +1895,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         setTimeout(() => {
           if (listeningAudioPlayer) listeningAudioPlayer.pause();
           modalListening.classList.remove('active');
+          if (window.StudyTimer) void window.StudyTimer.popActivity({ expectedActivity: 'assignment_listening', flush: true });
           loadAndRenderLessonAssignments();
         }, 1800);
 

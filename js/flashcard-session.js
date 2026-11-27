@@ -25,7 +25,7 @@ window.FlashcardSession = (function () {
    */
   function mount(opts) {
     const {
-      mode = 'srs_review', // 'srs_review' | 'self_study'
+      mode = 'srs_review', // 'srs_review' | 'self_study' | 'extra_practice'
       deckTitle = '',
       cards = [],
       totalDueOnServer = 0,
@@ -34,6 +34,8 @@ window.FlashcardSession = (function () {
       onProgressChange,
       onContinueNextBatch,
       onReplayDeck,
+      onFinish,
+      extraRuleResolver,
       backUrl = 'dashboard.html',
       backLabel = '← Quay lại trang chủ',
       els = {}
@@ -67,8 +69,10 @@ window.FlashcardSession = (function () {
 
     // Theo dõi kết quả theo từng thẻ duy nhất trong phiên (dùng đánh giá đầu tiên để tổng kết trung thực)
     const firstOutcomeByKey = new Map();
+    const extraOutcomesByKey = new Map();
     let retriedCardsCount = 0;
     let latestRemainingOnServer = Number(totalDueOnServer || queue.length);
+    let shownQuotaNotice = false;
 
     function cardKey(card) {
       const t = safeText(card.item_type, mode === 'self_study' ? 'self_study' : 'vocab');
@@ -149,17 +153,25 @@ window.FlashcardSession = (function () {
         }
       }
 
-      // Nguồn của thẻ (Bài học hoặc "Tự học · Tên bộ thẻ")
+      // Nguồn của thẻ (Bài học, "Tự học · Tên bộ thẻ", hoặc nhãn quy tắc Luyện thêm)
       if (fcSourceBadge) {
-        const isSelf = Boolean(card.is_self_study) || mode === 'self_study';
-        if (isSelf) {
-          const dTitle = safeText(card.deck_title || deckTitle, 'Bộ thẻ lớp');
-          fcSourceBadge.className = 'srs-source-badge srs-self-study-badge';
-          fcSourceBadge.textContent = `🃏 Tự học · ${dTitle}`;
+        if (mode === 'extra_practice') {
+          const ruleInfo = typeof extraRuleResolver === 'function' ? extraRuleResolver(card) : null;
+          const badgeCls = safeText(ruleInfo && ruleInfo.badgeClass, 'srs-source-badge');
+          const badgeTxt = safeText(ruleInfo && ruleInfo.label, '🕊️ Luyện tự do (không đổi lịch ôn)');
+          fcSourceBadge.className = badgeCls;
+          fcSourceBadge.textContent = badgeTxt;
         } else {
-          const srcLabel = safeText(card.source_label, 'Từ vựng bài học');
-          fcSourceBadge.className = 'srs-source-badge';
-          fcSourceBadge.textContent = `📖 ${srcLabel}`;
+          const isSelf = Boolean(card.is_self_study) || mode === 'self_study';
+          if (isSelf) {
+            const dTitle = safeText(card.deck_title || deckTitle, 'Bộ thẻ lớp');
+            fcSourceBadge.className = 'srs-source-badge srs-self-study-badge';
+            fcSourceBadge.textContent = `🃏 Tự học · ${dTitle}`;
+          } else {
+            const srcLabel = safeText(card.source_label, 'Từ vựng bài học');
+            fcSourceBadge.className = 'srs-source-badge';
+            fcSourceBadge.textContent = `📖 ${srcLabel}`;
+          }
         }
       }
 
@@ -169,8 +181,10 @@ window.FlashcardSession = (function () {
         const parts = [];
         if (card._retriedOnce) parts.push('🔁 Thử lại');
         if (overdueDays > 0) parts.push(`⏰ Trễ ${overdueDays} ngày`);
-        if (stageNum !== null && mode === 'srs_review') {
+        if (stageNum !== null && (mode === 'srs_review' || mode === 'extra_practice')) {
           parts.push(stageNum >= 6 ? '⭐ Đã thuộc' : `Bậc ${stageNum + 1}`);
+        } else if (mode === 'extra_practice' && card.is_unlearned) {
+          parts.push('🆕 Chưa học');
         }
         fcStageBadge.textContent = parts.join(' · ');
         fcStageBadge.style.display = parts.length > 0 ? 'inline-flex' : 'none';
@@ -260,11 +274,20 @@ window.FlashcardSession = (function () {
         const key = cardKey(card);
         if (!firstOutcomeByKey.has(key)) {
           firstOutcomeByKey.set(key, rating);
+          if (mode === 'extra_practice' && res) {
+            extraOutcomesByKey.set(key, res);
+          }
         }
 
-        // Chưa nhớ -> đẩy thẻ xuống cuối phiên để thử lại một lần
+        if (mode === 'extra_practice' && res && res.limit_reached && !shownQuotaNotice) {
+          shownQuotaNotice = true;
+          showAlert('Bạn đã chạm mốc 20 từ mới đưa vào lịch ôn trong ngày (giờ VN). Từ này và các từ mới còn lại vẫn tiếp tục luyện tự do bình thường!', 'warning');
+        }
+
+        // Chưa nhớ -> đẩy thẻ xuống cuối phiên để thử lại một lần (không làm thay đổi lịch ôn nếu là từ luyện tự do / từ mới đã ghi nhận ở lượt 1)
         if (rating === 1 && !card._retriedOnce) {
-          queue.push({ ...card, _retriedOnce: true });
+          const freeRetry = (mode === 'extra_practice' && (!card.is_due_today || card.is_unlearned));
+          queue.push({ ...card, _retriedOnce: true, _isFreeRetry: freeRetry });
           retriedCardsCount++;
         }
 
@@ -295,6 +318,9 @@ window.FlashcardSession = (function () {
     }
 
     async function renderSummary() {
+      if (typeof onFinish === 'function') {
+        try { onFinish(); } catch (_) {}
+      }
       if (playingArea) playingArea.style.display = 'none';
       if (summaryArea) summaryArea.style.display = 'block';
       if (counterEl) counterEl.textContent = 'Hoàn thành';
@@ -312,17 +338,44 @@ window.FlashcardSession = (function () {
 
       const totalUnique = firstOutcomeByKey.size;
 
+      let newlyEnrolledCount = 0;
+      let dueReviewedCount = 0;
+      let freePracticeCount = 0;
+      let quotaExceededCount = 0;
+      let xpSum = 0;
+      if (mode === 'extra_practice') {
+        extraOutcomesByKey.forEach(res => {
+          const kind = res && res.practiceKind ? res.practiceKind : 'free';
+          if (kind === 'new_enrolled') newlyEnrolledCount++;
+          else if (kind === 'due_reviewed') dueReviewedCount++;
+          else if (kind === 'quota_exceeded_free') quotaExceededCount++;
+          else freePracticeCount++;
+          xpSum += Number((res && res.xp_awarded) || 0);
+        });
+      }
+
+      const headingTitle = mode === 'self_study'
+        ? `Đã học xong bộ "${escapeHtml(safeText(deckTitle, 'Tự học'))}"!`
+        : (mode === 'extra_practice' ? 'Đã hoàn thành lượt luyện tập!' : 'Đã hoàn thành phiên ôn tập!');
+
+      const summarySubtitle = mode === 'self_study'
+        ? `Toàn bộ <strong>${totalUnique}</strong> thẻ đã được đưa vào lịch ôn tập SRS (hẹn ôn lần đầu sau 1 ngày).`
+        : (mode === 'extra_practice'
+          ? `Đã luyện <strong>${totalUnique}</strong> từ · Đưa mới vào lịch ôn: <strong>${newlyEnrolledCount}</strong> từ` +
+            (dueReviewedCount > 0 ? ` · Đã ôn đến hạn: <strong>${dueReviewedCount}</strong> từ` : '') +
+            ((freePracticeCount + quotaExceededCount) > 0 ? ` · Luyện tự do (giữ nguyên lịch): <strong>${freePracticeCount + quotaExceededCount}</strong> từ` : '') +
+            (xpSum > 0 ? ` · <span style="color: var(--accent-gold); font-weight: 800;">+${xpSum} XP</span>` : '')
+          : `Bạn đã ôn xong <strong>${totalUnique}</strong> từ trong phiên này${retriedCardsCount > 0 ? ` (đã thử lại ${retriedCardsCount} thẻ chưa nhớ ở cuối phiên)` : ''}.`);
+
       if (!summaryArea) return;
       summaryArea.innerHTML = `
         <div class="card" style="text-align: center; padding: 30px 20px;">
           <div style="font-size: 50px; margin-bottom: 10px;">🎉</div>
           <h2 style="font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">
-            ${mode === 'self_study' ? `Đã học xong bộ "${escapeHtml(safeText(deckTitle, 'Tự học'))}"!` : 'Đã hoàn thành phiên ôn tập!'}
+            ${headingTitle}
           </h2>
-          <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 18px;">
-            ${mode === 'self_study'
-              ? `Toàn bộ <strong>${totalUnique}</strong> thẻ đã được đưa vào lịch ôn tập SRS (hẹn ôn lần đầu sau 1 ngày).`
-              : `Bạn đã ôn xong <strong>${totalUnique}</strong> từ trong phiên này${retriedCardsCount > 0 ? ` (đã thử lại ${retriedCardsCount} thẻ chưa nhớ ở cuối phiên)` : ''}.`}
+          <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.55;">
+            ${summarySubtitle}
           </p>
 
           <div class="srs-summary-grid">
@@ -369,6 +422,21 @@ window.FlashcardSession = (function () {
           nextBatchBtn.textContent = `▶️ Ôn tiếp (${Math.min(50, latestRemainingOnServer)} từ nữa)`;
           nextBatchBtn.addEventListener('click', () => onContinueNextBatch());
           actionsRow.prepend(nextBatchBtn);
+        }
+      } else if (mode === 'srs_review' && latestRemainingOnServer <= 0 && actionsRow) {
+        const extraPracticeLink = document.createElement('a');
+        extraPracticeLink.href = 'vocab-practice.html';
+        extraPracticeLink.className = 'btn btn-primary';
+        extraPracticeLink.textContent = '📚 Luyện thêm từ Kho từ vựng';
+        actionsRow.prepend(extraPracticeLink);
+      } else if (mode === 'extra_practice' && actionsRow) {
+        if (typeof onReplayDeck === 'function') {
+          const continueBtn = document.createElement('button');
+          continueBtn.type = 'button';
+          continueBtn.className = 'btn btn-primary';
+          continueBtn.textContent = '🔄 Luyện tiếp';
+          continueBtn.addEventListener('click', () => onReplayDeck());
+          actionsRow.prepend(continueBtn);
         }
       } else if (mode === 'self_study' && actionsRow) {
         const goReviewBtn = document.createElement('a');

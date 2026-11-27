@@ -61,12 +61,15 @@ document.addEventListener('DOMContentLoaded', async function () {
       reviewLoading.style.display = 'none';
 
       if (cards.length === 0) {
+        if (window.StudyTimer) await window.StudyTimer.stop({ flush: false });
         if (counterEl) counterEl.textContent = '0/0';
         if (remainingNoteEl) remainingNoteEl.style.display = 'none';
         reviewEmpty.style.display = 'block';
         await renderEmptyUpcoming();
         return;
       }
+
+      if (window.StudyTimer) window.StudyTimer.start('srs_review');
 
       activeSession = window.FlashcardSession.mount({
         mode: 'srs_review',
@@ -92,9 +95,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         },
         onContinueNextBatch: () => {
           loadDueSession();
+        },
+        onFinish: () => {
+          if (window.StudyTimer) void window.StudyTimer.stop({ flush: true });
         }
       });
     } catch (err) {
+      if (window.StudyTimer) void window.StudyTimer.stop({ flush: false });
       console.error('Lỗi tải phiên ôn tập SRS:', err);
       reviewLoading.style.display = 'none';
       reviewError.style.display = 'block';

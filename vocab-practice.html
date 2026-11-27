@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Kho Từ Vựng &amp; Luyện Thêm — Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="css/style.css?v=6.2">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') ||
+                sessionStorage.getItem('minhngoc_theme') ||
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] ||
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="js/theme.js?v=6.0"></script>
+  <style>
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important;
+      appearance: none !important;
+      position: relative !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      width: 58px !important;
+      height: 30px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important;
+      border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important;
+      cursor: pointer !important;
+      outline: none !important;
+      user-select: none !important;
+      flex-shrink: 0 !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+    }
+    .theme-switch-track {
+      position: relative !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 6px !important;
+      pointer-events: none !important;
+    }
+    .theme-switch-icon { font-size: 13px !important; line-height: 1 !important; z-index: 1 !important; pointer-events: none !important; }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important; top: 2px !important; left: 2px !important;
+      width: 22px !important; height: 22px !important; border-radius: 50% !important;
+      background: #ffffff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4,0,0.2,1) !important; z-index: 2 !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important; border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important; background: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon { opacity: 0.35 !important; }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon { opacity: 1 !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="dashboard.html" class="nav-brand">
+        <div class="nav-brand-logo">学</div>
+        <span>Minh Ngọc HSK</span>
+      </a>
+
+      <!-- Menu Học sinh -->
+      <ul class="nav-menu">
+        <li class="nav-item"><a href="dashboard.html">🏠 Trang chủ</a></li>
+        <li class="nav-item"><a href="curriculum.html">📖 Giáo trình</a></li>
+        <li class="nav-item"><a href="review.html">🧠 Ôn tập <span class="nav-due-badge">0</span></a></li>
+        <li class="nav-item"><a href="self-study.html">🃏 Tự học</a></li>
+        <li class="nav-item active"><a href="vocab-practice.html">📚 Kho từ vựng</a></li>
+        <li class="nav-item"><a href="leaderboard.html">🏆 Bảng xếp hạng</a></li>
+      </ul>
+
+      <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track">
+            <span class="theme-switch-icon sun-icon">☀️</span>
+            <span class="theme-switch-icon moon-icon">🌙</span>
+            <span class="theme-switch-thumb"></span>
+          </span>
+        </button>
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-student">Học sinh</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-wrapper" style="padding-top: 18px;">
+    <!-- CHẾ ĐỘ 1: TRÌNH DUYỆT KHO TỪ VỰNG CHỈ ĐỌC + CHỌN TỪ LUYỆN TẬP -->
+    <div id="vp-browser-view">
+      <div class="section-header" style="margin-bottom: 14px; align-items: flex-start;">
+        <div>
+          <h1 class="section-title">📚 Kho Từ Vựng &amp; Luyện Thêm</h1>
+          <p style="font-size: 13.5px; color: var(--text-muted); margin-top: 3px;">
+            Tự chọn từ bất kỳ trong kho để luyện Flashcard hoặc Trắc nghiệm mà không làm rối lịch ôn tập chính thức.
+          </p>
+        </div>
+        <div id="vp-daily-quota-pill" class="srs-stage-pill" style="font-size: 12.5px; padding: 6px 12px;">
+          🆕 Từ mới hôm nay: <strong id="vp-daily-new-used">0</strong>/20
+        </div>
+      </div>
+
+      <!-- Quy tắc ngắn gọn -->
+      <div class="vp-rules-card">
+        <div class="vp-rules-title">📌 Quy tắc luyện thêm bảo toàn lịch ôn</div>
+        <ul class="vp-rules-list">
+          <li><strong>Từ chưa đến hạn:</strong> Luyện tự do, <strong>không</strong> đổi bậc ôn/ngày hẹn và <strong>không</strong> cộng XP.</li>
+          <li><strong>Từ đang đến hạn hôm nay / trễ hạn:</strong> Tự động đi qua luồng ôn tập chính thức (<code>Tính vào lịch ôn</code>).</li>
+          <li><strong>Từ chưa học bao giờ:</strong> Đưa vào lịch ôn bậc đầu (hẹn 1 ngày) &amp; cộng XP từ mới theo quy tắc hiện hành — tối đa <strong>20 từ mới/ngày</strong> (giờ VN); vượt vẫn luyện tự do.</li>
+        </ul>
+      </div>
+
+      <div id="vp-browser-alert" class="alert"></div>
+
+      <!-- Bộ lọc nhanh & lọc chi tiết -->
+      <div class="card" style="padding: 14px; margin-bottom: 14px;">
+        <div class="vp-quick-filters" id="vp-quick-filters">
+          <button type="button" class="vp-quick-btn active" data-quick="all">Tất cả (<span id="vp-cnt-all">--</span>)</button>
+          <button type="button" class="vp-quick-btn" data-quick="difficult">⚠️ Từ khó của tôi (<span id="vp-cnt-difficult">0</span>)</button>
+          <button type="button" class="vp-quick-btn" data-quick="upcoming_soon">⏰ Sắp đến hạn 1–2 ngày (<span id="vp-cnt-upcoming">0</span>)</button>
+          <button type="button" class="vp-quick-btn" data-quick="unlearned">🆕 Chưa học (<span id="vp-cnt-unlearned">--</span>)</button>
+          <button type="button" class="vp-quick-btn" data-quick="due_today">🎯 Đến hạn hôm nay (<span id="vp-cnt-due">0</span>)</button>
+        </div>
+
+        <div class="vp-filter-grid">
+          <input
+            type="text"
+            id="vp-search-input"
+            class="form-control vp-search-field"
+            placeholder="🔍 Tìm chữ Hán, Pinyin hoặc nghĩa tiếng Việt..."
+          >
+          <select id="vp-filter-hsk" class="form-control" aria-label="Lọc theo cấp HSK">
+            <option value="all">Tất cả cấp HSK</option>
+          </select>
+          <select id="vp-filter-pos" class="form-control" aria-label="Lọc theo loại từ">
+            <option value="all">Tất cả loại từ</option>
+          </select>
+          <select id="vp-filter-lesson" class="form-control" aria-label="Lọc theo bài học">
+            <option value="">Tất cả bài học</option>
+          </select>
+          <select id="vp-sort-by" class="form-control" aria-label="Sắp xếp từ vựng">
+            <option value="sort_order">📌 Thứ tự bài / Excel</option>
+            <option value="pinyin">🔤 Pinyin (A–Z)</option>
+            <option value="hanzi">🀄 Chữ Hán (A–Z)</option>
+            <option value="difficult">⚠️ Quên nhiều nhất</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Thanh chọn nhiều & bắt đầu luyện -->
+      <div class="vp-selection-bar">
+        <div class="vp-selection-actions">
+          <label class="vp-select-page-label" title="Chọn hoặc bỏ chọn tất cả từ ở trang hiện tại">
+            <input type="checkbox" id="vp-chk-page-all">
+            <span>Chọn trang này</span>
+          </label>
+          <button type="button" id="vp-btn-select-filtered" class="btn btn-outline btn-sm">
+            ☑️ Chọn tất cả kết quả đang lọc (tối đa 100)
+          </button>
+          <button type="button" id="vp-btn-clear-sel" class="btn btn-outline btn-sm">
+            Bỏ chọn
+          </button>
+          <span class="vp-sel-count-text" id="vp-selected-count">Đã chọn: 0/100 từ</span>
+        </div>
+
+        <div class="vp-launch-group">
+          <div class="vp-mode-segmented" role="group" aria-label="Chọn chế độ luyện tập">
+            <button type="button" class="vp-mode-btn active" data-mode="flashcard">🗂️ Flashcard</button>
+            <button type="button" class="vp-mode-btn" data-mode="mcq">📝 Trắc nghiệm 4 lựa chọn</button>
+          </div>
+          <button type="button" id="vp-btn-start-practice" class="btn btn-primary" disabled>
+            ▶️ Luyện các từ đã chọn
+          </button>
+        </div>
+      </div>
+      <div class="vp-shift-hint">
+        💡 Mẹo: Tích vào 1 từ rồi giữ phím <strong>Shift + click</strong> vào từ khác trên trang để chọn nhanh cả khoảng (tối đa 100 từ/lượt).
+      </div>
+
+      <!-- Loading / Error / Empty / Danh sách -->
+      <div id="vp-loading" class="card" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 32px; margin-bottom: 8px;">⏳</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--text-muted);">Đang tải danh sách từ vựng từ máy chủ...</div>
+      </div>
+
+      <div id="vp-error" class="card" style="display: none; text-align: center; padding: 36px 20px;">
+        <div style="font-size: 34px; margin-bottom: 8px;">⚠️</div>
+        <div id="vp-error-msg" style="font-size: 14px; color: var(--danger); margin-bottom: 14px;">Không tải được kho từ vựng.</div>
+        <button type="button" id="vp-btn-retry" class="btn btn-primary">🔄 Thử lại</button>
+      </div>
+
+      <div id="vp-empty" class="card" style="display: none; text-align: center; padding: 38px 20px;">
+        <div style="font-size: 40px; margin-bottom: 8px;">🔍</div>
+        <h3 style="font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">Không tìm thấy từ vựng phù hợp</h3>
+        <p style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 14px;">Hãy thử xóa từ khóa hoặc đổi bộ lọc HSK / loại từ / bài học.</p>
+        <button type="button" id="vp-btn-reset-filters" class="btn btn-outline btn-sm">🔄 Đặt lại bộ lọc</button>
+      </div>
+
+      <div id="vp-list-wrap" style="display: none;">
+        <div class="vp-list-header-desktop">
+          <div style="width: 38px;"></div>
+          <div>Từ vựng</div>
+          <div>Pinyin &amp; Loại từ</div>
+          <div>Nghĩa tiếng Việt</div>
+          <div>Trạng thái học của bạn</div>
+          <div style="text-align: right;">Nghe</div>
+        </div>
+        <div id="vp-words-list" class="vp-words-list"></div>
+
+        <!-- Phân trang server -->
+        <div class="vp-pagination-bar">
+          <span id="vp-page-info" style="font-size: 13px; color: var(--text-muted);">--</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="vp-btn-prev" class="btn btn-outline btn-sm">« Trước</button>
+            <span id="vp-page-indicator" style="font-size: 13px; font-weight: 700;">Trang 1 / 1</span>
+            <button type="button" id="vp-btn-next" class="btn btn-outline btn-sm">Sau »</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHẾ ĐỘ 2: PHIÊN LUYỆN TẬP (FLASHCARD HOẶC TRẮC NGHIỆM 4 LỰA CHỌN) -->
+    <div id="vp-practice-view" class="lesson-studio-container" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+        <button type="button" id="vp-btn-exit-practice" class="btn btn-outline btn-sm">
+          ← Quay lại Kho từ vựng
+        </button>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span id="session-remaining-note" class="srs-stage-pill" style="display: none;"></span>
+          <span id="session-counter" style="font-size: 14px; font-weight: 800; color: var(--primary);">0/0</span>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-bottom: 14px;">
+        <h2 id="vp-practice-heading" style="font-size: 20px; font-weight: 800; color: var(--text-main);">📚 Luyện thêm từ vựng</h2>
+        <p id="vp-practice-subheading" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+          Từ chưa đến hạn sẽ luyện tự do không làm lệch lịch ôn.
+        </p>
+      </div>
+
+      <div id="session-alert" class="alert"></div>
+
+      <!-- Khung Flashcard (tái sử dụng FlashcardSession) -->
+      <div id="fc-playing-area" style="display: none;">
+        <div id="flashcard-card" class="flashcard-wrapper">
+          <div class="flashcard-inner">
+            <div class="flashcard-face flashcard-front">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+                <span id="fc-source-badge" class="srs-source-badge">🕊️ Luyện tự do</span>
+                <span id="fc-stage-badge" class="srs-stage-pill" style="display: none;"></span>
+              </div>
+              <div id="fc-front-hanzi" style="font-size: 64px; font-weight: 800; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">
+                字
+              </div>
+              <button type="button" id="btn-fc-speak" class="btn btn-outline btn-sm" style="margin-top: 14px; border-radius: var(--radius-full);">
+                🔊 Nghe phát âm
+              </button>
+              <div class="flashcard-hint">
+                💡 Chạm vào thẻ hoặc bấm nút dưới để lật xem đáp án
+              </div>
+            </div>
+
+            <div class="flashcard-face flashcard-back">
+              <span style="font-size: 11.5px; font-weight: 700; color: var(--primary); margin-bottom: 6px; text-transform: uppercase;">
+                Đáp án &amp; Ý nghĩa
+              </span>
+              <div id="fc-back-pinyin" style="font-size: 24px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;"></div>
+              <div id="fc-back-meaning" style="font-size: 20px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;"></div>
+              <div id="fc-back-pos" class="vocab-pos-badge" style="display: none; margin-bottom: 8px; font-size: 11px;"></div>
+              <div id="fc-back-example" style="display: none; font-size: 13px; color: var(--text-muted); background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); width: 100%; text-align: left; margin-bottom: 6px;"></div>
+              <div id="fc-back-note" style="display: none; font-size: 12.5px; color: var(--warning); background: var(--warning-bg); border: 1px solid var(--warning-border); padding: 8px 10px; border-radius: var(--radius-sm); width: 100%; text-align: left;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="fc-flip-prompt" style="text-align: center; margin-bottom: 16px;">
+          <button type="button" id="btn-flip-card" class="btn btn-secondary btn-block">
+            🔄 Chạm để Lật Thẻ
+          </button>
+        </div>
+
+        <div id="fc-srs-actions" class="srs-actions-grid" style="display: none;">
+          <button type="button" class="btn-srs btn-srs-hard" data-srs="1">
+            <span>🔴 Quên</span>
+            <small>Chưa nhớ</small>
+          </button>
+          <button type="button" class="btn-srs btn-srs-medium" data-srs="2">
+            <span>🟡 Tạm nhớ</span>
+            <small>Nhớ mang máng</small>
+          </button>
+          <button type="button" class="btn-srs btn-srs-easy" data-srs="3">
+            <span>🟢 Đã thuộc</span>
+            <small>Nhớ rõ</small>
+          </button>
+        </div>
+      </div>
+
+      <!-- Khung Trắc nghiệm 4 lựa chọn (chấm tại trình duyệt) -->
+      <div id="vp-mcq-area" style="display: none;">
+        <div class="card vp-mcq-card">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+            <span id="vp-mcq-rule-badge" class="srs-source-badge">🕊️ Luyện tự do</span>
+            <span id="vp-mcq-stage-badge" class="srs-stage-pill" style="display: none;"></span>
+          </div>
+
+          <div style="text-align: center; margin-bottom: 18px;">
+            <div id="vp-mcq-hanzi" style="font-size: 56px; font-weight: 800; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.2;">
+              字
+            </div>
+            <div style="margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" id="vp-mcq-speak" class="btn btn-outline btn-sm" style="border-radius: var(--radius-full);">
+                🔊 Nghe phát âm
+              </button>
+              <span id="vp-mcq-pos" class="vocab-pos-badge" style="display: none;"></span>
+            </div>
+          </div>
+
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 10px; text-align: center;">
+            Chọn nghĩa tiếng Việt đúng cho từ trên:
+          </div>
+
+          <div id="vp-mcq-options" class="vp-mcq-options"></div>
+
+          <div id="vp-mcq-feedback" class="vp-mcq-feedback" style="display: none;"></div>
+
+          <div id="vp-mcq-next-wrap" style="display: none; margin-top: 14px; text-align: right;">
+            <button type="button" id="vp-mcq-next-btn" class="btn btn-primary btn-block">
+              Câu tiếp theo ➡️
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Màn hình tổng kết -->
+      <div id="fc-summary-area" style="display: none;"></div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống học tiếng Trung thông minh
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js?v=6.2"></script>
+  <script src="js/db.js?v=6.2"></script>
+  <script src="js/auth.js?v=6.2"></script>
+  <script src="js/xp.js?v=6.2"></script>
+  <script src="js/student.js?v=8.2"></script>
+  <script src="js/study-timer.js?v=1.0"></script>
+  <script src="js/flashcard-session.js?v=6.2"></script>
+  <script src="js/vocab-practice.js?v=1.1"></script>
+</body>
+</html>

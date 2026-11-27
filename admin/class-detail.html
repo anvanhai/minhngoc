@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Chi tiết Lớp học — Admin Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="../css/style.css?v=6.0">
+  <link rel="stylesheet" href="../css/style.css?v=6.3">
   <script>
     (function(){
       try {
@@ -231,20 +231,46 @@
 
     <!-- TAB 2: QUẢN LÝ HỌC SINH -->
     <div id="tab-students" class="tab-pane" style="display: none;">
-      <div class="section-header">
-        <h3 class="section-title">Danh sách Học sinh trong Lớp</h3>
-        <button type="button" id="btn-open-enroll-modal" class="btn btn-primary">
-          ➕ Thêm Học Sinh Vào Lớp
-        </button>
+      <div class="section-header" style="flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 class="section-title" style="margin-bottom: 2px;">Danh sách Học sinh trong Lớp</h3>
+          <div id="students-study-week-meta" style="font-size: 12.5px; color: var(--text-muted);">
+            Thời gian học tính theo giờ Việt Nam (Tuần từ Thứ Hai đến Chủ nhật) · Bấm vào học viên để xem lịch sử 8 tuần
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <button type="button" id="btn-refresh-students-study" class="btn btn-outline btn-sm" title="Làm mới thời gian học">
+            🔄 Làm mới
+          </button>
+          <button type="button" id="btn-export-students-study-csv" class="btn btn-outline btn-sm" title="Xuất danh sách &amp; thời gian học ra file CSV chuẩn Excel tiếng Việt">
+            📥 Xuất CSV
+          </button>
+          <button type="button" id="btn-open-enroll-modal" class="btn btn-primary">
+            ➕ Thêm Học Sinh Vào Lớp
+          </button>
+        </div>
       </div>
+
+      <div id="students-study-alert" class="alert"></div>
 
       <div class="table-responsive">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Học sinh</th>
+              <th>
+                <button type="button" class="st-sort-header" data-sort="name">Học sinh <span class="st-sort-icon">↕</span></button>
+              </th>
               <th>Username</th>
               <th>Số điện thoại</th>
+              <th>
+                <button type="button" class="st-sort-header" data-sort="today">Hôm nay <span class="st-sort-icon">↕</span></button>
+              </th>
+              <th>
+                <button type="button" class="st-sort-header" data-sort="this_week">Tuần này <span class="st-sort-icon">↓</span></button>
+              </th>
+              <th>
+                <button type="button" class="st-sort-header" data-sort="last_week">Tuần trước <span class="st-sort-icon">↕</span></button>
+              </th>
               <th>Ngày vào lớp</th>
               <th>Trạng thái</th>
               <th style="text-align: right;">Thao tác</th>
@@ -252,7 +278,7 @@
           </thead>
           <tbody id="students-table-body">
             <tr>
-              <td colspan="6" style="text-align: center; padding: 24px; color: var(--text-muted);">
+              <td colspan="9" style="text-align: center; padding: 24px; color: var(--text-muted);">
                 Đang tải danh sách học sinh...
               </td>
             </tr>
@@ -635,119 +661,364 @@
     </div>
   </div>
 
-  <!-- MODAL: GIAO BÀI TẬP MỚI -->
-  <div id="modal-create-assignment" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 class="modal-title">Giao Bài Tập Cho Lớp</h3>
+  <!-- MODAL: GIAO BÀI TẬP MỚI / TỰ SOẠN -->
+  <div id="modal-create-assignment" class="modal-overlay ca-modal-overlay">
+    <div id="modal-create-assignment-card" class="modal-card ca-modal-card">
+      <div class="modal-header ca-modal-header">
+        <h3 class="modal-title" id="assign-modal-title">Giao Bài Tập Cho Lớp</h3>
         <button type="button" class="modal-close" data-close="modal-create-assignment">&times;</button>
       </div>
-      <form id="form-create-assignment">
-        <div class="modal-body">
-          <div id="assign-modal-alert" class="alert"></div>
+      <form id="form-create-assignment" class="ca-modal-form">
+        <div class="ca-modal-top-pinned">
+          <div id="assign-modal-alert" class="alert ca-modal-alert"></div>
 
-          <div class="form-group">
-            <label class="form-label" for="assign-type">Loại bài tập *</label>
-            <select id="assign-type" class="form-control" required>
-              <option value="vocabulary">📖 Từ vựng (Vocabulary)</option>
-              <option value="listening">🎧 Nghe hiểu (Listening)</option>
-              <option value="speaking">🎙️ Nói & Ghi âm (Speaking)</option>
-              <option value="quiz">📝 Bài kiểm tra (Quiz)</option>
-            </select>
-          </div>
+          <!-- Cảnh báo khi sửa bài tự soạn đã có học viên làm -->
+          <div id="custom-locked-banner" class="ca-locked-banner" style="display: none;"></div>
 
-          <div class="form-group">
-            <label class="form-label" for="assign-title">Tiêu đề bài tập *</label>
-            <input type="text" id="assign-title" class="form-control" placeholder="Ví dụ: Đọc thuộc đoạn hội thoại Bài 3" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="assign-lesson">Gắn với bài học (Tùy chọn)</label>
-            <select id="assign-lesson" class="form-control">
-              <option value="">-- Không gắn bài cụ thể --</option>
-            </select>
-          </div>
-
-          <!-- KHUNG RIÊNG CHO BÀI TẬP NÓI / GHI ÂM -->
-          <div id="assign-speaking-fields" style="display: none; background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); margin-bottom: 16px; border: 1.5px dashed var(--border-color);">
-            <div style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-              🎙️ Cấu hình Đề bài Nói (Ghi âm)
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="assign-speaking-prompt">Đề bài câu / đoạn tiếng Trung cần đọc *</label>
-              <textarea id="assign-speaking-prompt" class="form-control" rows="2" placeholder="Ví dụ: 你好！我是明玉，很高兴认识你。"></textarea>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="assign-speaking-pinyin">Phiên âm Pinyin (Hỗ trợ học sinh luyện đọc)</label>
-              <input type="text" id="assign-speaking-pinyin" class="form-control" placeholder="Ví dụ: Nǐ hǎo! Wǒ shì Míng Yù, hěn gāoxìng rènshi nǐ.">
-            </div>
-            <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label" for="assign-speaking-audio">Link Audio đọc mẫu (Tùy chọn, để học sinh nghe trước khi ghi âm)</label>
-              <input type="url" id="assign-speaking-audio" class="form-control" placeholder="https://... file audio đọc mẫu (.mp3 / .wav)">
-            </div>
-          </div>
-
-          <!-- KHUNG RIÊNG CHO BÀI TẬP NGHE HIỂU -->
-          <div id="assign-listening-fields" style="display: none; background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); margin-bottom: 16px; border: 1.5px dashed var(--border-color);">
-            <div style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-              🎧 Cấu hình Bài tập Nghe hiểu
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="assign-listening-audio">Đường dẫn file Audio bài nghe *</label>
-              <input type="url" id="assign-listening-audio" class="form-control" placeholder="Link audio hội thoại / bài nghe (https://...)">
-            </div>
-            <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">
-              Danh sách câu hỏi nghe hiểu:
-            </div>
-            <div id="listening-questions-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
-              <!-- Câu hỏi trắc nghiệm sẽ render ở đây -->
-            </div>
-            <button type="button" id="btn-add-listening-question" class="btn btn-outline btn-sm">
-              ➕ Thêm câu hỏi trắc nghiệm
-            </button>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group">
-              <label class="form-label" for="assign-due-date">Hạn chót nộp (Deadline) *</label>
-              <input type="datetime-local" id="assign-due-date" class="form-control" required>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="assign-xp">Thưởng hoàn thành (XP)</label>
-              <input type="number" id="assign-xp" class="form-control" value="30" min="0">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="assign-desc">Hướng dẫn làm bài</label>
-            <textarea id="assign-desc" class="form-control" placeholder="Nhắc nhở học sinh cần ôn kỹ các từ nào..."></textarea>
+          <!-- Thanh 4 bước khi chọn loại Bài tập tự soạn -->
+          <div id="custom-wizard-stepper" class="ca-stepper ca-modal-stepper" style="display: none;">
+            <button type="button" class="ca-step-btn is-active" data-step="1">1. Thông tin chung</button>
+            <button type="button" class="ca-step-btn" data-step="2">2. Soạn câu hỏi</button>
+            <button type="button" class="ca-step-btn" data-step="3">3. Cài đặt</button>
+            <button type="button" class="ca-step-btn" data-step="4">4. Xem trước & Giao</button>
           </div>
         </div>
-        <div class="modal-footer">
+
+        <div class="modal-body ca-modal-body" id="ca-modal-body">
+
+          <div id="ca-step1-general-wrap">
+            <div class="form-group">
+              <label class="form-label" for="assign-type">Loại bài tập *</label>
+              <select id="assign-type" class="form-control" required>
+                <option value="vocabulary">📖 Từ vựng (Vocabulary)</option>
+                <option value="listening">🎧 Nghe hiểu (Listening)</option>
+                <option value="speaking">🎙️ Nói & Ghi âm (Speaking)</option>
+                <option value="quiz">📝 Bài kiểm tra (Quiz)</option>
+                <option value="custom">🧩 Bài tập tự soạn (Nhiều dạng câu hỏi)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="assign-title">Tiêu đề bài tập *</label>
+              <input type="text" id="assign-title" class="form-control" placeholder="Ví dụ: Đọc thuộc đoạn hội thoại Bài 3" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="assign-lesson">Gắn với bài học (Tùy chọn)</label>
+              <select id="assign-lesson" class="form-control">
+                <option value="">-- Không gắn bài cụ thể --</option>
+              </select>
+            </div>
+
+            <!-- KHUNG RIÊNG CHO BÀI TẬP NÓI / GHI ÂM -->
+            <div id="assign-speaking-fields" style="display: none; background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); margin-bottom: 16px; border: 1.5px dashed var(--border-color);">
+              <div style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                🎙️ Cấu hình Đề bài Nói (Ghi âm)
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="assign-speaking-prompt">Đề bài câu / đoạn tiếng Trung cần đọc *</label>
+                <textarea id="assign-speaking-prompt" class="form-control" rows="2" placeholder="Ví dụ: 你好！我是明玉，很高兴认识你。"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="assign-speaking-pinyin">Phiên âm Pinyin (Hỗ trợ học sinh luyện đọc)</label>
+                <input type="text" id="assign-speaking-pinyin" class="form-control" placeholder="Ví dụ: Nǐ hǎo! Wǒ shì Míng Yù, hěn gāoxìng rènshi nǐ.">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="assign-speaking-audio">Link Audio đọc mẫu (Tùy chọn, để học sinh nghe trước khi ghi âm)</label>
+                <input type="url" id="assign-speaking-audio" class="form-control" placeholder="https://... file audio đọc mẫu (.mp3 / .wav)">
+              </div>
+            </div>
+
+            <!-- KHUNG RIÊNG CHO BÀI TẬP NGHE HIỂU -->
+            <div id="assign-listening-fields" style="display: none; background: var(--bg-subtle); padding: 14px; border-radius: var(--radius-sm); margin-bottom: 16px; border: 1.5px dashed var(--border-color);">
+              <div style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                🎧 Cấu hình Bài tập Nghe hiểu
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="assign-listening-audio">Đường dẫn file Audio bài nghe *</label>
+                <input type="url" id="assign-listening-audio" class="form-control" placeholder="Link audio hội thoại / bài nghe (https://...)">
+              </div>
+              <div style="font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-main);">
+                Danh sách câu hỏi nghe hiểu:
+              </div>
+              <div id="listening-questions-container" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+                <!-- Câu hỏi trắc nghiệm sẽ render ở đây -->
+              </div>
+              <button type="button" id="btn-add-listening-question" class="btn btn-outline btn-sm">
+                ➕ Thêm câu hỏi trắc nghiệm
+              </button>
+            </div>
+
+            <div class="ca-form-row-2col">
+              <div class="form-group">
+                <label class="form-label" for="assign-due-date">Hạn chót nộp (Deadline) *</label>
+                <input type="datetime-local" id="assign-due-date" class="form-control" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="assign-xp">Thưởng hoàn thành (XP)</label>
+                <input type="number" id="assign-xp" class="form-control" value="30" min="0">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="assign-desc">Hướng dẫn làm bài</label>
+              <textarea id="assign-desc" class="form-control" placeholder="Nhắc nhở học sinh cần ôn kỹ các từ nào..."></textarea>
+            </div>
+
+            <div id="custom-step1-next-bar" style="display: none; justify-content: flex-end; margin-top: 8px;">
+              <button type="button" id="btn-ca-to-step2" class="btn btn-primary">Tiếp theo: Soạn câu hỏi →</button>
+            </div>
+          </div>
+
+          <!-- BƯỚC 2: SOẠN CÂU HỎI (6 DẠNG + TẠO NHANH TỪ TỪ VỰNG) -->
+          <div id="custom-wizard-step-2" style="display: none;">
+            <div id="ca-step2-toolbar" class="ca-step2-toolbar">
+              <div class="ca-toolbar-top-row">
+                <div class="ca-toolbar-summary">
+                  Tổng quan: <span id="ca-total-q" style="color: var(--primary);">0</span>/100 câu · <span id="ca-total-pts" style="color: var(--accent-gold);">0</span> điểm
+                </div>
+                <div class="ca-toolbar-utility-btns">
+                  <button type="button" id="btn-ca-collapse-all" class="btn btn-outline btn-sm ca-toolbar-util-btn" disabled>Thu gọn tất cả</button>
+                  <button type="button" id="btn-ca-expand-all" class="btn btn-outline btn-sm ca-toolbar-util-btn" disabled>Mở tất cả</button>
+                  <button type="button" id="btn-ca-open-vocab-gen" class="btn btn-primary btn-sm ca-toolbar-util-btn">
+                    ⚡ Tạo nhanh từ Từ vựng (Quizlet)
+                  </button>
+                </div>
+              </div>
+
+              <div class="ca-toolbar-add-row">
+                <button type="button" class="btn btn-outline btn-sm btn-ca-add-q" data-qtype="mcq">🔘 + Trắc nghiệm</button>
+                <button type="button" class="btn btn-outline btn-sm btn-ca-add-q" data-qtype="true_false">⚖️ + Đúng / Sai</button>
+                <button type="button" class="btn btn-outline btn-sm btn-ca-add-q" data-qtype="fill_blank">✍️ + Điền từ</button>
+                <button type="button" class="btn btn-outline btn-sm btn-ca-add-q" data-qtype="translation">🌐 + Dịch câu</button>
+                <button type="button" class="btn btn-outline btn-sm btn-ca-add-q" data-qtype="word_order">🧩 + Sắp xếp từ</button>
+                <button type="button" class="btn btn-outline btn-sm btn-ca-add-q" data-qtype="matching">🔗 + Nối cặp</button>
+              </div>
+
+              <div id="ca-builder-nav-strip" class="ca-builder-nav-strip" style="display: none;">
+                <span class="ca-builder-nav-label">Câu:</span>
+                <div id="ca-builder-nav-pills" class="ca-builder-nav-pills" role="navigation" aria-label="Điều hướng nhanh câu hỏi"></div>
+              </div>
+            </div>
+
+            <div id="ca-questions-list" class="ca-questions-list"></div>
+          </div>
+
+          <!-- BƯỚC 3: CÀI ĐẶT BÀI LÀM -->
+          <div id="custom-wizard-step-3" style="display: none;">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; gap: 18px; flex-wrap: wrap; padding: 12px 14px; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; font-weight: 600;">
+                  <input type="checkbox" id="ca-set-shuffle-q" style="width: 17px; height: 17px;">
+                  🔀 Xáo trộn thứ tự câu hỏi mỗi lượt làm
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; font-weight: 600;">
+                  <input type="checkbox" id="ca-set-shuffle-opt" style="width: 17px; height: 17px;">
+                  🎲 Xáo trộn thứ tự các lựa chọn (Trắc nghiệm)
+                </label>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;">
+                <div class="form-group">
+                  <label class="form-label" for="ca-set-time-limit">Giới hạn thời gian (phút)</label>
+                  <input type="number" id="ca-set-time-limit" class="form-control" min="1" max="300" placeholder="Để trống = không giới hạn">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="ca-set-max-attempts">Số lần làm tối đa (tính điểm cao nhất)</label>
+                  <input type="number" id="ca-set-max-attempts" class="form-control" min="1" max="100" value="1" placeholder="Để trống = không giới hạn">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="ca-set-pass-score">Ngưỡng đạt bài tập (%)</label>
+                  <input type="number" id="ca-set-pass-score" class="form-control" min="0" max="100" value="60">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="ca-set-reveal-mode">Thời điểm cho học viên xem đáp án đúng & giải thích</label>
+                <select id="ca-set-reveal-mode" class="form-control">
+                  <option value="after_submit">Ngay sau khi nộp bài</option>
+                  <option value="immediate">Ngay sau mỗi câu (có nút Kiểm tra khi đang làm)</option>
+                  <option value="after_due">Chỉ mở đáp án sau hạn chót nộp bài</option>
+                  <option value="never">Không bao giờ hiển thị đáp án</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- BƯỚC 4: XEM TRƯỚC NHƯ HỌC VIÊN & GIAO BÀI -->
+          <div id="custom-wizard-step-4" style="display: none;">
+            <div id="ca-validation-summary" style="margin-bottom: 12px;"></div>
+            <div id="ca-overview-card" style="padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg-subtle); border: 1px solid var(--border-color); margin-bottom: 12px;"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+              <div style="font-size: 13px; color: var(--text-muted);">Bạn có thể làm thử trực tiếp bên dưới trước khi lưu nháp hoặc giao ngay cho lớp:</div>
+              <button type="button" id="btn-ca-launch-preview" class="btn btn-outline btn-sm">👁️ Mở làm thử như học viên</button>
+            </div>
+            <div id="ca-preview-inline-host" style="display: none; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; background: var(--bg-card);"></div>
+          </div>
+        </div>
+
+        <div class="modal-footer ca-modal-footer" id="assign-old-footer-actions">
           <button type="button" class="btn btn-secondary" data-close="modal-create-assignment">Hủy</button>
           <button type="submit" id="btn-submit-assignment" class="btn btn-primary">Xác nhận giao bài</button>
+        </div>
+        <div class="modal-footer ca-modal-footer ca-modal-footer-wizard" id="ca-footer-actions" style="display: none;">
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-secondary" data-close="modal-create-assignment">Hủy</button>
+            <button type="button" id="btn-ca-prev-step" class="btn btn-outline" style="display: none;">← Quay lại</button>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="btn-ca-next-step" class="btn btn-outline">Tiếp theo →</button>
+            <button type="button" id="btn-ca-save-draft" class="btn btn-secondary">💾 Lưu nháp</button>
+            <button type="button" id="btn-ca-publish" class="btn btn-primary">🚀 Giao ngay cho lớp</button>
+          </div>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- MODAL: TẠO NHANH CÂU HỎI TỪ TỪ VỰNG (QUIZLET) -->
+  <div id="modal-ca-vocab-generator" class="modal-overlay ca-modal-overlay">
+    <div class="modal-card ca-modal-card ca-gen-modal-card">
+      <div class="modal-header ca-modal-header">
+        <div>
+          <h3 class="modal-title">⚡ Tạo Nhanh Câu Hỏi Từ Kho Từ Vựng / Bài Học</h3>
+          <div style="font-size: 12.5px; color: var(--text-muted); margin-top: 2px;">Tự động lấy từ gây nhiễu cùng cấp HSK & loại từ, không trùng đáp án đúng</div>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-ca-vocab-generator">&times;</button>
+      </div>
+      <div class="modal-body ca-modal-body">
+        <div id="ca-gen-alert" class="alert"></div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="ca-gen-tab-warehouse" class="btn btn-sm btn-primary">📚 Chọn từ Kho từ vựng</button>
+            <button type="button" id="ca-gen-tab-lesson" class="btn btn-sm btn-outline">📖 Chọn toàn bộ từ Bài học X</button>
+          </div>
+          <span id="ca-gen-selected-count" style="font-weight: 800; color: var(--primary); font-size: 13px;">Đã chọn: 0 từ</span>
+        </div>
+
+        <!-- Nguồn 1: Kho từ vựng (server pagination + lọc HSK + chọn khoảng) -->
+        <div id="ca-gen-pane-warehouse">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+            <input type="text" id="ca-gen-search" class="form-control" placeholder="Tìm chữ Hán, Pinyin hoặc nghĩa..." style="flex: 1; min-width: 160px; height: 36px; font-size: 13px;">
+            <select id="ca-gen-hsk" class="form-control" style="width: 125px; height: 36px; font-size: 13px;">
+              <option value="all">Tất cả HSK</option>
+              <option value="1">HSK 1</option><option value="2">HSK 2</option><option value="3">HSK 3</option>
+              <option value="4">HSK 4</option><option value="5">HSK 5</option><option value="6">HSK 6</option>
+              <option value="7">HSK 7</option><option value="8">HSK 8</option><option value="9">HSK 9</option>
+            </select>
+            <select id="ca-gen-sort" class="form-control" style="width: 175px; height: 36px; font-size: 13px;">
+              <option value="sort_order" selected>📌 Thứ tự Excel</option>
+              <option value="pinyin">🔤 Pinyin (A–Z)</option>
+              <option value="hanzi">🀄 Chữ Hán (A–Z)</option>
+              <option value="created_at">🕒 Mới thêm gần đây</option>
+            </select>
+            <button type="button" id="btn-ca-gen-search" class="btn btn-outline btn-sm">🔍 Tìm</button>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 10px; background: var(--bg-subtle); border-radius: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-size: 12px; font-weight: 600;">Chọn nhanh khoảng dòng:</span>
+              <input type="number" id="ca-gen-range-from" class="form-control" min="1" value="1" style="width: 68px; height: 30px; font-size: 12px; padding: 4px 6px;">
+              <span style="font-size: 12px;">đến</span>
+              <input type="number" id="ca-gen-range-to" class="form-control" min="1" value="15" style="width: 68px; height: 30px; font-size: 12px; padding: 4px 6px;">
+              <button type="button" id="btn-ca-gen-select-range" class="btn btn-outline btn-sm" style="height: 30px; font-size: 12px;">☑️ Chọn khoảng</button>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" id="btn-ca-gen-select-page" class="btn btn-outline btn-sm" style="height: 30px; font-size: 12px;">Chọn trang</button>
+              <button type="button" id="btn-ca-gen-clear-sel" class="btn btn-outline btn-sm" style="height: 30px; font-size: 12px;">Bỏ chọn hết</button>
+            </div>
+          </div>
+
+          <div class="table-responsive" style="max-height: 220px;">
+            <table class="data-table" style="font-size: 12.5px;">
+              <thead>
+                <tr>
+                  <th style="width: 36px; text-align: center;"><input type="checkbox" id="chk-ca-gen-page-all" style="width: 15px; height: 15px;"></th>
+                  <th style="width: 50px; text-align: center;">STT</th>
+                  <th>Chữ Hán</th>
+                  <th>Pinyin</th>
+                  <th>Nghĩa</th>
+                  <th style="width: 75px;">HSK</th>
+                </tr>
+              </thead>
+              <tbody id="ca-gen-table-body"></tbody>
+            </table>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; color: var(--text-muted);">
+            <span id="ca-gen-page-info">--</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button type="button" id="btn-ca-gen-prev" class="btn btn-outline btn-sm" style="height: 26px; padding: 0 8px;">«</button>
+              <span id="ca-gen-page-indicator">Trang 1 / 1</span>
+              <button type="button" id="btn-ca-gen-next" class="btn btn-outline btn-sm" style="height: 26px; padding: 0 8px;">»</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nguồn 2: Toàn bộ từ của Bài học X -->
+        <div id="ca-gen-pane-lesson" style="display: none; padding: 12px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 10px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <select id="ca-gen-lesson-select" class="form-control" style="flex: 1; min-width: 220px; height: 38px;">
+              <option value="">-- Chọn bài học --</option>
+            </select>
+            <button type="button" id="btn-ca-gen-load-lesson" class="btn btn-primary btn-sm" style="height: 38px;">📥 Chọn toàn bộ từ bài này</button>
+          </div>
+          <div id="ca-gen-lesson-status" style="font-size: 12.5px; color: var(--success); margin-top: 8px; font-weight: 600;"></div>
+        </div>
+
+        <!-- Cấu hình sinh câu -->
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; padding: 12px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <div style="flex: 1; min-width: 220px;">
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Dạng câu hỏi muốn sinh:</label>
+            <select id="ca-gen-format" class="form-control" style="height: 36px; font-size: 13px;">
+              <option value="mixed">🎲 Trộn nhiều dạng (Trắc nghiệm + Điền từ)</option>
+              <option value="mcq_vi">🔘 Trắc nghiệm chọn Nghĩa tiếng Việt</option>
+              <option value="mcq_hanzi">🀄 Trắc nghiệm chọn Chữ Hán</option>
+              <option value="fill_hanzi">✍️ Nhìn nghĩa điền Chữ Hán</option>
+              <option value="fill_pinyin">🔤 Nhìn chữ Hán gõ Pinyin</option>
+              <option value="matching">🔗 Nối cặp Hán tự – Nghĩa (Quizlet Match)</option>
+            </select>
+          </div>
+          <div style="width: 110px;">
+            <label style="font-size: 12px; font-weight: 700; display: block; margin-bottom: 4px;">Số câu:</label>
+            <input type="number" id="ca-gen-count" class="form-control" min="1" max="100" value="5" style="height: 36px; font-size: 13px;">
+          </div>
+          <button type="button" id="btn-ca-gen-generate" class="btn btn-primary btn-sm" style="height: 36px; white-space: nowrap;">⚡ Sinh câu hỏi xem trước</button>
+        </div>
+
+        <!-- Danh sách câu vừa sinh để xem/sửa trước khi đưa vào bài -->
+        <div id="ca-gen-preview-section" style="display: none; margin-top: 14px;">
+          <div style="font-weight: 700; font-size: 13.5px; margin-bottom: 8px; color: var(--text-main);">
+            ✏️ Xem trước & sửa nhanh từng câu trước khi đưa vào bài:
+          </div>
+          <div id="ca-gen-preview-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer ca-modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-ca-vocab-generator">Đóng</button>
+        <button type="button" id="btn-ca-gen-commit" class="btn btn-primary" disabled>➕ Thêm (0) câu vào bài tập</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: XEM TIẾN ĐỘ NỘP BÀI TẬP CỦA HỌC SINH -->
-  <div id="modal-view-submissions" class="modal-overlay">
-    <div class="modal-card" style="max-width: 960px; width: 95%;">
-      <div class="modal-header">
+  <div id="modal-view-submissions" class="modal-overlay ca-modal-overlay">
+    <div class="modal-card ca-modal-card ca-submissions-modal-card">
+      <div class="modal-header ca-modal-header">
         <div>
           <h3 class="modal-title" id="view-submissions-title">Danh Sách Học Sinh Nộp Bài</h3>
           <div id="view-submissions-subtitle" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;"></div>
         </div>
         <button type="button" class="modal-close" data-close="modal-view-submissions">&times;</button>
       </div>
-      <div class="modal-body" style="max-height: 75vh; overflow-y: auto; padding: 16px 20px;">
+      <div class="modal-body ca-modal-body" style="padding: 16px 20px;">
         <div id="submissions-list-container">
           <div style="text-align: center; padding: 24px; color: var(--text-muted);">Đang tải danh sách bài nộp...</div>
         </div>
       </div>
-      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+      <div class="modal-footer ca-modal-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
         <div id="view-submissions-footer-hint" style="font-size: 12px; color: var(--text-muted);">Mẹo: Bấm vào tên hoặc nút "Chấm bài" để mở chi tiết trên trang chấm bài</div>
         <button type="button" class="btn btn-secondary" data-close="modal-view-submissions">Đóng</button>
       </div>
@@ -1154,6 +1425,29 @@
     </div>
   </div>
 
+  <!-- MODAL: LỊCH SỬ THỜI GIAN HỌC 8 TUẦN CỦA HỌC VIÊN -->
+  <div id="modal-student-study-history" class="modal-overlay">
+    <div class="modal-card" style="max-width: 720px; width: 96%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="st-hist-modal-title">⏱️ Lịch sử thời gian học 8 tuần</h3>
+          <div id="st-hist-modal-sub" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">--</div>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-student-study-history">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 76vh; overflow-y: auto;">
+        <div id="st-hist-modal-body">
+          <div style="text-align: center; padding: 28px; color: var(--text-muted);">
+            ⏳ Đang tải lịch sử 8 tuần gần nhất...
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-student-study-history">Đóng</button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
   </footer>
@@ -1164,7 +1458,11 @@
   <script src="../js/config.js?v=4.0"></script>
   <script src="../js/db.js?v=4.0"></script>
   <script src="../js/auth.js?v=4.0"></script>
-  <script src="../js/admin.js?v=7.0"></script>
-  <script src="../js/admin-class-detail.js?v=8.0"></script>
+  <script src="../js/admin.js?v=8.2"></script>
+  <script src="../js/student.js?v=8.2"></script>
+  <script src="../js/custom-assignment-shared.js?v=1.0"></script>
+  <script src="../js/student-custom-assignment.js?v=1.1"></script>
+  <script src="../js/admin-custom-assignment.js?v=1.1"></script>
+  <script src="../js/admin-class-detail.js?v=9.2"></script>
 </body>
 </html>

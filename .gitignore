@@ -11,3 +11,6 @@ Thumbs.db
 *.log
 
 supabase/
+
+# File thử nghiệm tạm khi phát triển tính năng import
+test-import-samples/

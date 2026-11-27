@@ -314,122 +314,528 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // Tải bảng học sinh ở Tab 2
-  async function loadClassStudentsList() {
-    try {
-      const students = await window.Admin.getClassStudents(classId);
+  // Tải bảng học sinh ở Tab 2 (kèm thống kê thời gian học Hôm nay / Tuần này / Tuần trước + sắp xếp + Xuất CSV + Modal 8 tuần)
+  let classStudentsRows = [];
+  let studentsStudyMeta = null;
+  let studentStudySortKey = 'this_week'; // 'name' | 'today' | 'this_week' | 'last_week'
+  let studentStudySortDir = 'desc';
 
-      statStudentCount.textContent = students.length;
-      countStudentsTab.textContent = students.length;
+  const studentsStudyWeekMeta = document.getElementById('students-study-week-meta');
+  const studentsStudyAlert = document.getElementById('students-study-alert');
+  const btnRefreshStudentsStudy = document.getElementById('btn-refresh-students-study');
+  const btnExportStudentsStudyCsv = document.getElementById('btn-export-students-study-csv');
+  const modalStudentStudyHistory = document.getElementById('modal-student-study-history');
+  const stHistModalTitle = document.getElementById('st-hist-modal-title');
+  const stHistModalSub = document.getElementById('st-hist-modal-sub');
+  const stHistModalBody = document.getElementById('st-hist-modal-body');
 
-      if (!students || students.length === 0) {
-        studentsTableBody.innerHTML = `
-          <tr><td colspan="6" style="text-align: center; padding: 32px; color: var(--text-muted);">
-            Lớp học hiện chưa có học sinh nào. Hãy nhấn <strong>"Thêm Học Sinh Vào Lớp"</strong> ở trên!
-          </td></tr>
-        `;
-        return;
+  function cleanStr(val, fallback = '') {
+    if (val === null || val === undefined) return fallback;
+    const s = String(val).trim();
+    if (!s || s === 'null' || s === 'undefined') return fallback;
+    return s;
+  }
+
+  function escHtml(val) {
+    return cleanStr(val)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatStudyCellTime(totalSeconds) {
+    const sec = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    if (sec === 0) return '<span style="color: var(--text-light);">0 phút</span>';
+    if (sec < 60) return `<strong>${sec} giây</strong>`;
+    if (sec < 3600) return `<strong>${Math.round(sec / 60)} phút</strong>`;
+    const totalMins = Math.round(sec / 60);
+    const hrs = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    return `<strong>${hrs} giờ ${mins} phút</strong>`;
+  }
+
+  function formatStudyPlainText(totalSeconds) {
+    const sec = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    if (sec === 0) return '0 phút';
+    if (sec < 60) return `${sec} giây`;
+    if (sec < 3600) return `${Math.round(sec / 60)} phút`;
+    const totalMins = Math.round(sec / 60);
+    return `${Math.floor(totalMins / 60)} giờ ${totalMins % 60} phút`;
+  }
+
+  function formatShortVnDate(isoDate) {
+    const s = cleanStr(isoDate);
+    const p = s.split('-');
+    if (p.length !== 3) return s;
+    return `${p[2]}/${p[1]}`;
+  }
+
+  function showStudentsStudyAlert(msg, type = 'danger', retryFn = null) {
+    if (!studentsStudyAlert) return;
+    if (!msg) {
+      studentsStudyAlert.className = 'alert';
+      studentsStudyAlert.innerHTML = '';
+      return;
+    }
+    studentsStudyAlert.className = `alert alert-${type} show`;
+    studentsStudyAlert.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = msg;
+    studentsStudyAlert.appendChild(span);
+    if (typeof retryFn === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-outline btn-sm';
+      btn.style.marginLeft = '10px';
+      btn.textContent = '🔄 Thử lại';
+      btn.addEventListener('click', () => retryFn());
+      studentsStudyAlert.appendChild(btn);
+    }
+  }
+
+  function updateStudentSortHeadersUi() {
+    document.querySelectorAll('#tab-students .st-sort-header').forEach(btn => {
+      const k = btn.getAttribute('data-sort');
+      const iconEl = btn.querySelector('.st-sort-icon');
+      const active = k === studentStudySortKey;
+      btn.classList.toggle('is-active', active);
+      if (iconEl) {
+        iconEl.textContent = active ? (studentStudySortDir === 'asc' ? '↑' : '↓') : '↕';
       }
+    });
+  }
 
-      studentsTableBody.innerHTML = students.map(st => `
+  function getSortedStudentsRows() {
+    const copy = [...classStudentsRows];
+    const dir = studentStudySortDir === 'asc' ? 1 : -1;
+    copy.sort((a, b) => {
+      if (studentStudySortKey === 'name') {
+        const na = cleanStr(a.display_name || a.username).toLowerCase();
+        const nb = cleanStr(b.display_name || b.username).toLowerCase();
+        return na.localeCompare(nb, 'vi') * dir;
+      }
+      const fieldMap = {
+        today: 'today_seconds',
+        this_week: 'this_week_seconds',
+        last_week: 'last_week_seconds'
+      };
+      const f = fieldMap[studentStudySortKey] || 'this_week_seconds';
+      const va = Number(a[f] || 0);
+      const vb = Number(b[f] || 0);
+      if (va !== vb) return (va - vb) * dir;
+      const na = cleanStr(a.display_name || a.username).toLowerCase();
+      const nb = cleanStr(b.display_name || b.username).toLowerCase();
+      return na.localeCompare(nb, 'vi');
+    });
+    return copy;
+  }
+
+  async function openStudentStudyHistoryModal(studentId, fallbackName, fallbackUsername) {
+    if (!modalStudentStudyHistory || !stHistModalBody) return;
+    if (stHistModalTitle) {
+      stHistModalTitle.textContent = `⏱️ Lịch sử 8 tuần — ${cleanStr(fallbackName || fallbackUsername, 'Học viên')}`;
+    }
+    if (stHistModalSub) {
+      stHistModalSub.textContent = fallbackUsername ? `@${cleanStr(fallbackUsername)} · ${cleanStr(currentClass && currentClass.name, 'Lớp học')}` : cleanStr(currentClass && currentClass.name, 'Lớp học');
+    }
+    stHistModalBody.innerHTML = `
+      <div style="text-align: center; padding: 32px; color: var(--text-muted);">
+        ⏳ Đang tải lịch sử thời gian học 8 tuần gần nhất...
+      </div>
+    `;
+    modalStudentStudyHistory.classList.add('active');
+
+    try {
+      const res = await window.Admin.getStudentStudyTimeHistory(classId, studentId);
+      const displayName = cleanStr(res && res.display_name, fallbackName || fallbackUsername || 'Học viên');
+      const username = cleanStr(res && res.username, fallbackUsername);
+      const weeks = Array.isArray(res && res.weeks) ? res.weeks : [];
+
+      if (stHistModalTitle) stHistModalTitle.textContent = `⏱️ Lịch sử 8 tuần — ${displayName}`;
+      if (stHistModalSub) stHistModalSub.textContent = `${username ? `@${username} · ` : ''}${cleanStr(currentClass && currentClass.name, 'Lớp học')}`;
+
+      const total8Sec = weeks.reduce((s, w) => s + Number(w.seconds || 0), 0);
+      const avgWeekSec = weeks.length > 0 ? Math.round(total8Sec / weeks.length) : 0;
+      const currentWeekRow = weeks.find(w => w.is_current_week);
+      const curWeekSec = currentWeekRow ? Number(currentWeekRow.seconds || 0) : 0;
+      const maxWeekSec = Math.max(weeks.reduce((m, w) => Math.max(m, Number(w.seconds || 0)), 0), 600);
+
+      const barsHtml = weeks.map(w => {
+        const sec = Number(w.seconds || 0);
+        const mins = Math.round(sec / 60);
+        const hPct = sec > 0 ? Math.max(10, Math.round((sec / maxWeekSec) * 100)) : 5;
+        const valShort = sec === 0 ? '0p' : (sec < 60 ? `${sec}s` : (mins < 60 ? `${mins}p` : `${Math.floor(mins / 60)}g${mins % 60 > 0 ? `${mins % 60}p` : ''}`));
+        const activeDays = Number(w.active_days || 0);
+        const label = w.is_current_week ? 'Tuần này' : `${formatShortVnDate(w.week_start)}`;
+
+        return `
+          <div class="st-hist-col ${w.is_current_week ? 'is-current' : ''}" title="${formatShortVnDate(w.week_start)} – ${formatShortVnDate(w.week_end)}: ${formatStudyPlainText(sec)} (${activeDays}/7 ngày)">
+            <div class="st-bar-top-val">${valShort}</div>
+            <div class="st-bar-track">
+              <div class="st-bar-fill ${sec > 0 ? 'has-data' : ''}" style="height: ${hPct}%;"></div>
+            </div>
+            <div class="st-bar-day-label">${escHtml(label)}</div>
+            <div class="st-hist-days-badge">${activeDays}d</div>
+          </div>
+        `;
+      }).join('');
+
+      const rowsHtml = [...weeks].reverse().map(w => {
+        const sec = Number(w.seconds || 0);
+        const days = Number(w.active_days || 0);
+        return `
+          <tr>
+            <td>
+              <strong>${formatShortVnDate(w.week_start)} – ${formatShortVnDate(w.week_end)}</strong>
+              ${w.is_current_week ? '<span class="badge-status badge-ongoing" style="margin-left: 6px; font-size: 11px;">Tuần hiện tại</span>' : ''}
+            </td>
+            <td>${formatStudyCellTime(sec)}</td>
+            <td><strong>${days}</strong> / 7 ngày</td>
+          </tr>
+        `;
+      }).join('');
+
+      stHistModalBody.innerHTML = `
+        <div class="st-hist-summary-grid">
+          <div class="st-metric-box is-today">
+            <div class="st-metric-label">Tuần hiện tại</div>
+            <div class="st-metric-value">${escHtml(formatStudyPlainText(curWeekSec))}</div>
+          </div>
+          <div class="st-metric-box">
+            <div class="st-metric-label">Tổng 8 tuần</div>
+            <div class="st-metric-value">${escHtml(formatStudyPlainText(total8Sec))}</div>
+          </div>
+          <div class="st-metric-box">
+            <div class="st-metric-label">Trung bình / tuần</div>
+            <div class="st-metric-value">${escHtml(formatStudyPlainText(avgWeekSec))}</div>
+          </div>
+        </div>
+
+        <div class="st-chart-section" style="margin-bottom: 14px;">
+          <div class="st-chart-title">Biểu đồ cột 8 tuần gần nhất (Thứ Hai – Chủ nhật · Số ngày có học bên dưới)</div>
+          <div class="st-hist-chart">${barsHtml}</div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" style="font-size: 13px;">
+            <thead>
+              <tr>
+                <th>Khoảng tuần (Thứ 2 – CN)</th>
+                <th>Tổng thời gian học</th>
+                <th>Số ngày có học</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      `;
+    } catch (err) {
+      console.error('Lỗi tải lịch sử 8 tuần học viên:', err);
+      stHistModalBody.innerHTML = `
+        <div class="alert alert-danger show" style="margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <span>${escHtml(cleanStr(err && err.message, 'Không thể tải lịch sử thời gian học của học viên này.'))}</span>
+          <button type="button" id="btn-retry-st-hist" class="btn btn-outline btn-sm">🔄 Thử lại</button>
+        </div>
+      `;
+      const retryBtn = document.getElementById('btn-retry-st-hist');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => openStudentStudyHistoryModal(studentId, fallbackName, fallbackUsername));
+      }
+    }
+  }
+
+  function renderStudentsTableRows() {
+    updateStudentSortHeadersUi();
+    if (!classStudentsRows || classStudentsRows.length === 0) {
+      studentsTableBody.innerHTML = `
+        <tr><td colspan="9" style="text-align: center; padding: 32px; color: var(--text-muted);">
+          Lớp học hiện chưa có học sinh nào. Hãy nhấn <strong>"Thêm Học Sinh Vào Lớp"</strong> ở trên!
+        </td></tr>
+      `;
+      return;
+    }
+
+    const sortedRows = getSortedStudentsRows();
+    studentsTableBody.innerHTML = sortedRows.map(st => {
+      const displayName = cleanStr(st.display_name || st.username, 'Học viên');
+      const username = cleanStr(st.username, '--');
+      const phone = cleanStr(st.phone);
+      const statusLabel = st.status === 'active' ? 'Đang học' : cleanStr(st.status, 'Đang học');
+
+      return `
         <tr>
           <td>
-            <div style="font-weight: 600; color: var(--text-main);">${st.display_name || st.username}</div>
-            <div style="font-size: 12px; color: var(--text-muted);">Streak: 🔥 ${st.current_streak || 0} ngày · ${(st.lifetime_xp || 0).toLocaleString()} XP</div>
+            <button type="button" class="st-student-name-btn btn-open-student-study-hist" data-student-id="${escHtml(st.id)}" data-name="${escHtml(displayName)}" data-username="${escHtml(username)}" title="Bấm để xem lịch sử thời gian học 8 tuần gần nhất">
+              ${escHtml(displayName)}
+            </button>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Streak: 🔥 ${Number(st.current_streak || 0)} ngày · ${(Number(st.lifetime_xp || 0)).toLocaleString('vi-VN')} XP
+            </div>
           </td>
-          <td><code>${st.username}</code></td>
-          <td>${st.phone || '<span style="color: var(--text-light);">Chưa có</span>'}</td>
+          <td><code>${escHtml(username)}</code></td>
+          <td>${phone ? escHtml(phone) : '<span style="color: var(--text-light);">Chưa có</span>'}</td>
+          <td>
+            <button type="button" class="st-time-pill-btn btn-open-student-study-hist" data-student-id="${escHtml(st.id)}" data-name="${escHtml(displayName)}" data-username="${escHtml(username)}" title="Xem chi tiết 8 tuần">
+              ${formatStudyCellTime(st.today_seconds)}
+            </button>
+          </td>
+          <td>
+            <button type="button" class="st-time-pill-btn is-week btn-open-student-study-hist" data-student-id="${escHtml(st.id)}" data-name="${escHtml(displayName)}" data-username="${escHtml(username)}" title="Xem chi tiết 8 tuần">
+              ${formatStudyCellTime(st.this_week_seconds)}
+            </button>
+          </td>
+          <td>
+            <button type="button" class="st-time-pill-btn btn-open-student-study-hist" data-student-id="${escHtml(st.id)}" data-name="${escHtml(displayName)}" data-username="${escHtml(username)}" title="Xem chi tiết 8 tuần">
+              ${formatStudyCellTime(st.last_week_seconds)}
+            </button>
+          </td>
           <td>${st.joinedAt ? new Date(st.joinedAt).toLocaleDateString('vi-VN') : '--'}</td>
-          <td><span class="badge-status badge-ongoing">${st.status === 'active' ? 'Đang học' : st.status}</span></td>
+          <td><span class="badge-status badge-ongoing">${escHtml(statusLabel)}</span></td>
           <td style="text-align: right;">
             <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
-              <button type="button" class="btn btn-outline btn-sm btn-reset-password" data-student-id="${st.id}" data-username="${st.username}" data-name="${st.display_name || st.username}" title="Đặt lại mật khẩu cho học sinh" style="font-weight: 600; color: var(--primary); border-color: var(--primary);">
+              <button type="button" class="btn btn-outline btn-sm btn-open-student-study-hist" data-student-id="${escHtml(st.id)}" data-name="${escHtml(displayName)}" data-username="${escHtml(username)}" title="Xem lịch sử thời gian học 8 tuần">
+                📊 8 tuần
+              </button>
+              <button type="button" class="btn btn-outline btn-sm btn-reset-password" data-student-id="${escHtml(st.id)}" data-username="${escHtml(username)}" data-name="${escHtml(displayName)}" title="Đặt lại mật khẩu cho học sinh" style="font-weight: 600; color: var(--primary); border-color: var(--primary);">
                 🔑 Đổi MK
               </button>
-              <button type="button" class="btn btn-primary btn-sm btn-promote-student" data-student-id="${st.id}" data-name="${st.display_name || st.username}">
+              <button type="button" class="btn btn-primary btn-sm btn-promote-student" data-student-id="${escHtml(st.id)}" data-name="${escHtml(displayName)}">
                 ⬆️ Lên HSK2 / Đổi lớp
               </button>
-              <button type="button" class="btn btn-outline btn-sm btn-remove-student" data-enrollment-id="${st.enrollmentId}" data-name="${st.display_name || st.username}">
+              <button type="button" class="btn btn-outline btn-sm btn-remove-student" data-enrollment-id="${escHtml(st.enrollmentId)}" data-name="${escHtml(displayName)}">
                 Xóa
               </button>
             </div>
           </td>
         </tr>
-      `).join('');
+      `;
+    }).join('');
 
-      // Gắn sự kiện nút Đặt lại mật khẩu cho học sinh
-      document.querySelectorAll('.btn-reset-password').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const stId = btn.getAttribute('data-student-id');
-          const stUsername = btn.getAttribute('data-username');
-          const stName = btn.getAttribute('data-name');
-          window.Admin.openResetPasswordModal({
-            id: stId,
-            username: stUsername,
-            displayName: stName
-          });
+    document.querySelectorAll('.btn-open-student-study-hist').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stId = btn.getAttribute('data-student-id');
+        const stName = btn.getAttribute('data-name');
+        const stUser = btn.getAttribute('data-username');
+        if (stId) openStudentStudyHistoryModal(stId, stName, stUser);
+      });
+    });
+
+    // Gắn sự kiện nút Đặt lại mật khẩu cho học sinh
+    document.querySelectorAll('.btn-reset-password').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stId = btn.getAttribute('data-student-id');
+        const stUsername = btn.getAttribute('data-username');
+        const stName = btn.getAttribute('data-name');
+        window.Admin.openResetPasswordModal({
+          id: stId,
+          username: stUsername,
+          displayName: stName
         });
       });
+    });
 
-      // Gắn sự kiện nút Lên cấp / Đổi lớp
-      document.querySelectorAll('.btn-promote-student').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const stId = btn.getAttribute('data-student-id');
-          const stName = btn.getAttribute('data-name');
-          selectedStudentForPromote = stId;
+    // Gắn sự kiện nút Lên cấp / Đổi lớp
+    document.querySelectorAll('.btn-promote-student').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const stId = btn.getAttribute('data-student-id');
+        const stName = btn.getAttribute('data-name');
+        selectedStudentForPromote = stId;
 
-          promoteStudentName.textContent = stName;
-          promoteCurrentClassName.textContent = currentClass.name;
-          promoteModalAlert.className = 'alert';
-          promoteModalAlert.textContent = '';
-          selectTargetClass.innerHTML = '<option value="">Đang tải danh sách lớp...</option>';
-          modalPromoteStudent.classList.add('active');
+        promoteStudentName.textContent = stName;
+        promoteCurrentClassName.textContent = currentClass.name;
+        promoteModalAlert.className = 'alert';
+        promoteModalAlert.textContent = '';
+        selectTargetClass.innerHTML = '<option value="">Đang tải danh sách lớp...</option>';
+        modalPromoteStudent.classList.add('active');
 
+        try {
+          const allClasses = await window.Admin.getClasses();
+          const otherClasses = (allClasses || []).filter(c => c.id !== classId);
+
+          if (otherClasses.length === 0) {
+            selectTargetClass.innerHTML = '<option value="">-- Chưa có lớp học nào khác. Vui lòng tạo lớp mới trước! --</option>';
+            btnSubmitPromote.disabled = true;
+          } else {
+            selectTargetClass.innerHTML = otherClasses.map(c => `
+              <option value="${escHtml(c.id)}">
+                ${escHtml(c.name)} (${escHtml(c.level)}) - ${escHtml(c.curriculum ? c.curriculum.title : '')}
+              </option>
+            `).join('');
+            btnSubmitPromote.disabled = false;
+          }
+        } catch (e) {
+          selectTargetClass.innerHTML = '<option value="">Lỗi tải danh sách lớp</option>';
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-remove-student').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const enrollId = btn.getAttribute('data-enrollment-id');
+        const studentName = btn.getAttribute('data-name');
+        if (confirm(`Bạn có chắc chắn muốn xóa học sinh "${studentName}" ra khỏi lớp này?`)) {
           try {
-            const allClasses = await window.Admin.getClasses();
-            // Lọc bỏ lớp hiện tại
-            const otherClasses = (allClasses || []).filter(c => c.id !== classId);
-
-            if (otherClasses.length === 0) {
-              selectTargetClass.innerHTML = '<option value="">-- Chưa có lớp học nào khác. Vui lòng tạo lớp mới trước! --</option>';
-              btnSubmitPromote.disabled = true;
-            } else {
-              selectTargetClass.innerHTML = otherClasses.map(c => `
-                <option value="${c.id}">
-                  ${c.name} (${c.level}) - ${c.curriculum ? c.curriculum.title : ''}
-                </option>
-              `).join('');
-              btnSubmitPromote.disabled = false;
-            }
-          } catch (e) {
-            selectTargetClass.innerHTML = '<option value="">Lỗi tải danh sách lớp</option>';
+            btn.disabled = true;
+            btn.textContent = 'Đang xóa...';
+            await window.Admin.removeStudentFromClass(enrollId);
+            showAlert(`Đã xóa "${studentName}" khỏi lớp.`, 'success');
+            await loadClassStudentsList();
+          } catch (err) {
+            alert('Lỗi: ' + (err.message || err));
+            btn.disabled = false;
+            btn.textContent = 'Xóa';
           }
+        }
+      });
+    });
+  }
+
+  function exportStudentsStudyCsv() {
+    if (!classStudentsRows || classStudentsRows.length === 0) {
+      showStudentsStudyAlert('Lớp chưa có học sinh để xuất CSV.', 'warning');
+      return;
+    }
+    const sortedRows = getSortedStudentsRows();
+    const csvEscape = (v) => `"${String(v === null || v === undefined ? '' : v).replace(/"/g, '""')}"`;
+    const headers = [
+      'Họ và tên',
+      'Tên đăng nhập',
+      'Số điện thoại',
+      'Hôm nay (phút)',
+      'Hôm nay (hiển thị)',
+      'Tuần này (phút)',
+      'Tuần này (hiển thị)',
+      'Tuần trước (phút)',
+      'Tuần trước (hiển thị)',
+      'Streak (ngày)',
+      'Tổng XP',
+      'Ngày vào lớp',
+      'Trạng thái'
+    ];
+
+    const lines = [
+      headers.map(csvEscape).join(','),
+      ...sortedRows.map(st => {
+        const tMin = Math.round((Number(st.today_seconds || 0)) / 60);
+        const wMin = Math.round((Number(st.this_week_seconds || 0)) / 60);
+        const lwMin = Math.round((Number(st.last_week_seconds || 0)) / 60);
+        const joined = st.joinedAt ? new Date(st.joinedAt).toLocaleDateString('vi-VN') : '';
+        return [
+          cleanStr(st.display_name || st.username, 'Học viên'),
+          cleanStr(st.username),
+          cleanStr(st.phone),
+          tMin,
+          formatStudyPlainText(st.today_seconds),
+          wMin,
+          formatStudyPlainText(st.this_week_seconds),
+          lwMin,
+          formatStudyPlainText(st.last_week_seconds),
+          Number(st.current_streak || 0),
+          Number(st.lifetime_xp || 0),
+          joined,
+          st.status === 'active' ? 'Đang học' : cleanStr(st.status, '')
+        ].map(csvEscape).join(',');
+      })
+    ];
+
+    const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const clsSlug = cleanStr(currentClass && currentClass.name, 'lop-hoc')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'lop-hoc';
+    const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    link.href = url;
+    link.download = `thoi-gian-hoc_${clsSlug}_${dateStr}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  document.querySelectorAll('#tab-students .st-sort-header').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const k = btn.getAttribute('data-sort') || 'this_week';
+      if (studentStudySortKey === k) {
+        studentStudySortDir = studentStudySortDir === 'desc' ? 'asc' : 'desc';
+      } else {
+        studentStudySortKey = k;
+        studentStudySortDir = k === 'name' ? 'asc' : 'desc';
+      }
+      renderStudentsTableRows();
+    });
+  });
+
+  if (btnRefreshStudentsStudy) {
+    btnRefreshStudentsStudy.addEventListener('click', () => loadClassStudentsList());
+  }
+  if (btnExportStudentsStudyCsv) {
+    btnExportStudentsStudyCsv.addEventListener('click', () => exportStudentsStudyCsv());
+  }
+  document.querySelectorAll('[data-close="modal-student-study-history"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (modalStudentStudyHistory) modalStudentStudyHistory.classList.remove('active');
+    });
+  });
+
+  async function loadClassStudentsList() {
+    showStudentsStudyAlert('');
+    try {
+      const fetchStudyTimeSafe = async () => {
+        if (!window.Admin || typeof window.Admin.getClassStudyTime !== 'function') {
+          return { __error: new Error('Vui lòng tải lại trang (Ctrl+F5) để cập nhật admin.js mới nhất.') };
+        }
+        try {
+          return await window.Admin.getClassStudyTime(classId);
+        } catch (err) {
+          return { __error: err };
+        }
+      };
+
+      const [students, studyRes] = await Promise.all([
+        window.Admin.getClassStudents(classId),
+        fetchStudyTimeSafe()
+      ]);
+
+      statStudentCount.textContent = students.length;
+      countStudentsTab.textContent = students.length;
+
+      const studyMap = new Map();
+      if (studyRes && studyRes.__error) {
+        console.warn('Lỗi tải thời gian học của lớp:', studyRes.__error);
+        showStudentsStudyAlert(
+          cleanStr(studyRes.__error && studyRes.__error.message, 'Không thể tải số liệu thời gian học của lớp.'),
+          'warning',
+          () => loadClassStudentsList()
+        );
+      } else if (studyRes) {
+        studentsStudyMeta = studyRes;
+        if (studentsStudyWeekMeta && studyRes.this_week_start && studyRes.last_week_start) {
+          studentsStudyWeekMeta.textContent =
+            `Tuần này: ${formatShortVnDate(studyRes.this_week_start)} – ${formatShortVnDate(studyRes.this_week_end)} · ` +
+            `Tuần trước: ${formatShortVnDate(studyRes.last_week_start)} – ${formatShortVnDate(studyRes.last_week_end)} (giờ VN) · Bấm vào học viên để xem 8 tuần`;
+        }
+        (Array.isArray(studyRes.students) ? studyRes.students : []).forEach(s => {
+          studyMap.set(s.student_id, s);
         });
+      }
+
+      classStudentsRows = (students || []).map(st => {
+        const stTime = studyMap.get(st.id) || {};
+        return {
+          ...st,
+          today_seconds: Number(stTime.today_seconds || 0),
+          this_week_seconds: Number(stTime.this_week_seconds || 0),
+          last_week_seconds: Number(stTime.last_week_seconds || 0)
+        };
       });
 
-      document.querySelectorAll('.btn-remove-student').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const enrollId = btn.getAttribute('data-enrollment-id');
-          const studentName = btn.getAttribute('data-name');
-          if (confirm(`Bạn có chắc chắn muốn xóa học sinh "${studentName}" ra khỏi lớp này?`)) {
-            try {
-              btn.disabled = true;
-              btn.textContent = 'Đang xóa...';
-              await window.Admin.removeStudentFromClass(enrollId);
-              showAlert(`Đã xóa "${studentName}" khỏi lớp.`, 'success');
-              await loadClassStudentsList();
-            } catch (err) {
-              alert('Lỗi: ' + (err.message || err));
-              btn.disabled = false;
-              btn.textContent = 'Xóa khỏi lớp';
-            }
-          }
-        });
-      });
-
+      renderStudentsTableRows();
     } catch (err) {
       console.error('Lỗi tải danh sách học sinh:', err);
-      studentsTableBody.innerHTML = `<tr><td colspan="6" style="color: red; text-align: center;">Lỗi tải học sinh</td></tr>`;
+      studentsTableBody.innerHTML = `<tr><td colspan="9" style="color: var(--danger); text-align: center; padding: 24px;">Không thể tải danh sách học sinh.</td></tr>`;
     }
   }
 
@@ -449,7 +855,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
 
       assignmentsTableBody.innerHTML = assignments.map(a => {
-        const lessonText = a.lesson ? `Bài ${a.lesson.order_index}: ${a.lesson.title_zh}` : '<span style="color: var(--text-light);">Tự do</span>';
+        const lessonText = a.lesson ? `Bài ${a.lesson.order_index}: ${escHtml(a.lesson.title_zh)}` : '<span style="color: var(--text-light);">Tự do</span>';
         const dueFormatted = new Date(a.due_date).toLocaleString('vi-VN', {
           hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
         });
@@ -462,15 +868,25 @@ document.addEventListener('DOMContentLoaded', async function () {
           typeBadge = '<span class="badge-status" style="background: rgba(248, 113, 113, 0.18); color: #dc2626;">🎙️ Nói / Ghi âm</span>';
         } else if (a.assignment_type === 'quiz') {
           typeBadge = '<span class="badge-status" style="background: rgba(168, 85, 247, 0.18); color: #9333ea;">📝 Quiz</span>';
+        } else if (a.assignment_type === 'custom') {
+          const draftPill = a.is_published === false
+            ? ' <span class="badge-status" style="background: rgba(234, 179, 8, 0.2); color: #ca8a04; margin-left: 4px;">Bản nháp</span>'
+            : '';
+          typeBadge = `<span class="badge-status" style="background: rgba(99, 102, 241, 0.18); color: #6366f1;">🧩 Tự soạn</span>${draftPill}`;
         }
+
+        const customMetaLine = a.assignment_type === 'custom'
+          ? `<div style="font-size: 12px; color: var(--primary); margin-top: 2px;">❓ ${a.total_questions || 0} câu · Tổng ${a.total_points || 0} điểm</div>`
+          : '';
 
         return `
           <tr>
             <td>${typeBadge}</td>
             <td>
-              <div style="font-weight: 700; color: var(--text-main);">${a.title}</div>
-              <div style="font-size: 12px; color: var(--text-muted);">${a.description || ''}</div>
-              ${a.speaking_prompt ? `<div style="font-size: 12px; color: var(--primary); margin-top: 2px;">💬 Đề: ${a.speaking_prompt}</div>` : ''}
+              <div style="font-weight: 700; color: var(--text-main);">${escHtml(a.title)}</div>
+              <div style="font-size: 12px; color: var(--text-muted);">${escHtml(a.description || '')}</div>
+              ${a.speaking_prompt ? `<div style="font-size: 12px; color: var(--primary); margin-top: 2px;">💬 Đề: ${escHtml(a.speaking_prompt)}</div>` : ''}
+              ${customMetaLine}
             </td>
             <td>${lessonText}</td>
             <td>
@@ -481,10 +897,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             <td><strong style="color: #ca8a04;">+${a.reward_xp || 30} XP</strong></td>
             <td>
               <button type="button" class="btn btn-outline btn-sm btn-view-submissions" data-id="${a.id}" data-title="${encodeURIComponent(a.title)}" data-type="${a.assignment_type}">
-                👥 ${a.completedCount} / ${statStudentCount.textContent} đã nộp
+                👥 ${a.completedCount} / ${statStudentCount.textContent} ${a.assignment_type === 'custom' ? 'đã làm' : 'đã nộp'}
               </button>
             </td>
-            <td style="text-align: right;">
+            <td style="text-align: right; white-space: nowrap;">
+              ${a.assignment_type === 'custom' ? `
+                <button type="button" class="btn btn-outline btn-sm btn-edit-custom-assignment" data-id="${a.id}" style="margin-right: 4px;" title="Sửa hoặc xem câu hỏi">✏️ Sửa</button>
+              ` : ''}
               <button type="button" class="btn btn-outline btn-sm btn-delete-assignment" data-id="${a.id}" data-title="${encodeURIComponent(a.title)}" style="color: var(--danger); border-color: var(--danger-border);" title="Xóa bài tập này">
                 🗑️ Xóa
               </button>
@@ -493,13 +912,33 @@ document.addEventListener('DOMContentLoaded', async function () {
         `;
       }).join('');
 
-      // Gắn sự kiện Xem nộp bài
+      // Gắn sự kiện Xem nộp bài (hoặc kết quả/thống kê chi tiết với bài tự soạn)
       document.querySelectorAll('.btn-view-submissions').forEach(btn => {
         btn.addEventListener('click', async () => {
           const assignId = btn.getAttribute('data-id');
           const assignTitle = decodeURIComponent(btn.getAttribute('data-title'));
           const assignType = btn.getAttribute('data-type');
-          await openSubmissionsModal(assignId, assignTitle, assignType);
+          if (assignType === 'custom' && window.AdminCustomAssignment) {
+            await window.AdminCustomAssignment.openCustomResultsModal(assignId, assignTitle);
+          } else {
+            await openSubmissionsModal(assignId, assignTitle, assignType);
+          }
+        });
+      });
+
+      // Gắn sự kiện Sửa bài tự soạn
+      document.querySelectorAll('.btn-edit-custom-assignment').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const assignId = btn.getAttribute('data-id');
+          if (!window.AdminCustomAssignment) return;
+          await window.AdminCustomAssignment.openEditCustomAssignment(assignId, {
+            classId,
+            lessons: curriculumLessons,
+            onSaved: async (msg) => {
+              showAlert(`🎉 ${msg}`, 'success');
+              await loadClassAssignmentsList();
+            }
+          });
         });
       });
 
@@ -855,11 +1294,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
+  if (window.AdminCustomAssignment && typeof window.AdminCustomAssignment.initOnce === 'function') {
+    window.AdminCustomAssignment.initOnce();
+  }
+
   if (assignTypeSelect) {
     assignTypeSelect.addEventListener('change', () => {
       const type = assignTypeSelect.value;
       if (assignSpeakingFields) assignSpeakingFields.style.display = (type === 'speaking') ? 'block' : 'none';
       if (assignListeningFields) assignListeningFields.style.display = (type === 'listening') ? 'block' : 'none';
+      if (window.AdminCustomAssignment) {
+        window.AdminCustomAssignment.setModeActive(type === 'custom');
+      }
     });
   }
 
@@ -879,12 +1325,30 @@ document.addEventListener('DOMContentLoaded', async function () {
     assignModalAlert.className = 'alert';
     assignModalAlert.textContent = '';
     formCreateAssignment.reset();
+    if (assignTypeSelect) {
+      assignTypeSelect.disabled = false;
+      assignTypeSelect.value = 'vocabulary';
+    }
+    const assignModalTitle = document.getElementById('assign-modal-title');
+    if (assignModalTitle) assignModalTitle.textContent = 'Giao Bài Tập Cho Lớp';
     listeningQuestions = [];
     if (assignSpeakingFields) assignSpeakingFields.style.display = 'none';
     if (assignListeningFields) assignListeningFields.style.display = 'none';
     renderListeningQuestions();
 
-    // Tự động điền link audio nếu lớp gắn với bài học đã có audio
+    if (window.AdminCustomAssignment) {
+      window.AdminCustomAssignment.resetCustomWizardState({
+        classId,
+        lessons: curriculumLessons,
+        onSaved: async (msg) => {
+          showAlert(`🎉 ${msg}`, 'success');
+          await loadClassAssignmentsList();
+        }
+      });
+      window.AdminCustomAssignment.setModeActive(false);
+    }
+
+    // Tự động điền hạn chót tối nay
     const tonight = new Date();
     tonight.setHours(22, 0, 0, 0);
     const tzOffset = tonight.getTimezoneOffset() * 60000;
@@ -1373,6 +1837,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   formCreateAssignment.addEventListener('submit', async function (e) {
     e.preventDefault();
     const assignmentType = assignTypeSelect ? assignTypeSelect.value : 'vocabulary';
+    if (assignmentType === 'custom') {
+      // Loại bài tập tự soạn xử lý qua các nút Lưu nháp / Giao ngay của wizard 4 bước
+      return;
+    }
     const title = document.getElementById('assign-title').value.trim();
     const lessonId = assignLessonSelect.value || null;
     const dueDate = assignDueDate.value;

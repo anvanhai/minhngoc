@@ -403,6 +403,77 @@ window.Student = (function () {
     return data;
   }
 
+  // Bài tập tự soạn (Custom Assignments) — toàn bộ đáp án & chấm điểm chạy ở server RPC
+  async function getCustomAssignmentSession(assignmentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('get_custom_assignment_session', {
+      p_assignment_id: assignmentId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function startOrResumeCustomAttempt(assignmentId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('start_or_resume_custom_attempt', {
+      p_assignment_id: assignmentId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function saveCustomAttemptDraft(attemptId, draftAnswers) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('save_custom_attempt_draft', {
+      p_attempt_id: attemptId,
+      p_draft_answers: draftAnswers || {}
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function checkCustomQuestionImmediate(attemptId, questionId, responsePayload) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('check_custom_question_immediate', {
+      p_attempt_id: attemptId,
+      p_question_id: questionId,
+      p_response: responsePayload || {}
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function submitCustomAssignmentAttempt(attemptId, answers = null) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('submit_assignment_attempt', {
+      p_attempt_id: attemptId,
+      p_answers: answers
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getCustomAttemptResult(attemptId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const { data, error } = await db.rpc('get_custom_attempt_result', {
+      p_attempt_id: attemptId
+    });
+    if (error) throw error;
+    return data;
+  }
+
   /**
    * Tải file ghi âm của học sinh lên Supabase Storage bucket 'recordings'
    * @param {Blob} audioBlob
@@ -628,6 +699,94 @@ window.Student = (function () {
   }
 
   /**
+   * Phần A - Kho từ vựng cho học viên: bộ lọc, phân trang server & luyện thêm
+   */
+  async function getStudentVocabFilterOptions() {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_student_vocab_filter_options');
+    if (error) throw error;
+    return data || { today_vn: null, daily_new_limit: 20, daily_new_used: 0, daily_new_remaining: 20, hsk_levels: [], parts_of_speech: [], lessons: [], counts: {} };
+  }
+
+  async function getStudentVocabWarehousePage({
+    hskLevel = null,
+    partOfSpeech = null,
+    lessonId = null,
+    quickFilter = 'all',
+    search = '',
+    sortBy = 'sort_order',
+    page = 1,
+    limit = 30
+  } = {}) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const parsedHsk = (hskLevel && hskLevel !== 'all') ? parseInt(hskLevel, 10) : null;
+    const { data, error } = await db.rpc('get_student_vocab_warehouse_page', {
+      p_hsk_level: Number.isFinite(parsedHsk) ? parsedHsk : null,
+      p_part_of_speech: (partOfSpeech && partOfSpeech !== 'all') ? partOfSpeech : null,
+      p_lesson_id: lessonId || null,
+      p_quick_filter: quickFilter || 'all',
+      p_search: (search || '').trim(),
+      p_sort_by: sortBy || 'sort_order',
+      p_page: Math.max(1, parseInt(page, 10) || 1),
+      p_limit: Math.min(60, Math.max(1, parseInt(limit, 10) || 30))
+    });
+    if (error) throw error;
+    return data || { today_vn: null, page: 1, limit: 30, total: 0, total_pages: 1, items: [] };
+  }
+
+  async function getStudentVocabFilteredIds({
+    hskLevel = null,
+    partOfSpeech = null,
+    lessonId = null,
+    quickFilter = 'all',
+    search = '',
+    sortBy = 'sort_order',
+    maxSelect = 100
+  } = {}) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+
+    const parsedHsk = (hskLevel && hskLevel !== 'all') ? parseInt(hskLevel, 10) : null;
+    const { data, error } = await db.rpc('get_student_vocab_filtered_ids', {
+      p_hsk_level: Number.isFinite(parsedHsk) ? parsedHsk : null,
+      p_part_of_speech: (partOfSpeech && partOfSpeech !== 'all') ? partOfSpeech : null,
+      p_lesson_id: lessonId || null,
+      p_quick_filter: quickFilter || 'all',
+      p_search: (search || '').trim(),
+      p_sort_by: sortBy || 'sort_order',
+      p_max_select: Math.min(100, Math.max(1, parseInt(maxSelect, 10) || 100))
+    });
+    if (error) throw error;
+    return data || { total_matched: 0, cap: 100, ids: [] };
+  }
+
+  async function getStudentVocabPracticeBatch(vocabIds = []) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const cleanIds = Array.from(new Set((Array.isArray(vocabIds) ? vocabIds : []).filter(Boolean))).slice(0, 100);
+    const { data, error } = await db.rpc('get_student_vocab_practice_batch', {
+      p_vocab_ids: cleanIds
+    });
+    if (error) throw error;
+    return data || { today_vn: null, daily_new_limit: 20, daily_new_used: 0, daily_new_remaining: 20, cards: [], distractor_pool: [] };
+  }
+
+  async function submitExtraPracticeNewWord(vocabId, level = 2, classId = null) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('submit_extra_practice_new_word', {
+      p_vocab_id: vocabId,
+      p_level: level,
+      p_class_id: classId || null
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
    * Lấy tóm tắt từ cần ôn tập hôm nay (gộp từ bài học + thẻ Tự học, tính theo ngày VN)
    */
   async function getSrsDueSummary(classId = null) {
@@ -823,14 +982,47 @@ window.Student = (function () {
       const totalDue = Number(summary && summary.total_due ? summary.total_due : 0);
       updateNavbarDueBadge(totalDue);
 
-      if (showToast && summary && summary.today_vn) {
-        maybeShowDailyReviewBanner(currentUser.user.id, summary.today_vn, totalDue);
-      }
-      return summary;
-    } catch (e) {
-      console.warn('Chưa tải được thống kê ôn tập SRS trên menu:', e);
-      return null;
+    if (showToast && summary && summary.today_vn) {
+      maybeShowDailyReviewBanner(currentUser.user.id, summary.today_vn, totalDue);
     }
+    return summary;
+  } catch (e) {
+    console.warn('Chưa tải được thống kê ôn tập SRS trên menu:', e);
+    return null;
+  }
+}
+
+  // ===========================================================================
+  // THỐNG KÊ THỜI GIAN HỌC THỰC TẾ (PHẦN B)
+  // ===========================================================================
+
+  async function logStudyTime(sessionId, activityType) {
+    const db = getDb();
+    if (!db) return null;
+    const { data, error } = await db.rpc('log_study_time', {
+      p_session_id: sessionId,
+      p_activity: activityType
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getStudentStudyTimeSummary() {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_student_study_time_summary');
+    if (error) throw error;
+    return data;
+  }
+
+  async function dismissWeeklyStudyRecap(weekStart = null) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('dismiss_weekly_study_recap', {
+      p_week_start: weekStart || null
+    });
+    if (error) throw error;
+    return data;
   }
 
   return {
@@ -844,6 +1036,12 @@ window.Student = (function () {
     getLessonAssignments,
     completeAssignment,
     submitListeningAssignment,
+    getCustomAssignmentSession,
+    startOrResumeCustomAttempt,
+    saveCustomAttemptDraft,
+    checkCustomQuestionImmediate,
+    submitCustomAssignmentAttempt,
+    getCustomAttemptResult,
     uploadRecordingAudio,
     submitSpeakingAssignment,
     getSubmissionRecordings,
@@ -861,6 +1059,16 @@ window.Student = (function () {
     getStudentSelfStudyDecks,
     getStudentSelfStudyDeckCards,
     submitSelfStudyCard,
+    // Kho từ vựng & Luyện thêm (Phần A)
+    getStudentVocabFilterOptions,
+    getStudentVocabWarehousePage,
+    getStudentVocabFilteredIds,
+    getStudentVocabPracticeBatch,
+    submitExtraPracticeNewWord,
+    // Thống kê thời gian học (Phần B)
+    logStudyTime,
+    getStudentStudyTimeSummary,
+    dismissWeeklyStudyRecap,
     updateNavbarDueBadge,
     initReviewNavAndReminder
   };

@@ -48,6 +48,192 @@ document.addEventListener('DOMContentLoaded', async function () {
       .replace(/'/g, '&#39;');
   }
 
+  function formatStudyMinutesOnly(totalSeconds) {
+    const sec = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    if (sec === 0) return '0 phút';
+    if (sec < 60) return `${sec} giây`;
+    return `${Math.round(sec / 60)} phút`;
+  }
+
+  function formatStudyHoursMinutes(totalSeconds) {
+    const sec = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    if (sec === 0) return '0 giờ 0 phút';
+    if (sec < 30) return `< 1 phút (${sec} giây)`;
+    const minsTotal = Math.round(sec / 60);
+    const hrs = Math.floor(minsTotal / 60);
+    const mins = minsTotal % 60;
+    return `${hrs} giờ ${mins} phút`;
+  }
+
+  function formatVnShortDay(isoDate) {
+    if (!isoDate || typeof isoDate !== 'string') return '';
+    const parts = isoDate.split('-');
+    if (parts.length !== 3) return isoDate;
+    return `${parts[2]}/${parts[1]}`;
+  }
+
+  let lastStudyRefreshAt = 0;
+
+  function renderWeeklyRecapCard(summary) {
+    const recapEl = document.getElementById('study-weekly-recap-card');
+    if (!recapEl) return;
+
+    const recap = summary && summary.weekly_recap ? summary.weekly_recap : null;
+    if (!recap || !recap.should_show) {
+      recapEl.style.display = 'none';
+      recapEl.innerHTML = '';
+      return;
+    }
+
+    const totalSec = Number(recap.total_seconds || 0);
+    const activeDays = Number(recap.active_days || 0);
+    const hasPrevWeek = Boolean(recap.has_prev_week_data);
+    const diffMinutes = Math.round((Number(recap.diff_seconds || 0)) / 60);
+
+    let compareHtml = '';
+    if (!hasPrevWeek) {
+      compareHtml = '<span class="st-recap-compare is-neutral">🌟 Tuần đầu tiên ghi nhận dữ liệu học tập</span>';
+    } else if (diffMinutes > 0) {
+      compareHtml = `<span class="st-recap-compare is-up">📈 Tăng ${diffMinutes} phút so với tuần trước nữa</span>`;
+    } else if (diffMinutes < 0) {
+      compareHtml = `<span class="st-recap-compare is-down">📉 Giảm ${Math.abs(diffMinutes)} phút so với tuần trước nữa</span>`;
+    } else {
+      compareHtml = '<span class="st-recap-compare is-neutral">➖ Tương đương tuần trước nữa</span>';
+    }
+
+    const rangeLabel = (recap.week_start && recap.week_end)
+      ? `${formatVnShortDay(recap.week_start)} – ${formatVnShortDay(recap.week_end)}`
+      : 'Tuần vừa qua';
+
+    recapEl.style.display = 'block';
+    recapEl.innerHTML = `
+      <div class="st-recap-inner">
+        <div class="st-recap-content">
+          <div class="st-recap-top">
+            <span class="st-recap-badge">📊 Tổng kết tuần qua (${escapeDashHtml(rangeLabel)})</span>
+            ${compareHtml}
+          </div>
+          <div class="st-recap-stats">
+            <div>Tổng thời gian học: <strong>${escapeDashHtml(formatStudyHoursMinutes(totalSec))}</strong></div>
+            <div>Số ngày có học: <strong>${activeDays} / 7 ngày</strong></div>
+          </div>
+          <div id="st-recap-alert" class="alert" style="margin-top: 8px; margin-bottom: 0;"></div>
+        </div>
+        <button type="button" id="btn-dismiss-weekly-recap" class="btn btn-outline btn-sm st-recap-close-btn" title="Đóng tổng kết tuần qua">
+          ✕ Đã xem
+        </button>
+      </div>
+    `;
+
+    const dismissBtn = document.getElementById('btn-dismiss-weekly-recap');
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', async () => {
+        const recapAlert = document.getElementById('st-recap-alert');
+        try {
+          dismissBtn.disabled = true;
+          dismissBtn.textContent = 'Đang lưu...';
+          await window.Student.dismissWeeklyStudyRecap(recap.week_start || null);
+          recapEl.style.display = 'none';
+          recapEl.innerHTML = '';
+        } catch (err) {
+          console.error('Lỗi đóng tổng kết đầu tuần:', err);
+          dismissBtn.disabled = false;
+          dismissBtn.textContent = '✕ Đã xem';
+          if (recapAlert) {
+            recapAlert.className = 'alert alert-danger show';
+            recapAlert.textContent = 'Không lưu được trạng thái đã xem. Vui lòng thử lại!';
+          }
+        }
+      });
+    }
+  }
+
+  async function loadDashboardStudyTime() {
+    const bodyEl = document.getElementById('dash-study-time-body');
+    const rangeEl = document.getElementById('dash-study-week-range');
+    lastStudyRefreshAt = Date.now();
+
+    try {
+      const summary = await window.Student.getStudentStudyTimeSummary();
+      renderWeeklyRecapCard(summary);
+
+      if (!bodyEl) return;
+
+      const todaySec = Number(summary && summary.today_seconds ? summary.today_seconds : 0);
+      const thisWeekSec = Number(summary && summary.this_week_seconds ? summary.this_week_seconds : 0);
+      const lastWeekSec = Number(summary && summary.last_week_seconds ? summary.last_week_seconds : 0);
+      const days7 = Array.isArray(summary && summary.days_7) ? summary.days_7 : [];
+
+      if (rangeEl) {
+        if (summary && summary.this_week_start && summary.this_week_end) {
+          rangeEl.textContent = `Tuần này: ${formatVnShortDay(summary.this_week_start)} – ${formatVnShortDay(summary.this_week_end)}`;
+        } else {
+          rangeEl.textContent = 'T2 – CN';
+        }
+      }
+
+      const maxDaySec = days7.reduce((mx, d) => Math.max(mx, Number(d.seconds || 0)), 0);
+      const chartScaleMax = Math.max(maxDaySec, 600); // tối thiểu 10 phút để cột nhỏ không cao kịch trần
+
+      const barsHtml = days7.map(d => {
+        const sec = Number(d.seconds || 0);
+        const mins = Math.round(sec / 60);
+        const isFuture = Boolean(d.is_future);
+        const isToday = Boolean(d.is_today);
+        const heightPct = isFuture ? 8 : (sec > 0 ? Math.max(8, Math.round((sec / chartScaleMax) * 100)) : 5);
+        const topLabel = isFuture ? '--' : (sec > 0 ? (sec < 60 ? `${sec}s` : `${mins}p`) : '0p');
+        const tooltip = isFuture
+          ? `${escapeDashHtml(d.label || '')} (${formatVnShortDay(d.day)}): Chưa tới`
+          : `${escapeDashHtml(d.label || '')} (${formatVnShortDay(d.day)}): ${formatStudyMinutesOnly(sec)}`;
+
+        return `
+          <div class="st-bar-col ${isFuture ? 'is-future' : ''} ${isToday ? 'is-today' : ''}" title="${tooltip}">
+            <div class="st-bar-top-val">${topLabel}</div>
+            <div class="st-bar-track">
+              <div class="st-bar-fill ${sec > 0 && !isFuture ? 'has-data' : ''}" style="height: ${heightPct}%;"></div>
+            </div>
+            <div class="st-bar-day-label">${escapeDashHtml(d.label || '')}</div>
+          </div>
+        `;
+      }).join('');
+
+      bodyEl.innerHTML = `
+        <div class="st-metrics-grid">
+          <div class="st-metric-box is-today">
+            <div class="st-metric-label">Hôm nay</div>
+            <div class="st-metric-value">${escapeDashHtml(formatStudyMinutesOnly(todaySec))}</div>
+          </div>
+          <div class="st-metric-box">
+            <div class="st-metric-label">Tuần này (từ Thứ 2)</div>
+            <div class="st-metric-value">${escapeDashHtml(formatStudyHoursMinutes(thisWeekSec))}</div>
+          </div>
+          <div class="st-metric-box">
+            <div class="st-metric-label">Tuần trước (đã chốt)</div>
+            <div class="st-metric-value">${escapeDashHtml(formatStudyHoursMinutes(lastWeekSec))}</div>
+          </div>
+        </div>
+
+        <div class="st-chart-section">
+          <div class="st-chart-title">Biểu đồ 7 ngày tuần này (Thứ Hai – Chủ nhật)</div>
+          <div class="st-bar-chart" role="img" aria-label="Biểu đồ thời gian học 7 ngày trong tuần">${barsHtml}</div>
+          ${thisWeekSec === 0 ? `<div class="st-chart-empty-hint">Chưa có phút học nào trong tuần này — thời gian được tự động ghi nhận khi bạn vào bài học, ôn tập hoặc làm bài tập.</div>` : ''}
+        </div>
+      `;
+    } catch (err) {
+      console.error('Lỗi tải thống kê thời gian học:', err);
+      if (bodyEl) {
+        bodyEl.innerHTML = `
+          <div class="alert alert-danger show" style="margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span>Không thể tải thống kê thời gian học lúc này.</span>
+            <button type="button" id="btn-retry-study-time" class="btn btn-outline btn-sm">🔄 Thử lại</button>
+          </div>
+        `;
+        const retryBtn = document.getElementById('btn-retry-study-time');
+        if (retryBtn) retryBtn.addEventListener('click', () => loadDashboardStudyTime());
+      }
+    }
+  }
+
   /**
    * Tải danh sách từ cần ôn hôm nay trên Dashboard (gộp mọi bài học + Tự học)
    */
@@ -82,7 +268,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         bodyEl.innerHTML = `
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13.5px; color: var(--text-muted);">
             <span>✅ Không còn từ vựng hay thẻ Tự học nào đến hạn trong ngày hôm nay.</span>
-            <a href="self-study.html" class="btn btn-outline btn-sm">🃏 Học thêm Tự học</a>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <a href="vocab-practice.html" class="btn btn-primary btn-sm">📚 Luyện thêm</a>
+              <a href="self-study.html" class="btn btn-outline btn-sm">🃏 Học thêm Tự học</a>
+            </div>
           </div>
         `;
         return;
@@ -226,7 +415,10 @@ document.addEventListener('DOMContentLoaded', async function () {
       // Học sinh chưa được gán vào lớp nào
       unassignedBox.style.display = 'block';
       assignedBox.style.display = 'none';
-      await window.Student.initReviewNavAndReminder({ showToast: true });
+      await Promise.all([
+        window.Student.initReviewNavAndReminder({ showToast: true }),
+        loadDashboardStudyTime()
+      ]);
       return;
     }
 
@@ -328,6 +520,14 @@ document.addEventListener('DOMContentLoaded', async function () {
           return;
         }
 
+        const esc = (window.CustomAssignmentShared && window.CustomAssignmentShared.escapeHtml)
+          ? window.CustomAssignmentShared.escapeHtml
+          : (s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'));
+
+        if (window.StudentCustomAssignment && typeof window.StudentCustomAssignment.bindGlobalClose === 'function') {
+          window.StudentCustomAssignment.bindGlobalClose();
+        }
+
         assignmentsContainer.innerHTML = assignments.map(a => {
           const type = getEffectiveAssignmentType(a);
           a.effectiveType = type;
@@ -339,13 +539,29 @@ document.addEventListener('DOMContentLoaded', async function () {
             typeBadge = '<span class="badge-status" style="background: rgba(248, 113, 113, 0.18); color: #dc2626;">🎙️ Nói / Ghi âm</span>';
           } else if (type === 'quiz') {
             typeBadge = '<span class="badge-status" style="background: rgba(168, 85, 247, 0.18); color: #9333ea;">📝 Quiz</span>';
+          } else if (type === 'custom') {
+            typeBadge = '<span class="badge-status" style="background: rgba(99, 102, 241, 0.18); color: #6366f1;">🧩 Tự soạn</span>';
           }
 
           let statusBadge = '';
           let actionBtn = '';
           const sub = a.submission;
 
-          if (a.userStatus === 'graded') {
+          if (type === 'custom') {
+            if (a.userStatus === 'graded' || a.userStatus === 'completed') {
+              statusBadge = `<span class="badge-status badge-ongoing">🟢 Đạt: ${sub ? (sub.score ?? 0) : 0}/100</span>`;
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-custom" data-id="${a.id}">Xem kết quả / Làm lại 🧩</button>`;
+            } else if (a.userStatus === 'submitted') {
+              statusBadge = `<span class="badge-status badge-paused">🟡 Đã nộp: ${sub ? (sub.score ?? 0) : 0}/100</span>`;
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-custom" data-id="${a.id}">Xem / Làm lại 🧩</button>`;
+            } else if (a.isPastDue) {
+              statusBadge = '<span class="badge-status badge-completed" style="background: rgba(248, 113, 113, 0.2); color: #dc2626;">🔴 Quá hạn</span>';
+              actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-custom" data-id="${a.id}">Xem thông tin 🧩</button>`;
+            } else {
+              statusBadge = '<span class="badge-status badge-paused" style="background: rgba(148, 163, 184, 0.2); color: var(--text-muted);">⚪ Chưa làm</span>';
+              actionBtn = `<button type="button" class="btn btn-primary btn-sm btn-open-custom" data-id="${a.id}">Làm bài ngay 🧩</button>`;
+            }
+          } else if (a.userStatus === 'graded') {
             statusBadge = `<span class="badge-status badge-ongoing">🟢 Đã chấm: ${sub.score}/100</span>`;
             if (type === 'speaking') {
               actionBtn = `<button type="button" class="btn btn-outline btn-sm btn-open-speaking" data-id="${a.id}">Xem bài nộp 🎙️</button>`;
@@ -398,18 +614,19 @@ document.addEventListener('DOMContentLoaded', async function () {
           return `
             <div class="assignment-card-item" data-id="${a.id}" data-type="${type}" style="background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s;">
               <div style="flex: 1; min-width: 260px;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
                   ${typeBadge}
-                  <span style="font-weight: 700; font-size: 15px; color: var(--text-main);">${a.title}</span>
+                  <span style="font-weight: 700; font-size: 15px; color: var(--text-main);">${esc(a.title)}</span>
                 </div>
                 <div style="font-size: 13px; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap;">
                   <span>⏰ Hạn chót: <strong>${dueFormatted}</strong></span>
                   <span>⚡ Thưởng: <strong style="color: #ca8a04;">+${a.reward_xp || 30} XP</strong></span>
-                  ${a.lesson ? `<span>📖 Bài ${a.lesson.order_index}: ${a.lesson.title_zh}</span>` : ''}
+                  ${type === 'custom' ? `<span>❓ ${a.total_questions || 0} câu (${a.total_points || 0}đ)</span>` : ''}
+                  ${a.lesson ? `<span>📖 Bài ${a.lesson.order_index}: ${esc(a.lesson.title_zh)}</span>` : ''}
                 </div>
                 ${sub && sub.teacher_comment ? `
                   <div style="font-size: 12px; color: var(--primary); margin-top: 6px; background: var(--bg-subtle); padding: 4px 10px; border-radius: 4px; display: inline-block;">
-                    💬 Nhận xét của cô giáo: "${sub.teacher_comment}"
+                    💬 Nhận xét của cô giáo: "${esc(sub.teacher_comment)}"
                   </div>
                 ` : ''}
               </div>
@@ -421,6 +638,16 @@ document.addEventListener('DOMContentLoaded', async function () {
           `;
         }).join('');
 
+        const openCustomHandler = (assignObj) => {
+          if (!assignObj || !window.StudentCustomAssignment) return;
+          window.StudentCustomAssignment.openAssignmentModal(assignObj.id, {
+            onSubmitted: async () => {
+              await loadDashboardAssignments();
+              await refreshDashboardStats(activeClass.id);
+            }
+          });
+        };
+
         // Bấm vào cả thẻ bài tập để mở hộp thoại chi tiết
         document.querySelectorAll('.assignment-card-item').forEach(card => {
           card.addEventListener('click', (e) => {
@@ -431,13 +658,25 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (!assign) return;
 
             const type = assign.effectiveType || assign.assignment_type;
-            if (type === 'speaking') {
+            if (type === 'custom') {
+              openCustomHandler(assign);
+            } else if (type === 'speaking') {
               openSpeakingModal(assign);
             } else if (type === 'listening') {
               openListeningModal(assign);
             } else {
               openAssignmentDetailModal(assign);
             }
+          });
+        });
+
+        // Gắn sự kiện mở bài tập tự soạn
+        document.querySelectorAll('.btn-open-custom').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const assignId = btn.getAttribute('data-id');
+            const assign = assignments.find(x => x.id === assignId);
+            openCustomHandler(assign);
           });
         });
 
@@ -490,8 +729,15 @@ document.addEventListener('DOMContentLoaded', async function () {
       btn.addEventListener('click', () => {
         if (listeningAudioPlayer) listeningAudioPlayer.pause();
         modalListening.classList.remove('active');
+        if (window.StudyTimer) void window.StudyTimer.popActivity({ expectedActivity: 'assignment_listening', flush: true });
       });
     });
+
+    if (listeningAudioPlayer) {
+      listeningAudioPlayer.addEventListener('play', () => {
+        if (window.StudyTimer) window.StudyTimer.markActive();
+      });
+    }
 
     function openListeningModal(assign) {
       currentListeningAssign = assign;
@@ -534,6 +780,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       btnSubmitListening.disabled = false;
       btnSubmitListening.textContent = 'Nộp bài & Chấm điểm';
       modalListening.classList.add('active');
+      if (window.StudyTimer) window.StudyTimer.pushActivity('assignment_listening');
     }
 
     if (btnSubmitListening) {
@@ -566,8 +813,10 @@ document.addEventListener('DOMContentLoaded', async function () {
           `;
 
           if (listeningAudioPlayer) listeningAudioPlayer.pause();
+          if (window.StudyTimer) await window.StudyTimer.popActivity({ expectedActivity: 'assignment_listening', flush: true });
           await loadDashboardAssignments();
           await refreshDashboardStats(activeClass.id);
+          await loadDashboardStudyTime();
           if (res.xp_awarded > 0 && window.XP && typeof window.XP.showXpToast === 'function') {
             window.XP.showXpToast(res.xp_awarded, 'Bài tập Nghe hiểu');
           }
@@ -939,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         stopRecordingCleanup();
         resetRecordingUi();
         modalSpeaking.classList.remove('active');
+        if (window.StudyTimer) void window.StudyTimer.popActivity({ expectedActivity: 'assignment_speaking', flush: true });
       });
     });
 
@@ -1164,10 +1414,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
 
       modalSpeaking.classList.add('active');
+      if (window.StudyTimer) window.StudyTimer.pushActivity('assignment_speaking');
     }
 
     if (btnStartRecord) {
       btnStartRecord.addEventListener('click', async () => {
+        if (window.StudyTimer) window.StudyTimer.markActive();
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
           speakingModalAlert.className = 'alert alert-danger show';
           speakingModalAlert.textContent = 'Trình duyệt của bạn không hỗ trợ ghi âm trực tiếp qua Micro. Vui lòng sử dụng Google Chrome, Microsoft Edge hoặc Safari phiên bản mới nhất.';
@@ -1386,7 +1638,9 @@ document.addEventListener('DOMContentLoaded', async function () {
           await loadDashboardAssignments();
 
           // Cập nhật lại XP, streak, hạng lớp hiển thị trực tiếp trên dashboard
+          if (window.StudyTimer) await window.StudyTimer.popActivity({ expectedActivity: 'assignment_speaking', flush: true });
           await refreshDashboardStats(activeClass.id);
+          await loadDashboardStudyTime();
           if (res && res.xp_awarded > 0 && window.XP && typeof window.XP.showXpToast === 'function') {
             window.XP.showXpToast(res.xp_awarded, 'Nộp bài ghi âm');
           }
@@ -1414,20 +1668,36 @@ document.addEventListener('DOMContentLoaded', async function () {
       });
     }
 
-    // Tải lịch ôn SRS hôm nay và danh sách bài tập lần đầu
+    if (window.StudyTimer) {
+      window.StudyTimer.onUpdate(() => {
+        loadDashboardStudyTime();
+      });
+    }
+
+    // Tải lịch ôn SRS hôm nay, thống kê thời gian học và danh sách bài tập lần đầu
     await Promise.all([
       loadDashboardSrsReview(activeClass.id),
+      loadDashboardStudyTime(),
       loadDashboardAssignments()
     ]);
 
     // 5. Lấy thứ hạng thật, XP và chuỗi ngày mới nhất của học sinh trong lớp
     await refreshDashboardStats(activeClass.id);
 
-    // Tự động đồng bộ lại khi học viên quay lại từ trang lesson.html / review.html (bfcache)
+    // Tự động đồng bộ lại khi học viên quay lại từ trang lesson.html / review.html (bfcache hoặc đổi tab)
     window.addEventListener('pageshow', (e) => {
       if (e.persisted && currentActiveClassId) {
         refreshDashboardStats(currentActiveClassId);
         loadDashboardSrsReview(currentActiveClassId);
+      }
+      if (Date.now() - lastStudyRefreshAt > 4000) {
+        loadDashboardStudyTime();
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastStudyRefreshAt > 5000) {
+        loadDashboardStudyTime();
       }
     });
 
