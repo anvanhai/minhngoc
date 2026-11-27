@@ -36,6 +36,144 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   let currentActiveClassId = null;
 
+  function escapeDashHtml(str) {
+    if (str === null || str === undefined) return '';
+    const s = String(str);
+    if (s === 'null' || s === 'undefined') return '';
+    return s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
+   * Tải danh sách từ cần ôn hôm nay trên Dashboard (gộp mọi bài học + Tự học)
+   */
+  async function loadDashboardSrsReview(classId = currentActiveClassId) {
+    const headingEl = document.getElementById('dash-due-heading');
+    const subtitleEl = document.getElementById('dash-due-subtitle');
+    const bodyEl = document.getElementById('dash-due-body');
+    const btnStart = document.getElementById('btn-start-srs-review');
+    const btnToggleAll = document.getElementById('btn-toggle-all-due-groups');
+    if (!headingEl || !subtitleEl || !bodyEl) return;
+
+    subtitleEl.textContent = 'Đang kiểm tra lịch ôn tập hôm nay...';
+    bodyEl.innerHTML = '';
+    if (btnStart) btnStart.style.display = 'none';
+    if (btnToggleAll) btnToggleAll.style.display = 'none';
+
+    try {
+      const summary = await window.Student.getSrsDueSummary(classId);
+      const totalDue = Number(summary && summary.total_due ? summary.total_due : 0);
+      const lessonDue = Number(summary && summary.lesson_due_count ? summary.lesson_due_count : 0);
+      const selfDue = Number(summary && summary.self_study_due_count ? summary.self_study_due_count : 0);
+      const groups = Array.isArray(summary && summary.groups) ? summary.groups : [];
+      const upcoming = (summary && summary.upcoming) ? summary.upcoming : {};
+      const tomorrowCount = Number(upcoming.tomorrow_count || 0);
+      const in3DaysCount = Number(upcoming.in_3_days_count || 0);
+
+      await window.Student.initReviewNavAndReminder({ dueSummary: summary, showToast: true, classId });
+
+      if (totalDue === 0) {
+        headingEl.innerHTML = '🎉 Bạn đã ôn xong hôm nay!';
+        subtitleEl.innerHTML = `Lịch sắp tới: Ngày mai <strong>${tomorrowCount}</strong> từ · 3 ngày nữa <strong>${in3DaysCount}</strong> từ.`;
+        bodyEl.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 13.5px; color: var(--text-muted);">
+            <span>✅ Không còn từ vựng hay thẻ Tự học nào đến hạn trong ngày hôm nay.</span>
+            <a href="self-study.html" class="btn btn-outline btn-sm">🃏 Học thêm Tự học</a>
+          </div>
+        `;
+        return;
+      }
+
+      const parts = [];
+      if (lessonDue > 0) parts.push(`${lessonDue} từ bài học`);
+      if (selfDue > 0) parts.push(`${selfDue} thẻ Tự học`);
+      const batchNote = totalDue > 50 ? ' · Mỗi phiên ôn tối đa 50 từ' : '';
+
+      headingEl.innerHTML = `🧠 Hôm nay cần ôn: <span id="dash-due-count" style="color: var(--primary);">${totalDue}</span> từ`;
+      subtitleEl.textContent = `Bao gồm: ${parts.join(' + ')}${batchNote}.`;
+
+      if (btnStart) {
+        btnStart.style.display = 'inline-flex';
+        btnStart.textContent = totalDue > 50 ? '🧠 Bắt đầu ôn (50 từ)' : '🧠 Bắt đầu ôn';
+      }
+
+      if (groups.length > 1 && btnToggleAll) {
+        btnToggleAll.style.display = 'inline-flex';
+        btnToggleAll.textContent = 'Thu gọn tất cả';
+      }
+
+      bodyEl.innerHTML = `<div style="display: flex; flex-direction: column; gap: 10px;">${
+        groups.map(g => {
+          const words = Array.isArray(g.words) ? g.words : [];
+          const wordsHtml = words.map(w => {
+            const overdue = Number(w.overdue_days || 0);
+            const overdueTag = overdue > 0
+              ? `<span style="font-size: 11px; color: var(--danger); font-weight: 700;">Trễ ${overdue}d</span>`
+              : '';
+            const pinyin = escapeDashHtml(w.pinyin || '');
+            return `<span class="srs-word-pill"><strong>${escapeDashHtml(w.hanzi)}</strong>${pinyin ? `<span style="color: var(--text-muted); font-size: 12px;">${pinyin}</span>` : ''}${overdueTag}</span>`;
+          }).join('');
+
+          const icon = g.is_self_study ? '🃏' : '📖';
+          return `
+            <div class="srs-due-group">
+              <button type="button" class="srs-due-group-header">
+                <span>${icon} ${escapeDashHtml(g.group_title)} <span style="color: var(--primary); font-weight: 800;">(${Number(g.word_count || words.length)} từ)</span></span>
+                <span class="srs-due-toggle-chevron" style="font-size: 12px; color: var(--text-muted);">▾ Thu gọn</span>
+              </button>
+              <div class="srs-due-group-words">${wordsHtml}</div>
+            </div>
+          `;
+        }).join('')
+      }</div>`;
+
+      bodyEl.querySelectorAll('.srs-due-group-header').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const groupEl = btn.closest('.srs-due-group');
+          if (!groupEl) return;
+          groupEl.classList.toggle('collapsed');
+          const chev = btn.querySelector('.srs-due-toggle-chevron');
+          if (chev) {
+            chev.textContent = groupEl.classList.contains('collapsed') ? '▸ Mở rộng' : '▾ Thu gọn';
+          }
+        });
+      });
+
+      if (btnToggleAll) {
+        btnToggleAll.onclick = () => {
+          const allGroups = bodyEl.querySelectorAll('.srs-due-group');
+          const anyExpanded = Array.from(allGroups).some(el => !el.classList.contains('collapsed'));
+          allGroups.forEach(el => {
+            if (anyExpanded) el.classList.add('collapsed');
+            else el.classList.remove('collapsed');
+            const chev = el.querySelector('.srs-due-toggle-chevron');
+            if (chev) chev.textContent = anyExpanded ? '▸ Mở rộng' : '▾ Thu gọn';
+          });
+          btnToggleAll.textContent = anyExpanded ? 'Mở rộng tất cả' : 'Thu gọn tất cả';
+        };
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách từ cần ôn trên Dashboard:', err);
+      headingEl.textContent = '🧠 Ôn tập hôm nay';
+      subtitleEl.textContent = 'Không thể tải danh sách từ cần ôn lúc này.';
+      const errMsg = (window.XP && typeof window.XP.formatDbError === 'function')
+        ? window.XP.formatDbError(err, 'Không thể kết nối máy chủ để tải lịch ôn.')
+        : (err && err.message ? err.message : 'Lỗi kết nối.');
+      bodyEl.innerHTML = `
+        <div class="alert alert-danger show" style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 0;">
+          <span>${escapeDashHtml(errMsg)}</span>
+          <button type="button" id="btn-retry-dash-srs" class="btn btn-secondary btn-sm">🔄 Thử lại</button>
+        </div>
+      `;
+      const btnRetry = document.getElementById('btn-retry-dash-srs');
+      if (btnRetry) btnRetry.addEventListener('click', () => loadDashboardSrsReview(classId));
+    }
+  }
+
   /**
    * Nạp lại số XP, chuỗi ngày học (streak) và hạng trong lớp mà không cần tải lại trang
    */
@@ -88,6 +226,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       // Học sinh chưa được gán vào lớp nào
       unassignedBox.style.display = 'block';
       assignedBox.style.display = 'none';
+      await window.Student.initReviewNavAndReminder({ showToast: true });
       return;
     }
 
@@ -1275,16 +1414,20 @@ document.addEventListener('DOMContentLoaded', async function () {
       });
     }
 
-    // Tải danh sách bài tập lần đầu
-    await loadDashboardAssignments();
+    // Tải lịch ôn SRS hôm nay và danh sách bài tập lần đầu
+    await Promise.all([
+      loadDashboardSrsReview(activeClass.id),
+      loadDashboardAssignments()
+    ]);
 
     // 5. Lấy thứ hạng thật, XP và chuỗi ngày mới nhất của học sinh trong lớp
     await refreshDashboardStats(activeClass.id);
 
-    // Tự động đồng bộ lại khi học viên quay lại từ trang lesson.html (bfcache)
+    // Tự động đồng bộ lại khi học viên quay lại từ trang lesson.html / review.html (bfcache)
     window.addEventListener('pageshow', (e) => {
       if (e.persisted && currentActiveClassId) {
         refreshDashboardStats(currentActiveClassId);
+        loadDashboardSrsReview(currentActiveClassId);
       }
     });
 

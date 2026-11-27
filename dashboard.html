@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Bàn học của tôi — Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="css/style.css?v=3.0">
+  <link rel="stylesheet" href="css/style.css?v=6.0">
   <script>
     (function(){
       try {
@@ -114,6 +114,8 @@
       <ul class="nav-menu">
         <li class="nav-item active"><a href="dashboard.html">🏠 Trang chủ</a></li>
         <li class="nav-item"><a href="curriculum.html">📖 Giáo trình</a></li>
+        <li class="nav-item"><a href="review.html">🧠 Ôn tập <span class="nav-due-badge">0</span></a></li>
+        <li class="nav-item"><a href="self-study.html">🃏 Tự học</a></li>
         <li class="nav-item"><a href="leaderboard.html">🏆 Bảng xếp hạng</a></li>
       </ul>
 
@@ -224,6 +226,23 @@
             <div id="dash-xp" class="stat-widget-value">0 XP</div>
           </div>
         </div>
+      </div>
+
+      <!-- Card ÔN TẬP HÔM NAY (SRS) -->
+      <div id="srs-review-dashboard-card" class="card" style="box-shadow: var(--shadow-md); border-left: 4px solid var(--primary); margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 id="dash-due-heading" class="card-title" style="margin-bottom: 2px;">🧠 Hôm nay cần ôn: <span id="dash-due-count">--</span> từ</h3>
+            <p id="dash-due-subtitle" style="font-size: 13px; color: var(--text-muted);">
+              Đang kiểm tra lịch ôn tập theo đường cong quên lãng...
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <button type="button" id="btn-toggle-all-due-groups" class="btn btn-outline btn-sm" style="display: none;">Thu gọn tất cả</button>
+            <a id="btn-start-srs-review" href="review.html" class="btn btn-primary" style="display: none;">🧠 Bắt đầu ôn</a>
+          </div>
+        </div>
+        <div id="dash-due-body" style="margin-top: 12px;"></div>
       </div>
 
       <!-- Card TIẾP TỤC HỌC NGAY -->
@@ -497,8 +516,8 @@
   <script src="js/db.js?v=5.0"></script>
   <script src="js/auth.js?v=5.0"></script>
   <script src="js/xp.js?v=5.0"></script>
-  <script src="js/student.js?v=5.0"></script>
+  <script src="js/student.js?v=6.0"></script>
   <script src="js/feedback-popup.js?v=5.0"></script>
-  <script src="js/dashboard.js?v=5.0"></script>
+  <script src="js/dashboard.js?v=6.0"></script>
 </body>
 </html>

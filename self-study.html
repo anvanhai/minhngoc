@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Tự Học (Flashcard Lớp) — Minh Ngọc HSK</title>
+  <link rel="stylesheet" href="css/style.css?v=6.0">
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('minhngoc_theme') ||
+                sessionStorage.getItem('minhngoc_theme') ||
+                (document.cookie.match(/(?:^|; )minhngoc_theme=(dark|light)/) || [])[1] ||
+                (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        if (document.body) {
+          document.body.setAttribute('data-theme', t);
+          document.body.style.colorScheme = t;
+        }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="js/theme.js?v=6.0"></script>
+  <style>
+    .theme-switch, .theme-toggle-btn {
+      -webkit-appearance: none !important; appearance: none !important;
+      position: relative !important; display: inline-flex !important; align-items: center !important;
+      width: 58px !important; height: 30px !important; padding: 0 !important; margin: 0 !important;
+      border: 1.5px solid var(--border-color, #cbd5e1) !important; border-radius: 999px !important;
+      background: var(--bg-subtle, #f1f5f9) !important; cursor: pointer !important;
+      outline: none !important; user-select: none !important; flex-shrink: 0 !important;
+      box-sizing: border-box !important; overflow: hidden !important;
+    }
+    .theme-switch-track {
+      position: relative !important; width: 100% !important; height: 100% !important;
+      display: flex !important; align-items: center !important; justify-content: space-between !important;
+      padding: 0 6px !important; pointer-events: none !important;
+    }
+    .theme-switch-icon { font-size: 13px !important; line-height: 1 !important; z-index: 1 !important; pointer-events: none !important; }
+    .theme-switch-icon.sun-icon { opacity: 1 !important; }
+    .theme-switch-icon.moon-icon { opacity: 0.35 !important; }
+    .theme-switch-thumb {
+      position: absolute !important; top: 2px !important; left: 2px !important;
+      width: 22px !important; height: 22px !important; border-radius: 50% !important;
+      background: #ffffff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+      transition: transform 0.25s cubic-bezier(0.4,0,0.2,1) !important; z-index: 2 !important;
+    }
+    html[data-theme="dark"] { color-scheme: dark !important; background-color: #0b0f19 !important; color: #f8fafc !important; }
+    html[data-theme="light"] { color-scheme: light !important; }
+    html[data-theme="dark"] .theme-switch, body[data-theme="dark"] .theme-switch, .theme-switch.is-dark {
+      background: #1e293b !important; border-color: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-thumb, body[data-theme="dark"] .theme-switch-thumb, .theme-switch.is-dark .theme-switch-thumb {
+      transform: translateX(28px) !important; background: #f87171 !important;
+    }
+    html[data-theme="dark"] .theme-switch-icon.sun-icon { opacity: 0.35 !important; }
+    html[data-theme="dark"] .theme-switch-icon.moon-icon { opacity: 1 !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Thanh Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="dashboard.html" class="nav-brand">
+        <div class="nav-brand-logo">学</div>
+        <span>Minh Ngọc HSK</span>
+      </a>
+
+      <ul class="nav-menu">
+        <li class="nav-item"><a href="dashboard.html">🏠 Trang chủ</a></li>
+        <li class="nav-item"><a href="curriculum.html">📖 Giáo trình</a></li>
+        <li class="nav-item"><a href="review.html">🧠 Ôn tập <span class="nav-due-badge">0</span></a></li>
+        <li class="nav-item active"><a href="self-study.html">🃏 Tự học</a></li>
+        <li class="nav-item"><a href="leaderboard.html">🏆 Bảng xếp hạng</a></li>
+      </ul>
+
+      <div class="nav-user">
+        <button type="button" class="theme-switch" id="theme-toggle" aria-label="Chuyển chế độ Sáng / Tối" title="Chuyển chế độ Sáng / Tối" onclick="window.toggleTheme && window.toggleTheme(event)">
+          <span class="theme-switch-track">
+            <span class="theme-switch-icon sun-icon">☀️</span>
+            <span class="theme-switch-icon moon-icon">🌙</span>
+            <span class="theme-switch-thumb"></span>
+          </span>
+        </button>
+        <span class="user-display-name" style="font-weight: 600;">Đang tải...</span>
+        <span class="user-role-badge role-student">Học sinh</span>
+        <button type="button" class="btn btn-outline btn-logout" style="height: 36px; padding: 0 12px; font-size: 13px;">
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-wrapper" style="padding-top: 20px;">
+    <!-- CHẾ ĐỘ 1: DANH SÁCH BỘ THẺ TỰ HỌC CỦA LỚP -->
+    <div id="decks-list-view">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+        <div>
+          <h1 style="font-size: 22px; font-weight: 800; color: var(--text-main);">🃏 Tự học Flashcard của lớp</h1>
+          <p style="font-size: 14px; color: var(--text-muted); margin-top: 2px;">
+            Các bộ thẻ bổ sung do giáo viên biên soạn riêng cho lớp của bạn. Thẻ học xong sẽ tự động vào lịch ôn tập hàng ngày.
+          </p>
+        </div>
+        <button type="button" id="btn-refresh-self-study" class="btn btn-outline btn-sm">🔄 Làm mới</button>
+      </div>
+
+      <div id="decks-alert" class="alert"></div>
+
+      <div id="decks-loading" class="card" style="text-align: center; padding: 44px 20px;">
+        <div style="font-size: 36px; margin-bottom: 10px;">⏳</div>
+        <div style="font-size: 14px; font-weight: 600; color: var(--text-muted);">Đang tải danh sách bộ thẻ Tự học...</div>
+      </div>
+
+      <div id="decks-error" class="card" style="display: none; text-align: center; padding: 38px 20px;">
+        <div style="font-size: 36px; margin-bottom: 8px;">⚠️</div>
+        <div id="decks-error-msg" style="font-size: 14px; color: var(--danger); margin-bottom: 14px;">Không tải được danh sách bộ thẻ.</div>
+        <button type="button" id="btn-retry-decks" class="btn btn-primary">🔄 Thử lại</button>
+      </div>
+
+      <div id="decks-empty" class="card" style="display: none; text-align: center; padding: 44px 20px;">
+        <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">Chưa có bộ thẻ Tự học nào</h3>
+        <p style="font-size: 14px; color: var(--text-muted);">
+          Giáo viên hiện chưa mở bộ thẻ Tự học nào cho lớp của bạn. Hãy quay lại sau nhé!
+        </p>
+      </div>
+
+      <div id="decks-grid" class="self-study-deck-grid" style="display: none;"></div>
+    </div>
+
+    <!-- CHẾ ĐỘ 2: HỌC FLASHCARD TRONG MỘT BỘ THẺ -->
+    <div id="deck-study-view" class="lesson-studio-container" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+        <button type="button" id="btn-back-to-decks" class="btn btn-outline btn-sm">
+          ← Quay lại danh sách bộ thẻ
+        </button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="session-remaining-note" class="srs-stage-pill" style="display: none;"></span>
+          <span id="session-counter" style="font-size: 14px; font-weight: 800; color: var(--primary);">0/0</span>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-bottom: 16px;">
+        <h2 id="study-deck-title" style="font-size: 20px; font-weight: 800; color: var(--text-main);">Bộ thẻ Tự học</h2>
+        <p id="study-deck-desc" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;"></p>
+      </div>
+
+      <div id="session-alert" class="alert"></div>
+
+      <div id="study-cards-loading" class="card" style="text-align: center; padding: 44px 20px; display: none;">
+        <div style="font-size: 36px; margin-bottom: 10px;">⏳</div>
+        <div style="font-size: 14px; color: var(--text-muted);">Đang tải thẻ học...</div>
+      </div>
+
+      <div id="study-cards-error" class="card" style="display: none; text-align: center; padding: 36px 20px;">
+        <div id="study-cards-error-msg" style="font-size: 14px; color: var(--danger); margin-bottom: 14px;">Không tải được thẻ.</div>
+        <button type="button" id="btn-retry-study-cards" class="btn btn-primary">🔄 Thử lại</button>
+      </div>
+
+      <div id="fc-playing-area" style="display: none;">
+        <div id="flashcard-card" class="flashcard-wrapper">
+          <div class="flashcard-inner">
+            <div class="flashcard-face flashcard-front">
+              <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+                <span id="fc-source-badge" class="srs-source-badge srs-self-study-badge">🃏 Tự học</span>
+                <span id="fc-stage-badge" class="srs-stage-pill" style="display: none;"></span>
+              </div>
+              <div id="fc-front-hanzi" style="font-size: 64px; font-weight: 800; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">
+                字
+              </div>
+              <button type="button" id="btn-fc-speak" class="btn btn-outline btn-sm" style="margin-top: 14px; border-radius: var(--radius-full);">
+                🔊 Nghe phát âm
+              </button>
+              <div class="flashcard-hint">
+                💡 Chạm vào thẻ hoặc bấm nút dưới để lật xem đáp án
+              </div>
+            </div>
+
+            <div class="flashcard-face flashcard-back">
+              <span style="font-size: 11.5px; font-weight: 700; color: var(--primary); margin-bottom: 6px; text-transform: uppercase;">
+                Đáp án &amp; Ý nghĩa
+              </span>
+              <div id="fc-back-pinyin" style="font-size: 24px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;"></div>
+              <div id="fc-back-meaning" style="font-size: 20px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;"></div>
+              <div id="fc-back-pos" class="vocab-pos-badge" style="display: none; margin-bottom: 8px; font-size: 11px;"></div>
+              <div id="fc-back-example" style="display: none; font-size: 13px; color: var(--text-muted); background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); width: 100%; text-align: left; margin-bottom: 6px;"></div>
+              <div id="fc-back-note" style="display: none; font-size: 12.5px; color: var(--warning); background: var(--warning-bg); border: 1px solid var(--warning-border); padding: 8px 10px; border-radius: var(--radius-sm); width: 100%; text-align: left;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="fc-flip-prompt" style="text-align: center; margin-bottom: 16px;">
+          <button type="button" id="btn-flip-card" class="btn btn-secondary btn-block">
+            🔄 Chạm để Lật Thẻ
+          </button>
+        </div>
+
+        <div id="fc-srs-actions" class="srs-actions-grid" style="display: none;">
+          <button type="button" class="btn-srs btn-srs-hard" data-srs="1">
+            <span>🔴 Quên</span>
+            <small>Chưa nhớ · Hẹn 1 ngày</small>
+          </button>
+          <button type="button" class="btn-srs btn-srs-medium" data-srs="2">
+            <span>🟡 Tạm nhớ</span>
+            <small>Nhớ mang máng</small>
+          </button>
+          <button type="button" class="btn-srs btn-srs-easy" data-srs="3">
+            <span>🟢 Đã thuộc</span>
+            <small>Nhớ rõ</small>
+          </button>
+        </div>
+      </div>
+
+      <div id="fc-summary-area" style="display: none;"></div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    Minh Ngọc HSK &copy; 2026 · Hệ thống học tiếng Trung thông minh
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.0/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js?v=6.0"></script>
+  <script src="js/db.js?v=6.0"></script>
+  <script src="js/auth.js?v=6.0"></script>
+  <script src="js/xp.js?v=6.0"></script>
+  <script src="js/student.js?v=6.0"></script>
+  <script src="js/flashcard-session.js?v=6.0"></script>
+  <script src="js/self-study.js?v=6.0"></script>
+</body>
+</html>

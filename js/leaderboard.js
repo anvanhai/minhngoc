@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   const authData = await window.Auth.requireAuth();
   if (!authData) return;
   window.Auth.renderNavbarUserInfo(authData.profile);
+  window.Student.initReviewNavAndReminder({ showToast: true });
 
   const urlParams = new URLSearchParams(window.location.search);
   let classId = urlParams.get('class_id');

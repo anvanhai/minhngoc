@@ -131,6 +131,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     if (targetTabId === 'tab-leaderboard' && typeof loadClassLeaderboardAndAudit === 'function') {
       loadClassLeaderboardAndAudit();
+    } else if (targetTabId === 'tab-self-study' && typeof loadSelfStudyTab === 'function') {
+      loadSelfStudyTab();
     }
   }
 
@@ -220,6 +222,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       if (activeTabId === 'tab-leaderboard' && typeof loadClassLeaderboardAndAudit === 'function') {
         await loadClassLeaderboardAndAudit();
+      } else if (activeTabId === 'tab-self-study' && typeof loadSelfStudyTab === 'function') {
+        await loadSelfStudyTab();
       }
 
       return true;
@@ -2357,6 +2361,666 @@ document.addEventListener('DOMContentLoaded', async function () {
       modalXpAuditDetail.classList.remove('active');
     }
   });
+
+  // ===========================================================================
+  // 11. TAB TỰ HỌC (FLASHCARD RIÊNG CỦA LỚP - GIÁO VIÊN / ADMIN)
+  // ===========================================================================
+  const ssTabAlert = document.getElementById('ss-tab-alert');
+  const ssDecksContainer = document.getElementById('ss-decks-container');
+  const btnOpenSsDeckModal = document.getElementById('btn-open-ss-deck-modal');
+  const btnRefreshSsDecks = document.getElementById('btn-refresh-ss-decks');
+
+  const ssCardsPanel = document.getElementById('ss-cards-panel');
+  const ssSelectedDeckTitle = document.getElementById('ss-selected-deck-title');
+  const ssSelectedDeckMeta = document.getElementById('ss-selected-deck-meta');
+  const ssCardsAlert = document.getElementById('ss-cards-alert');
+  const ssCardsTableBody = document.getElementById('ss-cards-table-body');
+  const btnOpenSsManualCard = document.getElementById('btn-open-ss-manual-card');
+  const btnOpenSsWarehouseModal = document.getElementById('btn-open-ss-warehouse-modal');
+
+  // Modal Bộ thẻ
+  const modalSsDeck = document.getElementById('modal-ss-deck');
+  const ssDeckModalTitle = document.getElementById('ss-deck-modal-title');
+  const formSsDeck = document.getElementById('form-ss-deck');
+  const ssDeckModalAlert = document.getElementById('ss-deck-modal-alert');
+  const ssDeckIdInput = document.getElementById('ss-deck-id');
+  const ssDeckTitleInput = document.getElementById('ss-deck-title');
+  const ssDeckDescInput = document.getElementById('ss-deck-desc');
+  const ssDeckActiveInput = document.getElementById('ss-deck-active');
+  const btnSaveSsDeck = document.getElementById('btn-save-ss-deck');
+
+  // Modal Thẻ Tự nhập
+  const modalSsCard = document.getElementById('modal-ss-card');
+  const ssCardModalTitle = document.getElementById('ss-card-modal-title');
+  const formSsCard = document.getElementById('form-ss-card');
+  const ssCardModalAlert = document.getElementById('ss-card-modal-alert');
+  const ssCardIdInput = document.getElementById('ss-card-id');
+  const ssCardHanziInput = document.getElementById('ss-card-hanzi');
+  const ssCardPinyinInput = document.getElementById('ss-card-pinyin');
+  const ssCardMeaningInput = document.getElementById('ss-card-meaning');
+  const ssCardExHanziInput = document.getElementById('ss-card-ex-hanzi');
+  const ssCardExPinyinInput = document.getElementById('ss-card-ex-pinyin');
+  const ssCardExViInput = document.getElementById('ss-card-ex-vi');
+  const ssCardNoteInput = document.getElementById('ss-card-note');
+  const btnSaveSsCard = document.getElementById('btn-save-ss-card');
+
+  // Modal Chọn từ Kho từ vựng (Phân trang phía server + lọc HSK + sort_order Excel)
+  const modalSsWh = document.getElementById('modal-ss-warehouse-vocab');
+  const ssWhAlert = document.getElementById('ss-wh-alert');
+  const ssWhSearchInput = document.getElementById('ss-wh-search');
+  const ssWhHskSelect = document.getElementById('ss-wh-hsk');
+  const ssWhSortSelect = document.getElementById('ss-wh-sort');
+  const btnSsWhSearch = document.getElementById('btn-ss-wh-search');
+  const btnSsWhSelectPage = document.getElementById('btn-ss-wh-select-page');
+  const btnSsWhClearAll = document.getElementById('btn-ss-wh-clear-all');
+  const ssWhSelectedInfo = document.getElementById('ss-wh-selected-info');
+  const chkSsWhPageAll = document.getElementById('chk-ss-wh-page-all');
+  const ssWhTableBody = document.getElementById('ss-wh-table-body');
+  const ssWhPageInfo = document.getElementById('ss-wh-page-info');
+  const btnSsWhPrev = document.getElementById('btn-ss-wh-prev');
+  const btnSsWhNext = document.getElementById('btn-ss-wh-next');
+  const ssWhPageIndicator = document.getElementById('ss-wh-page-indicator');
+  const btnSsWhConfirm = document.getElementById('btn-ss-wh-confirm');
+
+  let ssDecksList = [];
+  let selectedSsDeckId = null;
+  let ssCardsList = [];
+  let isReorderingSsCards = false;
+
+  // State modal kho từ vựng
+  let ssWhPage = 1;
+  const SS_WH_PAGE_SIZE = 30;
+  let ssWhTotalPages = 1;
+  let ssWhCurrentPageRows = [];
+  let ssWhSelectedIds = [];
+  let ssWhDebounceTimer = null;
+
+  function showSsAlert(alertEl, msg, type = 'danger', retryFn = null) {
+    if (!alertEl) return;
+    alertEl.className = `alert alert-${type} show`;
+    alertEl.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = safeStr(msg, 'Đã xảy ra lỗi.');
+    alertEl.appendChild(span);
+    if (typeof retryFn === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-secondary btn-sm';
+      btn.style.cssText = 'margin-left: 10px; height: 28px; padding: 0 10px; font-size: 12px;';
+      btn.textContent = '🔄 Thử lại';
+      btn.addEventListener('click', () => {
+        alertEl.className = 'alert';
+        alertEl.textContent = '';
+        retryFn();
+      });
+      alertEl.appendChild(btn);
+    }
+  }
+
+  function clearSsAlert(alertEl) {
+    if (!alertEl) return;
+    alertEl.className = 'alert';
+    alertEl.textContent = '';
+  }
+
+  async function loadSelfStudyTab() {
+    if (!ssDecksContainer || !classId) return;
+    clearSsAlert(ssTabAlert);
+    ssDecksContainer.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-muted);">⏳ Đang tải danh sách bộ thẻ Tự học...</div>';
+
+    try {
+      ssDecksList = await window.Admin.getClassSelfStudyDecks(classId);
+      if (!ssDecksList || ssDecksList.length === 0) {
+        selectedSsDeckId = null;
+        ssCardsList = [];
+        ssDecksContainer.innerHTML = `
+          <div style="text-align: center; padding: 28px; color: var(--text-muted); background: var(--bg-subtle); border-radius: var(--radius-sm);">
+            Lớp này chưa có bộ thẻ Tự học nào. Hãy bấm <strong>"➕ Tạo bộ thẻ mới"</strong> ở góc trên để thêm bộ thẻ đầu tiên!
+          </div>
+        `;
+        if (ssCardsPanel) ssCardsPanel.style.display = 'none';
+        return;
+      }
+
+      if (!selectedSsDeckId || !ssDecksList.some(d => d.id === selectedSsDeckId)) {
+        selectedSsDeckId = ssDecksList[0].id;
+      }
+
+      renderSsDecksList();
+      await loadSelfStudyCards(selectedSsDeckId);
+    } catch (err) {
+      console.error('Lỗi tải tab Tự học:', err);
+      ssDecksContainer.innerHTML = '';
+      showSsAlert(ssTabAlert, err.message || 'Không thể tải danh sách bộ thẻ Tự học.', 'danger', loadSelfStudyTab);
+    }
+  }
+
+  function renderSsDecksList() {
+    if (!ssDecksContainer) return;
+    ssDecksContainer.innerHTML = ssDecksList.map(d => {
+      const isSelected = d.id === selectedSsDeckId;
+      const isActive = Boolean(d.is_active);
+      const desc = safeStr(d.description);
+      const count = Number(d.card_count || 0);
+      const statusBadge = isActive
+        ? '<span class="badge-status badge-ongoing">🟢 Đang bật</span>'
+        : '<span class="badge-status badge-completed">⚪ Đang tắt</span>';
+
+      return `
+        <div class="ss-deck-row" data-deck-id="${escHtml(d.id)}" style="border: 1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}; background: ${isSelected ? 'var(--primary-light, rgba(248, 113, 113, 0.08))' : 'var(--bg-subtle)'}; border-radius: var(--radius-sm); padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 210px; cursor: pointer;" class="ss-deck-select-area">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <strong style="font-size: 15px; color: var(--text-main);">${escHtml(d.title)}</strong>
+              ${statusBadge}
+              <span style="font-size: 12px; font-weight: 700; color: var(--primary);">${count} thẻ</span>
+            </div>
+            ${desc ? `<div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">${escHtml(desc)}</div>` : ''}
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn ${isSelected ? 'btn-primary' : 'btn-outline'} btn-sm btn-ss-select-deck" data-deck-id="${escHtml(d.id)}">
+              ${isSelected ? '📋 Đang xem thẻ' : '📋 Quản lý thẻ'}
+            </button>
+            <button type="button" class="btn btn-outline btn-sm btn-ss-toggle-deck" data-deck-id="${escHtml(d.id)}">
+              ${isActive ? 'Tắt' : 'Bật'}
+            </button>
+            <button type="button" class="btn btn-outline btn-sm btn-ss-edit-deck" data-deck-id="${escHtml(d.id)}" title="Sửa bộ thẻ">
+              ✏️
+            </button>
+            <button type="button" class="btn btn-outline btn-sm btn-ss-delete-deck" data-deck-id="${escHtml(d.id)}" style="color: var(--danger); border-color: var(--danger-border);" title="Xóa bộ thẻ">
+              🗑️
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    ssDecksContainer.querySelectorAll('.ss-deck-select-area, .btn-ss-select-deck').forEach(el => {
+      el.addEventListener('click', async () => {
+        const row = el.closest('.ss-deck-row');
+        const deckId = el.getAttribute('data-deck-id') || (row ? row.getAttribute('data-deck-id') : null);
+        if (!deckId) return;
+        selectedSsDeckId = deckId;
+        renderSsDecksList();
+        await loadSelfStudyCards(deckId);
+      });
+    });
+
+    ssDecksContainer.querySelectorAll('.btn-ss-toggle-deck').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const deckId = btn.getAttribute('data-deck-id');
+        const deck = ssDecksList.find(x => x.id === deckId);
+        if (!deck) return;
+        btn.disabled = true;
+        clearSsAlert(ssTabAlert);
+        try {
+          await window.Admin.upsertSelfStudyDeck({
+            classId,
+            deckId: deck.id,
+            title: deck.title,
+            description: safeStr(deck.description),
+            isActive: !deck.is_active
+          });
+          await loadSelfStudyTab();
+        } catch (err) {
+          showSsAlert(ssTabAlert, err.message || 'Không thể đổi trạng thái bộ thẻ.');
+          btn.disabled = false;
+        }
+      });
+    });
+
+    ssDecksContainer.querySelectorAll('.btn-ss-edit-deck').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const deckId = btn.getAttribute('data-deck-id');
+        const deck = ssDecksList.find(x => x.id === deckId);
+        if (deck) openSsDeckModal(deck);
+      });
+    });
+
+    ssDecksContainer.querySelectorAll('.btn-ss-delete-deck').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const deckId = btn.getAttribute('data-deck-id');
+        const deck = ssDecksList.find(x => x.id === deckId);
+        if (!deck) return;
+        if (!confirm(`Xóa bộ thẻ "${deck.title}"?\nToàn bộ thẻ bên trong và lịch ôn của các thẻ đó sẽ bị gỡ khỏi danh sách ôn của học viên.`)) {
+          return;
+        }
+        btn.disabled = true;
+        clearSsAlert(ssTabAlert);
+        try {
+          await window.Admin.deleteSelfStudyDeck(deck.id);
+          showSsAlert(ssTabAlert, `Đã xóa bộ thẻ "${deck.title}".`, 'success');
+          if (selectedSsDeckId === deck.id) selectedSsDeckId = null;
+          await loadSelfStudyTab();
+        } catch (err) {
+          showSsAlert(ssTabAlert, err.message || 'Lỗi khi xóa bộ thẻ.');
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function loadSelfStudyCards(deckId) {
+    if (!ssCardsPanel || !ssCardsTableBody || !deckId) return;
+    const deck = ssDecksList.find(d => d.id === deckId);
+    ssCardsPanel.style.display = 'block';
+    clearSsAlert(ssCardsAlert);
+
+    if (ssSelectedDeckTitle) ssSelectedDeckTitle.textContent = deck ? safeStr(deck.title) : 'Bộ thẻ Tự học';
+    if (ssSelectedDeckMeta) {
+      ssSelectedDeckMeta.textContent = deck
+        ? `${deck.is_active ? '🟢 Đang bật' : '⚪ Đang tắt'} · ${safeStr(deck.description) || 'Chưa có mô tả'}`
+        : '--';
+    }
+
+    ssCardsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">⏳ Đang tải danh sách thẻ...</td></tr>';
+
+    try {
+      ssCardsList = await window.Admin.getSelfStudyCards(deckId);
+      const deckIdx = ssDecksList.findIndex(d => d.id === deckId);
+      if (deckIdx >= 0) ssDecksList[deckIdx].card_count = ssCardsList.length;
+
+      if (!ssCardsList || ssCardsList.length === 0) {
+        ssCardsTableBody.innerHTML = `
+          <tr><td colspan="7" style="text-align: center; padding: 28px; color: var(--text-muted);">
+            Bộ thẻ này chưa có thẻ nào. Bạn có thể bấm <strong>"✍️ Tự nhập thẻ mới"</strong> hoặc <strong>"📚 Chọn từ Kho từ vựng"</strong>!
+          </td></tr>
+        `;
+        return;
+      }
+
+      ssCardsTableBody.innerHTML = ssCardsList.map((c, idx) => {
+        const exHanzi = safeStr(c.example_hanzi);
+        const exPinyin = safeStr(c.example_pinyin);
+        const exVi = safeStr(c.example_vi);
+        const note = safeStr(c.note);
+        const fromWhBadge = c.vocabulary_id
+          ? '<span style="font-size: 11px; color: var(--text-muted); display: block;">(Từ kho)</span>'
+          : '';
+
+        const extraLines = [
+          exHanzi ? `<div><strong>VD:</strong> ${escHtml(exHanzi)}</div>` : '',
+          exPinyin ? `<div style="color: var(--text-muted);">${escHtml(exPinyin)}</div>` : '',
+          exVi ? `<div style="color: var(--text-muted);">${escHtml(exVi)}</div>` : '',
+          note ? `<div style="color: var(--warning); margin-top: 2px;">📝 ${escHtml(note)}</div>` : ''
+        ].join('') || '<span style="color: var(--text-light);">--</span>';
+
+        return `
+          <tr>
+            <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+            <td style="font-size: 18px; font-weight: 800; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">
+              ${escHtml(c.hanzi)}${fromWhBadge}
+            </td>
+            <td style="font-weight: 600; color: var(--text-muted);">${escHtml(c.pinyin)}</td>
+            <td style="font-weight: 500;">${escHtml(c.meaning_vi)}</td>
+            <td style="font-size: 12.5px; line-height: 1.45;">${extraLines}</td>
+            <td style="text-align: center; white-space: nowrap;">
+              <button type="button" class="btn btn-outline btn-sm btn-ss-move-up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''} style="padding: 2px 7px;" title="Lên">⬆️</button>
+              <button type="button" class="btn btn-outline btn-sm btn-ss-move-down" data-idx="${idx}" ${idx === ssCardsList.length - 1 ? 'disabled' : ''} style="padding: 2px 7px;" title="Xuống">⬇️</button>
+            </td>
+            <td style="text-align: right; white-space: nowrap;">
+              <button type="button" class="btn btn-outline btn-sm btn-ss-edit-card" data-card-id="${escHtml(c.id)}" title="Sửa thẻ">✏️</button>
+              <button type="button" class="btn btn-outline btn-sm btn-ss-delete-card" data-card-id="${escHtml(c.id)}" style="color: var(--danger); border-color: var(--danger-border);" title="Xóa thẻ">🗑️</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      ssCardsTableBody.querySelectorAll('.btn-ss-move-up').forEach(btn => {
+        btn.addEventListener('click', () => moveSsCardOrder(parseInt(btn.getAttribute('data-idx'), 10), -1));
+      });
+      ssCardsTableBody.querySelectorAll('.btn-ss-move-down').forEach(btn => {
+        btn.addEventListener('click', () => moveSsCardOrder(parseInt(btn.getAttribute('data-idx'), 10), 1));
+      });
+      ssCardsTableBody.querySelectorAll('.btn-ss-edit-card').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cid = btn.getAttribute('data-card-id');
+          const card = ssCardsList.find(x => x.id === cid);
+          if (card) openSsCardModal(card);
+        });
+      });
+      ssCardsTableBody.querySelectorAll('.btn-ss-delete-card').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const cid = btn.getAttribute('data-card-id');
+          const card = ssCardsList.find(x => x.id === cid);
+          if (!card) return;
+          if (!confirm(`Xóa thẻ "${card.hanzi}" khỏi bộ thẻ? Tiến độ ôn của thẻ này cũng sẽ được dọn sạch.`)) return;
+          btn.disabled = true;
+          clearSsAlert(ssCardsAlert);
+          try {
+            await window.Admin.deleteSelfStudyCard(card.id);
+            await loadSelfStudyTab();
+          } catch (err) {
+            showSsAlert(ssCardsAlert, err.message || 'Lỗi xóa thẻ.');
+            btn.disabled = false;
+          }
+        });
+      });
+    } catch (err) {
+      console.error('Lỗi tải danh sách thẻ Tự học:', err);
+      ssCardsTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--danger);">Không thể tải danh sách thẻ.</td></tr>';
+      showSsAlert(ssCardsAlert, err.message || 'Lỗi tải danh sách thẻ.', 'danger', () => loadSelfStudyCards(deckId));
+    }
+  }
+
+  async function moveSsCardOrder(idx, delta) {
+    if (isReorderingSsCards || !selectedSsDeckId) return;
+    const targetIdx = idx + delta;
+    if (idx < 0 || targetIdx < 0 || idx >= ssCardsList.length || targetIdx >= ssCardsList.length) return;
+
+    isReorderingSsCards = true;
+    clearSsAlert(ssCardsAlert);
+    const copy = [...ssCardsList];
+    const tmp = copy[idx];
+    copy[idx] = copy[targetIdx];
+    copy[targetIdx] = tmp;
+
+    try {
+      await window.Admin.reorderSelfStudyCards(selectedSsDeckId, copy.map(c => c.id));
+      await loadSelfStudyCards(selectedSsDeckId);
+    } catch (err) {
+      showSsAlert(ssCardsAlert, err.message || 'Không thể đổi thứ tự thẻ.');
+    } finally {
+      isReorderingSsCards = false;
+    }
+  }
+
+  // Modal Bộ thẻ
+  function openSsDeckModal(deck = null) {
+    if (!modalSsDeck) return;
+    clearSsAlert(ssDeckModalAlert);
+    ssDeckIdInput.value = deck ? deck.id : '';
+    ssDeckTitleInput.value = deck ? safeStr(deck.title) : '';
+    ssDeckDescInput.value = deck ? safeStr(deck.description) : '';
+    ssDeckActiveInput.checked = deck ? Boolean(deck.is_active) : true;
+    if (ssDeckModalTitle) ssDeckModalTitle.textContent = deck ? 'Chỉnh sửa bộ thẻ Tự học' : 'Tạo bộ thẻ Tự học mới';
+    modalSsDeck.classList.add('active');
+  }
+
+  if (btnOpenSsDeckModal) btnOpenSsDeckModal.addEventListener('click', () => openSsDeckModal(null));
+  if (btnRefreshSsDecks) btnRefreshSsDecks.addEventListener('click', loadSelfStudyTab);
+  document.querySelectorAll('[data-close="modal-ss-deck"]').forEach(btn => {
+    btn.addEventListener('click', () => modalSsDeck && modalSsDeck.classList.remove('active'));
+  });
+
+  if (formSsDeck) {
+    formSsDeck.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearSsAlert(ssDeckModalAlert);
+      const title = ssDeckTitleInput.value.trim();
+      const description = ssDeckDescInput.value.trim();
+      const isActive = ssDeckActiveInput.checked;
+      const deckId = ssDeckIdInput.value.trim() || null;
+
+      if (!title) {
+        showSsAlert(ssDeckModalAlert, 'Vui lòng nhập tên bộ thẻ!');
+        return;
+      }
+
+      try {
+        btnSaveSsDeck.disabled = true;
+        btnSaveSsDeck.textContent = '⏳ Đang lưu...';
+        const saved = await window.Admin.upsertSelfStudyDeck({
+          classId,
+          deckId,
+          title,
+          description,
+          isActive
+        });
+        if (saved && saved.id) selectedSsDeckId = saved.id;
+        modalSsDeck.classList.remove('active');
+        showSsAlert(ssTabAlert, deckId ? 'Đã cập nhật bộ thẻ Tự học.' : 'Đã tạo bộ thẻ Tự học mới!', 'success');
+        await loadSelfStudyTab();
+      } catch (err) {
+        showSsAlert(ssDeckModalAlert, err.message || 'Lỗi khi lưu bộ thẻ.');
+      } finally {
+        btnSaveSsDeck.disabled = false;
+        btnSaveSsDeck.textContent = '💾 Lưu bộ thẻ';
+      }
+    });
+  }
+
+  // Modal Tự nhập / Sửa thẻ
+  function openSsCardModal(card = null) {
+    if (!modalSsCard || !selectedSsDeckId) return;
+    clearSsAlert(ssCardModalAlert);
+    ssCardIdInput.value = card ? card.id : '';
+    ssCardHanziInput.value = card ? safeStr(card.hanzi) : '';
+    ssCardPinyinInput.value = card ? safeStr(card.pinyin) : '';
+    ssCardMeaningInput.value = card ? safeStr(card.meaning_vi) : '';
+    ssCardExHanziInput.value = card ? safeStr(card.example_hanzi) : '';
+    ssCardExPinyinInput.value = card ? safeStr(card.example_pinyin) : '';
+    ssCardExViInput.value = card ? safeStr(card.example_vi) : '';
+    ssCardNoteInput.value = card ? safeStr(card.note) : '';
+    if (ssCardModalTitle) ssCardModalTitle.textContent = card ? `Sửa thẻ: ${safeStr(card.hanzi)}` : 'Thêm thẻ Tự học mới';
+    modalSsCard.classList.add('active');
+  }
+
+  if (btnOpenSsManualCard) btnOpenSsManualCard.addEventListener('click', () => openSsCardModal(null));
+  document.querySelectorAll('[data-close="modal-ss-card"]').forEach(btn => {
+    btn.addEventListener('click', () => modalSsCard && modalSsCard.classList.remove('active'));
+  });
+
+  if (formSsCard) {
+    formSsCard.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!selectedSsDeckId) return;
+      clearSsAlert(ssCardModalAlert);
+
+      const cardId = ssCardIdInput.value.trim() || null;
+      const hanzi = ssCardHanziInput.value.trim();
+      const pinyin = ssCardPinyinInput.value.trim();
+      const meaningVi = ssCardMeaningInput.value.trim();
+      if (!hanzi || !pinyin || !meaningVi) {
+        showSsAlert(ssCardModalAlert, 'Chữ Hán, Pinyin và Nghĩa tiếng Việt là bắt buộc!');
+        return;
+      }
+
+      try {
+        btnSaveSsCard.disabled = true;
+        btnSaveSsCard.textContent = '⏳ Đang lưu...';
+        await window.Admin.upsertSelfStudyCard({
+          deckId: selectedSsDeckId,
+          cardId,
+          hanzi,
+          pinyin,
+          meaningVi,
+          exampleHanzi: ssCardExHanziInput.value.trim(),
+          examplePinyin: ssCardExPinyinInput.value.trim(),
+          exampleVi: ssCardExViInput.value.trim(),
+          note: ssCardNoteInput.value.trim()
+        });
+        modalSsCard.classList.remove('active');
+        showSsAlert(ssCardsAlert, cardId ? 'Đã cập nhật thẻ.' : 'Đã thêm thẻ mới vào bộ thẻ!', 'success');
+        await loadSelfStudyTab();
+      } catch (err) {
+        showSsAlert(ssCardModalAlert, err.message || 'Lỗi khi lưu thẻ.');
+      } finally {
+        btnSaveSsCard.disabled = false;
+        btnSaveSsCard.textContent = '💾 Lưu thẻ';
+      }
+    });
+  }
+
+  // Modal Chọn từ Kho từ vựng (Phân trang phía server + lọc HSK + sort_order)
+  function updateSsWarehouseSelectionUi() {
+    if (ssWhSelectedInfo) ssWhSelectedInfo.textContent = `Đã chọn: ${ssWhSelectedIds.length} từ`;
+    if (btnSsWhConfirm) {
+      btnSsWhConfirm.textContent = `➕ Thêm (${ssWhSelectedIds.length}) từ vào bộ thẻ`;
+      btnSsWhConfirm.disabled = ssWhSelectedIds.length === 0;
+    }
+    if (chkSsWhPageAll) {
+      const enabledCheckboxes = Array.from(document.querySelectorAll('.chk-ss-wh-vocab:not(:disabled)'));
+      chkSsWhPageAll.checked = enabledCheckboxes.length > 0 && enabledCheckboxes.every(c => c.checked);
+    }
+  }
+
+  async function loadSsWarehousePage() {
+    if (!ssWhTableBody) return;
+    clearSsAlert(ssWhAlert);
+    ssWhTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">⏳ Đang tải từ vựng từ kho (phân trang server)...</td></tr>';
+
+    try {
+      const search = ssWhSearchInput ? ssWhSearchInput.value.trim() : '';
+      const hskLevel = ssWhHskSelect ? ssWhHskSelect.value : 'all';
+      const sortBy = ssWhSortSelect ? ssWhSortSelect.value : 'sort_order';
+
+      const res = await window.Admin.getVocabularies({
+        hskLevel,
+        search,
+        sortBy,
+        page: ssWhPage,
+        limit: SS_WH_PAGE_SIZE
+      });
+
+      ssWhCurrentPageRows = Array.isArray(res && res.data) ? res.data : [];
+      const total = Number(res && res.total ? res.total : 0);
+      ssWhTotalPages = Math.max(1, Number(res && res.totalPages ? res.totalPages : 1));
+      if (ssWhPage > ssWhTotalPages) ssWhPage = ssWhTotalPages;
+
+      const existingVocabSet = new Set(ssCardsList.map(c => c.vocabulary_id).filter(Boolean));
+      const selectedSet = new Set(ssWhSelectedIds);
+
+      if (ssWhPageInfo) {
+        const from = total === 0 ? 0 : (ssWhPage - 1) * SS_WH_PAGE_SIZE + 1;
+        const to = Math.min(ssWhPage * SS_WH_PAGE_SIZE, total);
+        ssWhPageInfo.textContent = total === 0
+          ? 'Không có từ vựng nào khớp bộ lọc'
+          : `Hiển thị ${from}–${to} / ${total.toLocaleString('vi-VN')} từ`;
+      }
+      if (ssWhPageIndicator) ssWhPageIndicator.textContent = `Trang ${ssWhPage} / ${ssWhTotalPages}`;
+      if (btnSsWhPrev) btnSsWhPrev.disabled = ssWhPage <= 1;
+      if (btnSsWhNext) btnSsWhNext.disabled = ssWhPage >= ssWhTotalPages;
+
+      if (ssWhCurrentPageRows.length === 0) {
+        ssWhTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Không tìm thấy từ vựng phù hợp bộ lọc.</td></tr>';
+        updateSsWarehouseSelectionUi();
+        return;
+      }
+
+      ssWhTableBody.innerHTML = ssWhCurrentPageRows.map((w, idx) => {
+        const alreadyInDeck = existingVocabSet.has(w.id);
+        const checked = selectedSet.has(w.id);
+        const stt = (w.sort_order !== null && w.sort_order !== undefined) ? w.sort_order : ((ssWhPage - 1) * SS_WH_PAGE_SIZE + idx + 1);
+        const statusHtml = alreadyInDeck
+          ? '<span class="badge-status badge-ongoing" style="font-size: 11px;">Đã có trong bộ</span>'
+          : '<span style="font-size: 11.5px; color: var(--text-muted);">Chưa thêm</span>';
+
+        return `
+          <tr>
+            <td style="text-align: center;">
+              <input type="checkbox" class="chk-ss-wh-vocab" value="${escHtml(w.id)}" ${alreadyInDeck ? 'disabled' : ''} ${checked ? 'checked' : ''} style="width: 16px; height: 16px;">
+            </td>
+            <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${stt}</td>
+            <td style="font-size: 17px; font-weight: 800; color: var(--primary); font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;">${escHtml(w.hanzi)}</td>
+            <td style="font-weight: 600; color: var(--text-muted);">${escHtml(w.pinyin)}</td>
+            <td>${escHtml(w.meaning_vi)}</td>
+            <td><span class="badge-hsk badge-hsk-${Number(w.hsk_level || 1)}">HSK ${Number(w.hsk_level || 1)}</span></td>
+            <td>${statusHtml}</td>
+          </tr>
+        `;
+      }).join('');
+
+      ssWhTableBody.querySelectorAll('.chk-ss-wh-vocab').forEach(chk => {
+        chk.addEventListener('change', () => {
+          const vid = chk.value;
+          if (chk.checked) {
+            if (!ssWhSelectedIds.includes(vid)) ssWhSelectedIds.push(vid);
+          } else {
+            ssWhSelectedIds = ssWhSelectedIds.filter(x => x !== vid);
+          }
+          updateSsWarehouseSelectionUi();
+        });
+      });
+
+      updateSsWarehouseSelectionUi();
+    } catch (err) {
+      console.error('Lỗi tải kho từ vựng cho Tự học:', err);
+      ssWhTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--danger);">Lỗi tải dữ liệu kho từ vựng.</td></tr>';
+      showSsAlert(ssWhAlert, err.message || 'Không thể tải danh sách từ từ kho.', 'danger', loadSsWarehousePage);
+    }
+  }
+
+  if (btnOpenSsWarehouseModal) {
+    btnOpenSsWarehouseModal.addEventListener('click', () => {
+      if (!selectedSsDeckId || !modalSsWh) return;
+      ssWhPage = 1;
+      ssWhSelectedIds = [];
+      if (ssWhSearchInput) ssWhSearchInput.value = '';
+      if (ssWhHskSelect) ssWhHskSelect.value = 'all';
+      if (ssWhSortSelect) ssWhSortSelect.value = 'sort_order';
+      modalSsWh.classList.add('active');
+      loadSsWarehousePage();
+    });
+  }
+
+  document.querySelectorAll('[data-close="modal-ss-warehouse-vocab"]').forEach(btn => {
+    btn.addEventListener('click', () => modalSsWh && modalSsWh.classList.remove('active'));
+  });
+
+  if (btnSsWhSearch) {
+    btnSsWhSearch.addEventListener('click', () => { ssWhPage = 1; loadSsWarehousePage(); });
+  }
+  if (ssWhSearchInput) {
+    ssWhSearchInput.addEventListener('input', () => {
+      if (ssWhDebounceTimer) clearTimeout(ssWhDebounceTimer);
+      ssWhDebounceTimer = setTimeout(() => { ssWhPage = 1; loadSsWarehousePage(); }, 300);
+    });
+  }
+  if (ssWhHskSelect) ssWhHskSelect.addEventListener('change', () => { ssWhPage = 1; loadSsWarehousePage(); });
+  if (ssWhSortSelect) ssWhSortSelect.addEventListener('change', () => { ssWhPage = 1; loadSsWarehousePage(); });
+
+  if (btnSsWhPrev) btnSsWhPrev.addEventListener('click', () => { if (ssWhPage > 1) { ssWhPage--; loadSsWarehousePage(); } });
+  if (btnSsWhNext) btnSsWhNext.addEventListener('click', () => { if (ssWhPage < ssWhTotalPages) { ssWhPage++; loadSsWarehousePage(); } });
+
+  function setCurrentPageWarehouseChecked(checkedState) {
+    document.querySelectorAll('.chk-ss-wh-vocab:not(:disabled)').forEach(chk => {
+      chk.checked = checkedState;
+      const vid = chk.value;
+      if (checkedState) {
+        if (!ssWhSelectedIds.includes(vid)) ssWhSelectedIds.push(vid);
+      } else {
+        ssWhSelectedIds = ssWhSelectedIds.filter(x => x !== vid);
+      }
+    });
+    updateSsWarehouseSelectionUi();
+  }
+
+  if (chkSsWhPageAll) chkSsWhPageAll.addEventListener('change', () => setCurrentPageWarehouseChecked(chkSsWhPageAll.checked));
+  if (btnSsWhSelectPage) btnSsWhSelectPage.addEventListener('click', () => setCurrentPageWarehouseChecked(true));
+  if (btnSsWhClearAll) {
+    btnSsWhClearAll.addEventListener('click', () => {
+      ssWhSelectedIds = [];
+      document.querySelectorAll('.chk-ss-wh-vocab:not(:disabled)').forEach(chk => { chk.checked = false; });
+      updateSsWarehouseSelectionUi();
+    });
+  }
+
+  if (btnSsWhConfirm) {
+    btnSsWhConfirm.addEventListener('click', async () => {
+      if (!selectedSsDeckId || ssWhSelectedIds.length === 0) return;
+      clearSsAlert(ssWhAlert);
+      try {
+        btnSsWhConfirm.disabled = true;
+        btnSsWhConfirm.textContent = '⏳ Đang thêm...';
+        const res = await window.Admin.addWarehouseVocabToDeck(selectedSsDeckId, ssWhSelectedIds);
+        const added = Number(res && res.added_count ? res.added_count : 0);
+        const skipped = Number(res && res.skipped_count ? res.skipped_count : 0);
+        modalSsWh.classList.remove('active');
+        showSsAlert(
+          ssCardsAlert,
+          skipped > 0
+            ? `Đã thêm ${added} từ vào bộ thẻ (bỏ qua ${skipped} từ đã có sẵn).`
+            : `Đã thêm ${added} từ từ kho vào bộ thẻ!`,
+          'success'
+        );
+        await loadSelfStudyTab();
+      } catch (err) {
+        showSsAlert(ssWhAlert, err.message || 'Không thể thêm từ vào bộ thẻ.');
+      } finally {
+        updateSsWarehouseSelectionUi();
+      }
+    });
+  }
 
   // Khởi tạo modal đặt lại mật khẩu nếu có
   if (window.Admin && typeof window.Admin.initResetPasswordModal === 'function') {

@@ -2108,6 +2108,124 @@ window.Admin = (function () {
     return data || null;
   }
 
+  // ===========================================================================
+  // 14. TỰ HỌC (FLASHCARD RIÊNG CHO LỚP - GIÁO VIÊN / ADMIN)
+  // ===========================================================================
+
+  async function getClassSelfStudyDecks(classId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_get_class_self_study_decks', {
+      p_class_id: classId
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function upsertSelfStudyDeck({ classId, deckId = null, title, description = '', isActive = true }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_upsert_self_study_deck', {
+      p_class_id: classId,
+      p_deck_id: deckId || null,
+      p_title: title,
+      p_description: description || null,
+      p_is_active: Boolean(isActive)
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteSelfStudyDeck(deckId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_delete_self_study_deck', {
+      p_deck_id: deckId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getSelfStudyCards(deckId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_get_self_study_cards', {
+      p_deck_id: deckId
+    });
+    if (error) throw error;
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function upsertSelfStudyCard({
+    deckId,
+    cardId = null,
+    hanzi,
+    pinyin,
+    meaningVi,
+    exampleHanzi = '',
+    examplePinyin = '',
+    exampleVi = '',
+    note = ''
+  }) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_upsert_self_study_card', {
+      p_deck_id: deckId,
+      p_card_id: cardId || null,
+      p_hanzi: hanzi,
+      p_pinyin: pinyin,
+      p_meaning_vi: meaningVi,
+      p_example_hanzi: exampleHanzi || null,
+      p_example_pinyin: examplePinyin || null,
+      p_example_vi: exampleVi || null,
+      p_note: note || null
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function addWarehouseVocabToDeck(deckId, vocabIds) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_add_warehouse_vocab_to_deck', {
+      p_deck_id: deckId,
+      p_vocab_ids: vocabIds
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteSelfStudyCard(cardId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_delete_self_study_card', {
+      p_card_id: cardId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function reorderSelfStudyCards(deckId, cardIds) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_reorder_self_study_cards', {
+      p_deck_id: deckId,
+      p_card_ids: cardIds
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function getClassSrsOverview(classId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('teacher_get_class_srs_overview', {
+      p_class_id: classId
+    });
+    if (error) throw error;
+    return data;
+  }
+
   return {
     // Giáo trình
     getCurriculums,
@@ -2192,6 +2310,16 @@ window.Admin = (function () {
     deleteLessonSlide,
     getLessonSlidesStorageStats,
     getSlideViewUrl,
+    // Tự học (Flashcard lớp)
+    getClassSelfStudyDecks,
+    upsertSelfStudyDeck,
+    deleteSelfStudyDeck,
+    getSelfStudyCards,
+    upsertSelfStudyCard,
+    addWarehouseVocabToDeck,
+    deleteSelfStudyCard,
+    reorderSelfStudyCards,
+    getClassSrsOverview,
     // Đặt lại mật khẩu & Quản lý Tài khoản
     resetUserPassword,
     getAllProfiles,

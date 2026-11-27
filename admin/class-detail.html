@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Chi tiết Lớp học — Admin Minh Ngọc HSK</title>
-  <link rel="stylesheet" href="../css/style.css?v=3.0">
+  <link rel="stylesheet" href="../css/style.css?v=6.0">
   <script>
     (function(){
       try {
@@ -170,6 +170,7 @@
       <button type="button" class="admin-subnav-btn" data-tab="tab-students">👥 Học sinh (<span id="count-students">0</span>)</button>
       <button type="button" class="admin-subnav-btn" data-tab="tab-lessons">📖 Bài học &amp; Mở khóa</button>
       <button type="button" class="admin-subnav-btn" data-tab="tab-assignments">📝 Bài tập (<span id="count-assignments">0</span>)</button>
+      <button type="button" class="admin-subnav-btn" data-tab="tab-self-study">🃏 Tự học (Flashcard)</button>
       <button type="button" class="admin-subnav-btn" data-tab="tab-leaderboard">🏆 Bảng xếp hạng</button>
       <button type="button" class="admin-subnav-btn" data-tab="tab-settings">⚙️ Cài đặt lớp</button>
     </div>
@@ -437,6 +438,78 @@
           <button type="button" id="btn-lb-prev-page" class="btn btn-outline btn-sm">← Trang trước</button>
           <span id="lb-page-indicator" style="font-weight: 700; color: var(--text-main);">Trang 1 / 1</span>
           <button type="button" id="btn-lb-next-page" class="btn btn-outline btn-sm">Trang sau →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4C: TỰ HỌC (FLASHCARD RIÊNG CỦA LỚP) -->
+    <div id="tab-self-study" class="tab-pane" style="display: none;">
+      <div class="section-header" style="align-items: flex-start;">
+        <div>
+          <h3 class="section-title">🃏 Bộ thẻ Tự học (Flashcard) của lớp</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+            Tạo bộ thẻ bổ sung riêng cho lớp. Học viên trong lớp sẽ thấy các bộ thẻ đang bật để tự học và tự động đưa vào lịch ôn tập SRS.
+          </p>
+        </div>
+        <button type="button" id="btn-open-ss-deck-modal" class="btn btn-primary">
+          ➕ Tạo bộ thẻ mới
+        </button>
+      </div>
+
+      <div id="ss-tab-alert" class="alert" style="margin-bottom: 14px;"></div>
+
+      <!-- Danh sách Bộ thẻ -->
+      <div class="card" style="margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <h4 style="font-size: 16px; font-weight: 800; color: var(--text-main); margin: 0;">📚 Danh sách bộ thẻ của lớp</h4>
+          <button type="button" id="btn-refresh-ss-decks" class="btn btn-outline btn-sm">🔄 Làm mới</button>
+        </div>
+        <div id="ss-decks-container" style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="text-align: center; padding: 24px; color: var(--text-muted);">Đang tải danh sách bộ thẻ...</div>
+        </div>
+      </div>
+
+      <!-- Quản lý Thẻ trong bộ đang chọn -->
+      <div id="ss-cards-panel" class="card" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <div style="font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase;">Bộ thẻ đang chọn</div>
+            <h4 id="ss-selected-deck-title" style="font-size: 18px; font-weight: 800; color: var(--text-main); margin: 2px 0;">--</h4>
+            <div id="ss-selected-deck-meta" style="font-size: 13px; color: var(--text-muted);">--</div>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="btn-open-ss-manual-card" class="btn btn-primary btn-sm">
+              ✍️ Tự nhập thẻ mới
+            </button>
+            <button type="button" id="btn-open-ss-warehouse-modal" class="btn btn-secondary btn-sm">
+              📚 Chọn từ Kho từ vựng
+            </button>
+          </div>
+        </div>
+
+        <div id="ss-cards-alert" class="alert" style="margin-bottom: 12px;"></div>
+
+        <div class="table-responsive">
+          <table class="data-table" style="min-width: 780px;">
+            <thead>
+              <tr>
+                <th style="width: 55px; text-align: center;">STT</th>
+                <th style="width: 110px;">Chữ Hán</th>
+                <th style="width: 130px;">Pinyin</th>
+                <th style="min-width: 170px;">Nghĩa tiếng Việt</th>
+                <th style="min-width: 210px;">Ví dụ &amp; Ghi chú</th>
+                <th style="width: 90px; text-align: center;">Thứ tự</th>
+                <th style="width: 120px; text-align: right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="ss-cards-table-body">
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">
+                  Chọn một bộ thẻ ở trên để xem và thêm thẻ.
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -904,6 +977,183 @@
     </div>
   </div>
 
+  <!-- MODAL: TẠO / SỬA BỘ THẺ TỰ HỌC -->
+  <div id="modal-ss-deck" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px; width: 95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="ss-deck-modal-title">Tạo bộ thẻ Tự học mới</h3>
+        <button type="button" class="modal-close" data-close="modal-ss-deck">&times;</button>
+      </div>
+      <form id="form-ss-deck">
+        <input type="hidden" id="ss-deck-id" value="">
+        <div class="modal-body">
+          <div id="ss-deck-modal-alert" class="alert"></div>
+          <div class="form-group">
+            <label class="form-label" for="ss-deck-title">Tên bộ thẻ *</label>
+            <input type="text" id="ss-deck-title" class="form-control" placeholder="Ví dụ: Từ vựng mở rộng chủ đề Thể thao" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ss-deck-desc">Mô tả bộ thẻ</label>
+            <textarea id="ss-deck-desc" class="form-control" rows="2" placeholder="Ghi chú ngắn gọn cho học viên (tùy chọn)"></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
+              <input type="checkbox" id="ss-deck-active" checked style="width: 17px; height: 17px;">
+              <span>Bật bộ thẻ (hiển thị cho học viên của lớp học và ôn tập)</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-ss-deck">Hủy</button>
+          <button type="submit" id="btn-save-ss-deck" class="btn btn-primary">💾 Lưu bộ thẻ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TỰ NHẬP / SỬA THẺ TỰ HỌC -->
+  <div id="modal-ss-card" class="modal-overlay">
+    <div class="modal-card" style="max-width: 560px; width: 95%;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="ss-card-modal-title">Thêm thẻ Tự học mới</h3>
+        <button type="button" class="modal-close" data-close="modal-ss-card">&times;</button>
+      </div>
+      <form id="form-ss-card">
+        <input type="hidden" id="ss-card-id" value="">
+        <div class="modal-body" style="max-height: 72vh; overflow-y: auto;">
+          <div id="ss-card-modal-alert" class="alert"></div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="ss-card-hanzi">Chữ Hán *</label>
+              <input type="text" id="ss-card-hanzi" class="form-control" placeholder="Ví dụ: 打篮球" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ss-card-pinyin">Pinyin *</label>
+              <input type="text" id="ss-card-pinyin" class="form-control" placeholder="Ví dụ: dǎ lánqiú" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ss-card-meaning">Nghĩa tiếng Việt *</label>
+            <input type="text" id="ss-card-meaning" class="form-control" placeholder="Ví dụ: Chơi bóng rổ" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="ss-card-ex-hanzi">Ví dụ (Câu Hán)</label>
+            <input type="text" id="ss-card-ex-hanzi" class="form-control" placeholder="Ví dụ: 我喜欢打篮球。">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label" for="ss-card-ex-pinyin">Ví dụ (Pinyin)</label>
+              <input type="text" id="ss-card-ex-pinyin" class="form-control" placeholder="Ví dụ: Wǒ xǐhuan dǎ lánqiú.">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ss-card-ex-vi">Ví dụ (Nghĩa)</label>
+              <input type="text" id="ss-card-ex-vi" class="form-control" placeholder="Ví dụ: Tôi thích chơi bóng rổ.">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="ss-card-note">Ghi chú của giáo viên</label>
+            <textarea id="ss-card-note" class="form-control" rows="2" placeholder="Lưu ý phát âm, ngữ pháp hoặc cách dùng..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-ss-card">Hủy</button>
+          <button type="submit" id="btn-save-ss-card" class="btn btn-primary">💾 Lưu thẻ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CHỌN TỪ TỪ KHO TỪ VỰNG VÀO BỘ THẺ (LỌC HSK + PHÂN TRANG SERVER + SẮP XẾP EXCEL) -->
+  <div id="modal-ss-warehouse-vocab" class="modal-overlay">
+    <div class="modal-card" style="max-width: 840px; width: 96%;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title">📚 Chọn Từ Từ Kho Vào Bộ Thẻ Tự Học</h3>
+          <span id="ss-wh-subtitle" style="font-size: 13px; color: var(--text-muted);">Lọc theo cấp HSK, phân trang phía server và sắp xếp theo thứ tự file Excel</span>
+        </div>
+        <button type="button" class="modal-close" data-close="modal-ss-warehouse-vocab">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top: 12px;">
+        <div id="ss-wh-alert" class="alert"></div>
+
+        <!-- Bộ lọc & tìm kiếm -->
+        <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+          <input type="text" id="ss-wh-search" class="form-control" placeholder="Tìm theo chữ Hán, Pinyin hoặc nghĩa..." style="flex: 1; min-width: 170px;">
+          <select id="ss-wh-hsk" class="form-control" style="width: 120px;">
+            <option value="all">Tất cả HSK</option>
+            <option value="1">HSK 1</option>
+            <option value="2">HSK 2</option>
+            <option value="3">HSK 3</option>
+            <option value="4">HSK 4</option>
+            <option value="5">HSK 5</option>
+            <option value="6">HSK 6</option>
+            <option value="7">HSK 7</option>
+            <option value="8">HSK 8</option>
+            <option value="9">HSK 9</option>
+          </select>
+          <select id="ss-wh-sort" class="form-control" style="width: 185px;">
+            <option value="sort_order" selected>📌 Thứ tự file Excel</option>
+            <option value="pinyin">🔤 Pinyin (A - Z)</option>
+            <option value="hanzi">🀄 Chữ Hán (A - Z)</option>
+            <option value="created_at">🕒 Mới thêm gần đây</option>
+          </select>
+          <button type="button" id="btn-ss-wh-search" class="btn btn-outline btn-sm" style="padding: 0 14px;">🔍 Tìm</button>
+        </div>
+
+        <!-- Thanh công cụ chọn nhanh -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 6px 10px; background: var(--bg-subtle); border-radius: 8px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="btn-ss-wh-select-page" class="btn btn-outline btn-sm" style="height: 28px; padding: 0 10px; font-size: 12px;">☑️ Chọn trang này</button>
+            <button type="button" id="btn-ss-wh-clear-all" class="btn btn-outline btn-sm" style="height: 28px; padding: 0 10px; font-size: 12px;">Bỏ chọn hết</button>
+          </div>
+          <span id="ss-wh-selected-info" style="font-size: 12px; font-weight: 700; color: var(--primary);">Đã chọn: 0 từ</span>
+        </div>
+
+        <div class="table-responsive" style="max-height: 330px; overflow-y: auto;">
+          <table class="data-table" style="font-size: 13px;">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;">
+                  <input type="checkbox" id="chk-ss-wh-page-all" style="width: 16px; height: 16px;">
+                </th>
+                <th style="width: 55px; text-align: center;">STT</th>
+                <th style="width: 110px;">Chữ Hán</th>
+                <th style="width: 115px;">Phiên âm</th>
+                <th>Nghĩa tiếng Việt</th>
+                <th style="width: 80px;">Cấp độ</th>
+                <th style="width: 115px;">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody id="ss-wh-table-body">
+              <tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Đang tải kho từ vựng...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Phân trang phía server -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 12.5px; color: var(--text-muted);">
+          <span id="ss-wh-page-info">--</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <button type="button" id="btn-ss-wh-prev" class="btn btn-outline btn-sm" style="height: 28px; padding: 0 10px;">« Trước</button>
+            <span id="ss-wh-page-indicator" style="font-weight: 700; color: var(--text-main);">Trang 1 / 1</span>
+            <button type="button" id="btn-ss-wh-next" class="btn btn-outline btn-sm" style="height: 28px; padding: 0 10px;">Sau »</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close="modal-ss-warehouse-vocab">Hủy</button>
+        <button type="button" id="btn-ss-wh-confirm" class="btn btn-primary" disabled>
+          ➕ Thêm (0) từ vào bộ thẻ
+        </button>
+      </div>
+    </div>
+  </div>
+
   <footer class="footer">
     Minh Ngọc HSK &copy; 2026 · Hệ thống Quản trị Đào tạo
   </footer>
@@ -914,7 +1164,7 @@
   <script src="../js/config.js?v=4.0"></script>
   <script src="../js/db.js?v=4.0"></script>
   <script src="../js/auth.js?v=4.0"></script>
-  <script src="../js/admin.js?v=6.0"></script>
-  <script src="../js/admin-class-detail.js?v=7.0"></script>
+  <script src="../js/admin.js?v=7.0"></script>
+  <script src="../js/admin-class-detail.js?v=8.0"></script>
 </body>
 </html>

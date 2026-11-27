@@ -627,6 +627,212 @@ window.Student = (function () {
     return data.signedUrl;
   }
 
+  /**
+   * Lấy tóm tắt từ cần ôn tập hôm nay (gộp từ bài học + thẻ Tự học, tính theo ngày VN)
+   */
+  async function getSrsDueSummary(classId = null) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_srs_due_summary', {
+      p_class_id: classId || null
+    });
+    if (error) throw error;
+    return data || { today_vn: null, session_limit: 50, total_due: 0, lesson_due_count: 0, self_study_due_count: 0, groups: [], upcoming: {} };
+  }
+
+  /**
+   * Lấy danh sách tối đa 50 thẻ đến hạn ôn cho phiên học SRS
+   */
+  async function getSrsDueCards(limit = 50, classId = null) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_srs_due_cards', {
+      p_limit: limit,
+      p_class_id: classId || null
+    });
+    if (error) throw error;
+    return data || { today_vn: null, session_limit: 50, total_due: 0, cards: [] };
+  }
+
+  /**
+   * Gửi kết quả ôn tập 1 thẻ lên server (không cộng XP mới, trả về lịch hẹn tiếp theo)
+   */
+  async function submitSrsReview(itemType, itemId, rating, isSessionRetry = false) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('submit_srs_review', {
+      p_item_type: itemType,
+      p_item_id: itemId,
+      p_rating: rating,
+      p_is_session_retry: Boolean(isSessionRetry)
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Lấy lịch ôn sắp tới theo ngày giờ Việt Nam
+   */
+  async function getSrsUpcomingSummary() {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_srs_upcoming_summary');
+    if (error) throw error;
+    return data || { today_vn: null, tomorrow_count: 0, in_3_days_count: 0, total_upcoming: 0, buckets: [] };
+  }
+
+  /**
+   * Lấy danh sách bộ thẻ Tự học đang bật của lớp học viên đang tham gia
+   */
+  async function getStudentSelfStudyDecks() {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_student_self_study_decks');
+    if (error) throw error;
+    return data || { today_vn: null, decks: [] };
+  }
+
+  /**
+   * Lấy toàn bộ thẻ thuộc một bộ Tự học đang bật của lớp mình
+   */
+  async function getStudentSelfStudyDeckCards(deckId) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('get_student_self_study_deck_cards', {
+      p_deck_id: deckId
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Ghi nhận học xong 1 thẻ Tự học và đưa vào lịch ôn SRS (bậc đầu 1 ngày)
+   */
+  async function submitSelfStudyCard(cardId, rating = 3) {
+    const db = getDb();
+    if (!db) throw new Error('Database chưa kết nối');
+    const { data, error } = await db.rpc('submit_self_study_learning_card', {
+      p_card_id: cardId,
+      p_rating: rating
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Cập nhật huy hiệu số từ cần ôn trên tất cả thanh menu trang học viên
+   */
+  function updateNavbarDueBadge(count) {
+    const safeCount = Math.max(0, parseInt(count, 10) || 0);
+    const label = safeCount > 99 ? '99+' : String(safeCount);
+    document.querySelectorAll('.nav-due-badge').forEach(badge => {
+      if (safeCount > 0) {
+        badge.textContent = label;
+        badge.style.display = 'inline-flex';
+        badge.setAttribute('aria-label', `${safeCount} từ cần ôn hôm nay`);
+      } else {
+        badge.textContent = '0';
+        badge.style.display = 'none';
+      }
+    });
+
+    const lessonPill = document.getElementById('lesson-due-pill');
+    if (lessonPill) {
+      if (safeCount > 0) {
+        lessonPill.textContent = `🧠 Ôn (${label})`;
+        lessonPill.style.display = 'inline-flex';
+      } else {
+        lessonPill.style.display = 'none';
+      }
+    }
+  }
+
+  /**
+   * Hiển thị thông báo nhắc ôn nhẹ (không chặn thao tác) đúng 1 lần trong ngày (giờ VN từ server)
+   */
+  function maybeShowDailyReviewBanner(userId, todayVn, totalDue) {
+    const due = Math.max(0, parseInt(totalDue, 10) || 0);
+    if (!userId || !todayVn || due <= 0) return;
+
+    // Không tự làm phiền khi học viên đang ở ngay trang ôn tập
+    const pathLower = (window.location.pathname || '').toLowerCase();
+    if (pathLower.endsWith('/review.html') || pathLower === 'review.html') return;
+
+    const storageKey = `minhngoc_srs_daily_notice_${userId}_${todayVn}`;
+    try {
+      if (localStorage.getItem(storageKey) === '1') return;
+      localStorage.setItem(storageKey, '1');
+    } catch (e) {}
+
+    if (document.getElementById('srs-daily-toast')) return;
+
+    const toast = document.createElement('div');
+    toast.id = 'srs-daily-toast';
+    toast.className = 'srs-daily-toast';
+    toast.setAttribute('role', 'status');
+
+    const textWrap = document.createElement('div');
+    textWrap.className = 'srs-daily-toast-text';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'srs-daily-toast-title';
+    titleEl.textContent = `🧠 Hôm nay bạn có ${due} từ cần ôn tập`;
+
+    const subEl = document.createElement('div');
+    subEl.className = 'srs-daily-toast-sub';
+    subEl.textContent = 'Ôn nhanh vài phút để giữ trí nhớ lâu hơn.';
+
+    textWrap.appendChild(titleEl);
+    textWrap.appendChild(subEl);
+
+    const actionsWrap = document.createElement('div');
+    actionsWrap.className = 'srs-daily-toast-actions';
+
+    const goBtn = document.createElement('a');
+    goBtn.href = 'review.html';
+    goBtn.className = 'btn btn-primary btn-sm';
+    goBtn.style.cssText = 'height: 32px; padding: 0 12px; font-size: 12px; white-space: nowrap;';
+    goBtn.textContent = 'Ôn ngay';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'srs-daily-toast-close';
+    closeBtn.setAttribute('aria-label', 'Đóng thông báo');
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', () => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    });
+
+    actionsWrap.appendChild(goBtn);
+    actionsWrap.appendChild(closeBtn);
+    toast.appendChild(textWrap);
+    toast.appendChild(actionsWrap);
+
+    document.body.appendChild(toast);
+  }
+
+  /**
+   * Nạp số từ cần ôn lên menu ở mọi trang học viên và hiện nhắc nhẹ lần đầu trong ngày
+   */
+  async function initReviewNavAndReminder({ dueSummary = null, showToast = true, classId = null } = {}) {
+    try {
+      const currentUser = await window.Auth.getCurrentUser();
+      if (!currentUser || !currentUser.user) return null;
+
+      const summary = dueSummary || await getSrsDueSummary(classId);
+      const totalDue = Number(summary && summary.total_due ? summary.total_due : 0);
+      updateNavbarDueBadge(totalDue);
+
+      if (showToast && summary && summary.today_vn) {
+        maybeShowDailyReviewBanner(currentUser.user.id, summary.today_vn, totalDue);
+      }
+      return summary;
+    } catch (e) {
+      console.warn('Chưa tải được thống kê ôn tập SRS trên menu:', e);
+      return null;
+    }
+  }
+
   return {
     getActiveClass,
     getCurriculumRoadmap,
@@ -646,6 +852,16 @@ window.Student = (function () {
     updateDailyStreak,
     getEnrollmentHistory,
     getLessonSlides,
-    getSlideViewUrl
+    getSlideViewUrl,
+    // SRS & Tự học
+    getSrsDueSummary,
+    getSrsDueCards,
+    submitSrsReview,
+    getSrsUpcomingSummary,
+    getStudentSelfStudyDecks,
+    getStudentSelfStudyDeckCards,
+    submitSelfStudyCard,
+    updateNavbarDueBadge,
+    initReviewNavAndReminder
   };
 })();

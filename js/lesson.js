@@ -5,6 +5,9 @@
 document.addEventListener('DOMContentLoaded', async function () {
   const authData = await window.Auth.requireAuth();
   if (!authData) return;
+  if (window.Student && typeof window.Student.initReviewNavAndReminder === 'function') {
+    window.Student.initReviewNavAndReminder({ showToast: true });
+  }
 
   const urlParams = new URLSearchParams(window.location.search);
   const lessonId = urlParams.get('id');
@@ -396,6 +399,9 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
 
       const res = await window.Student.recordLessonVocabProgress(targetClassId, lessonId, words.length, words.length);
+      if (window.Student && typeof window.Student.initReviewNavAndReminder === 'function') {
+        window.Student.initReviewNavAndReminder({ showToast: false });
+      }
       const lessonRewardXp = (currentLessonData && typeof currentLessonData.reward_xp === 'number') ? currentLessonData.reward_xp : 50;
 
       if (res && res.xp_awarded > 0) {
@@ -513,6 +519,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         const vocabRes = await window.Student.recordLessonVocabProgress(targetClassId, lessonId, words.length, words.length);
+        if (window.Student && typeof window.Student.initReviewNavAndReminder === 'function') {
+          window.Student.initReviewNavAndReminder({ showToast: false });
+        }
         if (vocabRes && vocabRes.xp_awarded > 0) {
           sessionVocabXpEarned += vocabRes.xp_awarded;
           showXpEarnedToast(vocabRes.xp_awarded, 'Hoàn thành từ vựng bài học');
